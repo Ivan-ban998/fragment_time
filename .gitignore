@@ -29,3 +29,4 @@ Thumbs.db
 # 环境
 .env
 .env.local
+*.bak
