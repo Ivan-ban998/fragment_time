@@ -1,0 +1,43 @@
+# Flutter / Dart
+.dart_tool/
+.flutter-plugins
+.flutter-plugins-dependencies
+.packages
+build/
+.pub-cache/
+.pub/
+*.lock.bak
+
+# IDE
+.idea/
+.vscode/
+*.iml
+*.ipr
+*.iws
+
+# OS
+.DS_Store
+Thumbs.db
+
+# 编辑器 / 临时
+*.bak
+*.bak[0-9]*
+*.tmp
+*.swp
+*~
+
+# Flutter 平台 (web-only 项目, 不上传这些)
+android/
+ios/
+macos/
+linux/
+windows/
+.fvm/
+
+# 环境 / 密钥
+.env
+.env.local
+*.pem
+firebase_options.dart  # 如果有
+google-services.json
+GoogleService-Info.plist

@@ -1,0 +1,32 @@
+# Flutter 应用配置
+# 打包命令：
+# 国内版：flutter build apk --dart-define=BUILD_MODE=domestic
+# 国际版：flutter build apk --dart-define=BUILD_MODE=global
+
+app_name:
+  domestic: "碎片时间"
+  global: "FragmentTime"
+
+package_name:
+  domestic: "com.fragmenttime.app"
+  global: "com.fragmenttime.global"
+
+content_sources:
+  domestic:
+    - ximalaya      # 喜马拉雅
+    - lizhiFM       # 荔枝FM
+    - news36kr      # 36氪
+    - zhihu         # 知乎
+
+  global:
+    - ximalaya      # 喜马拉雅
+    - lizhiFM       # 荔枝FM
+    - news36kr      # 36氪
+    - zhihu         # 知乎
+    - applePodcasts # Apple Podcasts
+    - spotify       # Spotify
+    - youtube       # YouTube
+
+copyright:
+  domestic: "©2024 碎片时间 | 内容版权归属原作者"
+  global: "©2024 FragmentTime | Content copyright belongs to original creators"
