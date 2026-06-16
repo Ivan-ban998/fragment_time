@@ -20,6 +20,7 @@ import '../services/analytics_service.dart';
 import '../main.dart';
 import '../services/tts_service.dart';
 import 'content_reader_screen.dart';
+import '../widgets/tinder_recommendation_stack.dart';
 
 class ContentScreen extends StatefulWidget {
   final UserType userType;
@@ -270,38 +271,23 @@ class _ContentScreenState extends State<ContentScreen> {
                   Text(isEn ? 'You may also like' : '你可能还喜欢',
                       style: TextStyle(fontSize: 12 * _scale, color: AppTheme.textLight)),
                   SizedBox(height: 8 * _scale),
-                  SizedBox(
-                    height: 80 * _scale,
-                    child: ListView.separated(
-                      scrollDirection: Axis.horizontal,
-                      itemCount: _recItems.length,
-                      separatorBuilder: (_, __) => SizedBox(width: 8 * _scale),
-                      itemBuilder: (_, i) {
-                        final it = _recItems[i];
-                        return GestureDetector(
-                          onTap: () {
-                            Navigator.push(context, MaterialPageRoute(
-                              builder: (_) => ContentScreen(
-                                userType: widget.userType, scene: widget.scene,
-                                isInternational: widget.isInternational,
-                                isElderlyMode: widget.isElderlyMode,
-                                languageCode: widget.languageCode, prefillItem: it,
-                              ),
-                            ));
-                          },
-                          child: Container(
-                            width: 160 * _scale,
-                            padding: EdgeInsets.all(8 * _scale),
-                            decoration: BoxDecoration(
-                              color: Colors.white.withOpacity(0.6),
-                              borderRadius: BorderRadius.circular(10),
-                            ),
-                            child: Text(it.title, maxLines: 3, overflow: TextOverflow.ellipsis,
-                              style: TextStyle(fontSize: 11 * _scale)),
-                          ),
-                        );
-                      },
-                    ),
+                  // 6/16 接回 Tinder 风格推荐卡 (1 大卡 + 2 缩略 + 3 按钮)
+                  TinderRecommendationStack(
+                    items: _recItems,
+                    userType: widget.userType,
+                    scene: widget.scene,
+                    isEn: isEn,
+                    isElderlyMode: widget.isElderlyMode,
+                    onTapItem: (it) async {
+                      await Navigator.push(context, MaterialPageRoute(
+                        builder: (_) => ContentScreen(
+                          userType: widget.userType, scene: widget.scene,
+                          isInternational: widget.isInternational,
+                          isElderlyMode: widget.isElderlyMode,
+                          languageCode: widget.languageCode, prefillItem: it,
+                        ),
+                      ));
+                    },
                   ),
                 ],
               ],
