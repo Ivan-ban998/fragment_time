@@ -187,14 +187,13 @@ class _TinderRecommendationStackState extends State<TinderRecommendationStack>
           ),
         ),
         const SizedBox(height: 8),
-        // 6/18: 单卡 horizontal banner (高 220 横向, 不是 520 纵向 3 叠)
+        // 6/19: 36Kr horizontal banner 高度 110 (跟参考图 5min 阅读卡同比例)
         SizedBox(
-          height: 220,
+          height: 110,
           child: _buildCard(top, isTop: true, isDark: isDark, isWarm: isWarm),
         ),
         const SizedBox(height: 16),
-        // 三个动作按钮
-        _buildActionRow(top),
+        // 6/19 重构: 拿掉 3 按钮 (36Kr 风格 feed 不需 滑卡按钮, 只点 整卡 进详情)
       ],
     );
   }
@@ -224,115 +223,134 @@ class _TinderRecommendationStackState extends State<TinderRecommendationStack>
   }
   Widget _buildCard(ContentItem item,
       {double scale = 1.0, bool isTop = true, required bool isDark, required bool isWarm}) {
-    final isVideo = item.contentType == ContentType.video;
-    final primary = isWarm
-        ? GlassStyle.onGlassPrimaryWarm
-        : isDark
-            ? GlassStyle.onGlassPrimaryDark
-            : GlassStyle.onGlassPrimary;
-    final secondary = isWarm
-        ? GlassStyle.onGlassSecondaryWarm
-        : isDark
-            ? GlassStyle.onGlassSecondaryDark
-            : GlassStyle.onGlassSecondary;
-    return ClipRRect(
-      borderRadius: BorderRadius.circular(16),
-      child: BackdropFilter(
-        filter: ImageFilter.blur(sigmaX: 25, sigmaY: 25),
-        child: Container(
-          // 6/18 改: 用 glassFrosted (白透 0.65 + 双层阴影 + 顶亮) 替平涂白 0.9
-          decoration: GlassStyle.glassFrosted(
-            opacity: 0.65,
-            radius: 16,
+    // 6/19 重构: 36Kr 风格 horizontal banner
+    // 卡底: 米黄 #F5F5DC + 大阴影 + 顶高光 (不靠 BackdropFilter, Flutter web 不生效)
+    // 文字: 深棕 #3D2817 (标题) + 灰棕 #6B5B4F (副)
+    // 右图: 浅米黄渐变 + 小 icon (非中心大 icon)
+    const cream = Color(0xFFF5F5DC);   // 卡底米黄
+    const deepBrown = Color(0xFF3D2817);  // 标题深棕
+    const grayBrown = Color(0xFF6B5B4F);  // 副文灰棕
+    const accentBlue = Color(0xFF1E40AF); // 阅读 → 蓝色链接
+    return Container(
+      decoration: BoxDecoration(
+        color: cream,
+        borderRadius: BorderRadius.circular(16),
+        // 6/19 顶高光边: 上 1.5px 亮白边
+        border: Border(
+          top: BorderSide(color: Colors.white.withOpacity(0.7), width: 1.5),
+          left: BorderSide(color: Colors.black.withOpacity(0.04), width: 0.5),
+          right: BorderSide(color: Colors.black.withOpacity(0.04), width: 0.5),
+          bottom: BorderSide(color: Colors.black.withOpacity(0.04), width: 0.5),
+        ),
+        // 6/19 大阴影 + 接触阴影
+        boxShadow: [
+          BoxShadow(
+            color: Colors.black.withOpacity(0.08),
+            blurRadius: 24,
+            offset: const Offset(0, 6),
           ),
-          // 6/18 改: 玻璃卡外加 1.2px 高光边 (liquidTopHighlight 顶亮弧)
-          foregroundDecoration: BoxDecoration(
-            borderRadius: BorderRadius.circular(16),
-            border: Border(
-              top: BorderSide(
-                color: Colors.white.withOpacity(isDark ? 0.20 : 0.50),
-                width: 1.2,
-              ),
-            ),
+          BoxShadow(
+            color: Colors.black.withOpacity(0.04),
+            blurRadius: 2,
+            offset: const Offset(0, 1),
           ),
-          child: Material(
-            color: Colors.transparent,
-            child: InkWell(
-              borderRadius: BorderRadius.circular(16),
-              onTap: isTop ? () => _onTapItem(item) : null,
-              child: Row(
-                crossAxisAlignment: CrossAxisAlignment.stretch,
-                children: [
-                  // 6/18 重构: 左文字区 (flex 1, 占 70% 宽)
-                  Expanded(
-                    child: Padding(
-                      padding: EdgeInsets.fromLTRB(
-                        16 * _scale, 14 * _scale, 12 * _scale, 14 * _scale,
+        ],
+      ),
+      child: Material(
+        color: Colors.transparent,
+        child: InkWell(
+          borderRadius: BorderRadius.circular(16),
+          onTap: isTop ? () => _onTapItem(item) : null,
+          child: Row(
+            crossAxisAlignment: CrossAxisAlignment.stretch,
+            children: [
+              // 6/19 左 70% 文字区
+              Expanded(
+                child: Padding(
+                  padding: EdgeInsets.fromLTRB(
+                    16 * _scale, 12 * _scale, 12 * _scale, 12 * _scale,
+                  ),
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                    children: [
+                      // 6/19 顶行: source 右上 (不是 36氪 顶 logo, 简单文字)
+                      Align(
+                        alignment: Alignment.topRight,
+                        child: Text(
+                          item.source,
+                          style: TextStyle(
+                            fontSize: 12 * _scale,
+                            fontWeight: FontWeight.w600,
+                            color: grayBrown,
+                          ),
+                        ),
                       ),
-                      child: Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                      // 6/19 中行: 标题 (深棕大字)
+                      Text(
+                        item.title,
+                        maxLines: 2,
+                        overflow: TextOverflow.ellipsis,
+                        style: TextStyle(
+                          fontSize: 17 * _scale,
+                          fontWeight: FontWeight.w700,
+                          color: deepBrown,
+                          height: 1.25,
+                        ),
+                      ),
+                      // 6/19 底行: 5min + 阅读 →  (左下 5min, 右下阅读 → 蓝色)
+                      Row(
                         children: [
-                          // 顶行: 36氪 source logo (右上角对齐)
-                          Align(
-                            alignment: Alignment.topRight,
-                            child: Text(
-                              item.source,
+                          Icon(Icons.access_time, size: 12, color: grayBrown),
+                          const SizedBox(width: 4),
+                          Text(
+                            item.duration,
+                            style: TextStyle(
+                              fontSize: 11 * _scale,
+                              color: grayBrown,
+                            ),
+                          ),
+                          const Spacer(),
+                          if (isTop)
+                            Text(
+                              widget.isEn ? 'Read →' : '阅读 →',
                               style: TextStyle(
                                 fontSize: 12 * _scale,
+                                color: accentBlue,
                                 fontWeight: FontWeight.w600,
-                                color: primary.withOpacity(0.85),
                               ),
                             ),
-                          ),
-                          // 中行: 标题
-                          Text(
-                            item.title,
-                            maxLines: 2,
-                            overflow: TextOverflow.ellipsis,
-                            style: TextStyle(
-                              fontSize: 16 * _scale,
-                              fontWeight: FontWeight.w700,
-                              color: primary,
-                              height: 1.25,
-                            ),
-                          ),
-                          // 底行: 5min + 阅读 →
-                          Row(
-                            children: [
-                              Icon(Icons.access_time, size: 12, color: primary.withOpacity(0.7)),
-                              const SizedBox(width: 4),
-                              Text(
-                                item.duration,
-                                style: TextStyle(
-                                  fontSize: 11 * _scale,
-                                  color: primary.withOpacity(0.7),
-                                ),
-                              ),
-                              const Spacer(),
-                              if (isTop)
-                                Text(
-                                  widget.isEn ? 'Tap →' : '阅读 →',
-                                  style: TextStyle(
-                                    fontSize: 12 * _scale,
-                                    color: GlassStyle.accent,
-                                    fontWeight: FontWeight.w600,
-                                  ),
-                                ),
-                            ],
-                          ),
                         ],
                       ),
+                    ],
+                  ),
+                ),
+              ),
+              // 6/19 右 30% 图区: 浅米黄渐变 + 小 icon (不是中心大 icon)
+              SizedBox(
+                width: 90 * _scale,
+                child: Container(
+                  decoration: BoxDecoration(
+                    gradient: const LinearGradient(
+                      begin: Alignment.topLeft,
+                      end: Alignment.bottomRight,
+                      colors: [Color(0xFFFAF6E8), Color(0xFFE8DCC0)],
+                    ),
+                    borderRadius: const BorderRadius.only(
+                      topRight: Radius.circular(16),
+                      bottomRight: Radius.circular(16),
                     ),
                   ),
-                  // 6/18 重构: 右图区 (固定 80 宽, 占 30%)
-                  SizedBox(
-                    width: 100,
-                    child: _buildImageArea(item, isTop: isTop),
+                  child: Center(
+                    child: Icon(
+                      item.contentType.icon,
+                      size: 32 * _scale,
+                      color: deepBrown.withOpacity(0.55),
+                    ),
                   ),
-                ],
+                ),
               ),
-            ),
+            ],
           ),
         ),
       ),
