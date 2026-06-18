@@ -20,6 +20,7 @@ import '../services/analytics_service.dart';
 import '../main.dart';
 import '../services/tts_service.dart';
 import 'content_reader_screen.dart';
+import '../widgets/tinder_recommendation_stack.dart';
 
 class ContentScreen extends StatefulWidget {
   final UserType userType;
@@ -43,6 +44,7 @@ class ContentScreen extends StatefulWidget {
 
 class _ContentScreenState extends State<ContentScreen> {
   String _buf = '';
+  bool get _hasContent => _buf.isNotEmpty;
   bool _loading = true;
   bool _llmGotFirstChunk = false;
   Timer? _llmFallbackTimer;
@@ -97,13 +99,19 @@ class _ContentScreenState extends State<ContentScreen> {
   @override
   void initState() {
     super.initState();
+    // 6/16 21:17 兜底: 有 prefillItem 时, 立刻显示 article description, 不再空白 30s 等 AI
+    if (widget.prefillItem != null && widget.prefillItem!.description.isNotEmpty) {
+      _buf = widget.prefillItem!.description;
+      _loading = false;
+    }
     _loadRecommendations();
     _sub?.cancel();
     _llmGotFirstChunk = false;
     _llmFallbackTimer?.cancel();
     _llmFallbackTimer = Timer(const Duration(seconds: 30), () {
       if (!mounted) return;
-      if (!_llmGotFirstChunk && _loading) {
+      // 6/16 21:17 兜底优化: _buf 已有内容 (article 预填充) 时不再覆盖
+      if (!_llmGotFirstChunk && _loading && !_hasContent) {
         _showStub();
       }
     });
@@ -160,12 +168,13 @@ class _ContentScreenState extends State<ContentScreen> {
         }
       }, onError: (e) {
         if (!mounted) return;
-        if (!_llmGotFirstChunk) {
+        // 6/16 21:17 已有 article 内容时不覆盖
+        if (!_llmGotFirstChunk && !_hasContent) {
           _showStub();
         }
       }, onDone: () {
         if (!mounted) return;
-        if (_buf.isEmpty) _showStub();
+        if (_buf.isEmpty && !_hasContent) _showStub();
         _summary = LlmSummary.parse(_buf);
       });
     } catch (e) {
@@ -270,38 +279,23 @@ class _ContentScreenState extends State<ContentScreen> {
                   Text(isEn ? 'You may also like' : '你可能还喜欢',
                       style: TextStyle(fontSize: 12 * _scale, color: AppTheme.textLight)),
                   SizedBox(height: 8 * _scale),
-                  SizedBox(
-                    height: 80 * _scale,
-                    child: ListView.separated(
-                      scrollDirection: Axis.horizontal,
-                      itemCount: _recItems.length,
-                      separatorBuilder: (_, __) => SizedBox(width: 8 * _scale),
-                      itemBuilder: (_, i) {
-                        final it = _recItems[i];
-                        return GestureDetector(
-                          onTap: () {
-                            Navigator.push(context, MaterialPageRoute(
-                              builder: (_) => ContentScreen(
-                                userType: widget.userType, scene: widget.scene,
-                                isInternational: widget.isInternational,
-                                isElderlyMode: widget.isElderlyMode,
-                                languageCode: widget.languageCode, prefillItem: it,
-                              ),
-                            ));
-                          },
-                          child: Container(
-                            width: 160 * _scale,
-                            padding: EdgeInsets.all(8 * _scale),
-                            decoration: BoxDecoration(
-                              color: Colors.white.withOpacity(0.6),
-                              borderRadius: BorderRadius.circular(10),
-                            ),
-                            child: Text(it.title, maxLines: 3, overflow: TextOverflow.ellipsis,
-                              style: TextStyle(fontSize: 11 * _scale)),
-                          ),
-                        );
-                      },
-                    ),
+                  // 6/16 接回 Tinder 风格推荐卡 (1 大卡 + 2 缩略 + 3 按钮)
+                  TinderRecommendationStack(
+                    items: _recItems,
+                    userType: widget.userType,
+                    scene: widget.scene,
+                    isEn: isEn,
+                    isElderlyMode: widget.isElderlyMode,
+                    onTapItem: (it) async {
+                      await Navigator.push(context, MaterialPageRoute(
+                        builder: (_) => ContentScreen(
+                          userType: widget.userType, scene: widget.scene,
+                          isInternational: widget.isInternational,
+                          isElderlyMode: widget.isElderlyMode,
+                          languageCode: widget.languageCode, prefillItem: it,
+                        ),
+                      ));
+                    },
                   ),
                 ],
               ],
