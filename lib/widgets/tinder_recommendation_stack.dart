@@ -162,10 +162,8 @@ class _TinderRecommendationStackState extends State<TinderRecommendationStack>
     if (_items.isEmpty || _topIndex >= _items.length) {
       return _buildEmpty(isDark: isDark, isWarm: isWarm);
     }
-    // 顶卡 + 后两张缩略
+    // 6/18 重构: 单卡 horizontal banner (Brien 参考图 = 1 张大横向卡, 不是 3 张叠)
     final top = _items[_topIndex];
-    final mid = _topIndex + 1 < _items.length ? _items[_topIndex + 1] : null;
-    final bot = _topIndex + 2 < _items.length ? _items[_topIndex + 2] : null;
 
     return Column(
       crossAxisAlignment: CrossAxisAlignment.stretch,
@@ -189,25 +187,10 @@ class _TinderRecommendationStackState extends State<TinderRecommendationStack>
           ),
         ),
         const SizedBox(height: 8),
-        // 6/15 v2: 240→520 卡高 ≈屏 70% (Tinder 真实比例)
+        // 6/18: 单卡 horizontal banner (高 220 横向, 不是 520 纵向 3 叠)
         SizedBox(
-          height: 520,
-          child: Stack(
-            alignment: Alignment.center,
-            children: [
-              // 6/14 v5.3: 14→8 / 8→4 后面卡不推那么下
-              // 6/18 修: 背景卡包 IgnorePointer,desktop 端点顶卡下半不会先 hit 到 mid
-              if (bot != null)
-                IgnorePointer(
-                  child: _buildBackgroundCard(bot, scale: 0.86, offsetY: 8, opacity: 0.6, isDark: isDark, isWarm: isWarm),
-                ),
-              if (mid != null)
-                IgnorePointer(
-                  child: _buildBackgroundCard(mid, scale: 0.93, offsetY: 4, opacity: 0.85, isDark: isDark, isWarm: isWarm),
-                ),
-              _buildTopCard(top, isDark: isDark, isWarm: isWarm),
-            ],
-          ),
+          height: 220,
+          child: _buildCard(top, isTop: true, isDark: isDark, isWarm: isWarm),
         ),
         const SizedBox(height: 16),
         // 三个动作按钮
@@ -275,56 +258,53 @@ class _TinderRecommendationStackState extends State<TinderRecommendationStack>
             child: InkWell(
               borderRadius: BorderRadius.circular(16),
               onTap: isTop ? () => _onTapItem(item) : null,
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
+              child: Row(
+                crossAxisAlignment: CrossAxisAlignment.stretch,
                 children: [
-                  // 6/15 v2: 上 75% = scene 色相大色块 + 中心大 icon (当图用)
+                  // 6/18 重构: 左文字区 (flex 1, 占 70% 宽)
                   Expanded(
-                    flex: 3,
-                    child: _buildImageArea(item, isTop: isTop),
-                  ),
-                  // 6/15 v2: 下 25% = 标题+元数据, 紧贴上图 0px
-                  Expanded(
-                    flex: 1,
                     child: Padding(
                       padding: EdgeInsets.fromLTRB(
-                        16 * _scale, 10 * _scale, 16 * _scale, 14 * _scale,
+                        16 * _scale, 14 * _scale, 12 * _scale, 14 * _scale,
                       ),
                       child: Column(
                         crossAxisAlignment: CrossAxisAlignment.start,
-                        mainAxisAlignment: MainAxisAlignment.center,
+                        mainAxisAlignment: MainAxisAlignment.spaceBetween,
                         children: [
+                          // 顶行: 36氪 source logo (右上角对齐)
+                          Align(
+                            alignment: Alignment.topRight,
+                            child: Text(
+                              item.source,
+                              style: TextStyle(
+                                fontSize: 12 * _scale,
+                                fontWeight: FontWeight.w600,
+                                color: primary.withOpacity(0.85),
+                              ),
+                            ),
+                          ),
+                          // 中行: 标题
                           Text(
                             item.title,
                             maxLines: 2,
                             overflow: TextOverflow.ellipsis,
                             style: TextStyle(
-                              fontSize: 17 * _scale,
+                              fontSize: 16 * _scale,
                               fontWeight: FontWeight.w700,
                               color: primary,
-                              height: 1.15,
+                              height: 1.25,
                             ),
                           ),
-                          SizedBox(height: 4 * _scale),
+                          // 底行: 5min + 阅读 →
                           Row(
                             children: [
-                              Text(
-                                item.source,
-                                style: TextStyle(
-                                  fontSize: 11 * _scale,
-                                  color: primary,  // 6/15 v2.1
-                                ),
-                              ),
-                              const SizedBox(width: 6),
-                              Text('·', style: TextStyle(fontSize: 11, color: primary)),
-                              const SizedBox(width: 6),
-                              Icon(Icons.access_time, size: 11, color: primary),
-                              const SizedBox(width: 3),
+                              Icon(Icons.access_time, size: 12, color: primary.withOpacity(0.7)),
+                              const SizedBox(width: 4),
                               Text(
                                 item.duration,
                                 style: TextStyle(
                                   fontSize: 11 * _scale,
-                                  color: primary,  // 6/15 v2.1
+                                  color: primary.withOpacity(0.7),
                                 ),
                               ),
                               const Spacer(),
@@ -332,7 +312,7 @@ class _TinderRecommendationStackState extends State<TinderRecommendationStack>
                                 Text(
                                   widget.isEn ? 'Tap →' : '阅读 →',
                                   style: TextStyle(
-                                    fontSize: 11 * _scale,
+                                    fontSize: 12 * _scale,
                                     color: GlassStyle.accent,
                                     fontWeight: FontWeight.w600,
                                   ),
@@ -342,6 +322,11 @@ class _TinderRecommendationStackState extends State<TinderRecommendationStack>
                         ],
                       ),
                     ),
+                  ),
+                  // 6/18 重构: 右图区 (固定 80 宽, 占 30%)
+                  SizedBox(
+                    width: 100,
+                    child: _buildImageArea(item, isTop: isTop),
                   ),
                 ],
               ),
