@@ -24,6 +24,7 @@ import 'screens/about_screen.dart';
 import 'services/news_service.dart';
 import 'services/llm_service.dart';
 import 'screens/content_reader_screen.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 
 /// 6/14 v4 公开跨屏导航入口:content_screen "去搜索" 按钣直接调
 void navigateToMainTab(int index) {
@@ -224,11 +225,14 @@ class _MainHomeScreenState extends State<MainHomeScreen> {
   }
 
   // 6/12 加: 检查是否首启
+  // 6/18 改: 强制跳过 onboarding (Brien 看完 3 屏后确认 30s 引导是累赘)
   Future<void> _checkOnboarding() async {
-    final shown = await OnboardingScreen.hasShown();
+    // 直接写 prefs,跟 OnboardingScreen._kShownKey = 'onboarding_shown_v1' 一致
+    final prefs = await SharedPreferences.getInstance();
+    await prefs.setBool('onboarding_shown_v1', true);
     if (mounted) {
       setState(() {
-        _showOnboarding = !shown;
+        _showOnboarding = false;
         _checkedOnboarding = true;
       });
     }
