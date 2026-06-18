@@ -326,12 +326,21 @@ class _ContentReaderScreenState extends State<ContentReaderScreen> {
   Widget build(BuildContext context) {
     return Scaffold(
       appBar: AppBar(
-        leading: IconButton(
-          icon: Icon(Icons.arrow_back, size: 24 * scale),
-          // 6/14 v4 老人模式: 按钮点击区 48→64
-          padding: EdgeInsets.all(12 * scale),
-          constraints: BoxConstraints.tightFor(width: 48 * scale, height: 48 * scale),
-          onPressed: () => Navigator.pop(context),
+        // 6/19 修: AppBar 玻璃背景 + 0.8 elevation, 返 回头箭头能看清
+        backgroundColor: Colors.white.withOpacity(0.85),
+        foregroundColor: AppTheme.primary,
+        elevation: 0.5,
+        // 6/19 修: leading 返 回头加圆形背景 + 深色, 杏橘背景下能看见
+        leading: Material(
+          color: Colors.white.withOpacity(0.6),
+          shape: const CircleBorder(),
+          child: IconButton(
+            icon: Icon(Icons.arrow_back, size: 24 * scale, color: AppTheme.primary),
+            // 6/14 v4 老人模式: 按钮点击区 48→64
+            padding: EdgeInsets.all(12 * scale),
+            constraints: BoxConstraints.tightFor(width: 48 * scale, height: 48 * scale),
+            onPressed: () => Navigator.pop(context),
+          ),
         ),
         title: Row(
           mainAxisSize: MainAxisSize.min,
