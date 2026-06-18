@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import '../theme/glass_decoration.dart';
 import 'package:flutter/foundation.dart';
 import 'package:url_launcher/url_launcher.dart';
 import '../models/models.dart';
@@ -92,6 +93,9 @@ class _SubscriptionScreenState extends State<SubscriptionScreen> {
 
     return Scaffold(
       appBar: AppBar(
+        backgroundColor: GlassStyle.glassAppBarBg,
+        foregroundColor: GlassStyle.glassAppBarFg,
+        elevation: GlassStyle.glassAppBarElevation,
         title: Text(isEn ? 'Manage Following' : '关注管理'),
         actions: [
           TextButton(

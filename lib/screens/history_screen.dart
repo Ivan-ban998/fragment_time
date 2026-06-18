@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import '../theme/app_theme.dart';
+import '../theme/glass_decoration.dart';
 import '../services/history_service.dart';
 import 'content_reader_screen.dart';
 
@@ -83,6 +84,9 @@ class _HistoryScreenState extends State<HistoryScreen> {
     final isEn = widget.isEn;
     return Scaffold(
       appBar: AppBar(
+        backgroundColor: GlassStyle.glassAppBarBg,
+        foregroundColor: GlassStyle.glassAppBarFg,
+        elevation: GlassStyle.glassAppBarElevation,
         title: Text(isEn ? 'Reading History' : '阅读历史', style: TextStyle(fontSize: 18 * scale)),
         actions: [
           if (_items.isNotEmpty)

@@ -8,6 +8,7 @@
 //   5. 不动 AppTheme 静态常量（避免 64 处引用炸）
 
 import 'package:flutter/material.dart';
+import 'app_theme.dart';
 
 class GlassStyle {
   // ========== 背景渐变（按 scene 分 4 个色相 × 2 个亮度） ==========
@@ -344,4 +345,12 @@ class GlassStyle {
       ],
     );
   }
+
+  // 6/19 加: AppBar 玻璃背景 + 返回箭头可见性 修正
+  // 之前 AppBar 无 backgroundColor/foregroundColor = 透明 + theme 默认色
+  // 在杏橘/content 背景下 leading Icons.arrow_back 几乎不可见
+  // 用法: AppBar(backgroundColor: GlassStyle.glassAppBarBg(), foregroundColor: GlassStyle.glassAppBarFg(), elevation: 0.5, leading: ...)
+  static Color get glassAppBarBg => Colors.white.withOpacity(0.85);
+  static Color get glassAppBarFg => AppTheme.primary;  // #6750A4 紫
+  static double get glassAppBarElevation => 0.5;
 }

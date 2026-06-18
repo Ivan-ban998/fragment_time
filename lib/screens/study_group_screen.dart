@@ -1,5 +1,6 @@
 // 6/9 Sofa 启发：学习小组 screen
 import 'package:flutter/material.dart';
+import '../theme/glass_decoration.dart';
 import 'package:flutter/services.dart';
 import '../models/models.dart';
 import '../models/study_group.dart';
@@ -135,6 +136,9 @@ class _StudyGroupScreenState extends State<StudyGroupScreen> {
   Widget build(BuildContext context) {
     return Scaffold(
       appBar: AppBar(
+        backgroundColor: GlassStyle.glassAppBarBg,
+        foregroundColor: GlassStyle.glassAppBarFg,
+        elevation: GlassStyle.glassAppBarElevation,
         title: Text(widget.isEn ? 'Study Groups' : '学习小组'),
       ),
       // 6/10 加: 创建小组按钮
