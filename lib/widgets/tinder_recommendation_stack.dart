@@ -196,10 +196,15 @@ class _TinderRecommendationStackState extends State<TinderRecommendationStack>
             alignment: Alignment.center,
             children: [
               // 6/14 v5.3: 14→8 / 8→4 后面卡不推那么下
+              // 6/18 修: 背景卡包 IgnorePointer,desktop 端点顶卡下半不会先 hit 到 mid
               if (bot != null)
-                _buildBackgroundCard(bot, scale: 0.86, offsetY: 8, opacity: 0.6, isDark: isDark, isWarm: isWarm),
+                IgnorePointer(
+                  child: _buildBackgroundCard(bot, scale: 0.86, offsetY: 8, opacity: 0.6, isDark: isDark, isWarm: isWarm),
+                ),
               if (mid != null)
-                _buildBackgroundCard(mid, scale: 0.93, offsetY: 4, opacity: 0.85, isDark: isDark, isWarm: isWarm),
+                IgnorePointer(
+                  child: _buildBackgroundCard(mid, scale: 0.93, offsetY: 4, opacity: 0.85, isDark: isDark, isWarm: isWarm),
+                ),
               _buildTopCard(top, isDark: isDark, isWarm: isWarm),
             ],
           ),
