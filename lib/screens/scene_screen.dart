@@ -48,7 +48,8 @@ class SceneScreen extends StatelessWidget {
         foregroundColor: GlassStyle.glassAppBarFg,
         elevation: GlassStyle.glassAppBarElevation,
         title: Text(
-          '${userType.icon} $userTypeName',
+          // 6/19 修: 删 userType.icon (IconData 不能跟 String 直接拼接, 6/19 00:16 Brien 反馈 'IconData(U+0E6F2)' bug)
+          userTypeName,
           style: TextStyle(fontSize: 18 * _scale),
         ),
         leading: Material(
