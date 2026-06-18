@@ -20,6 +20,9 @@ class AboutScreen extends StatelessWidget {
   Widget build(BuildContext context) {
     return Scaffold(
       appBar: AppBar(
+        backgroundColor: GlassStyle.glassAppBarBg,
+        foregroundColor: GlassStyle.glassAppBarFg,
+        elevation: GlassStyle.glassAppBarElevation,
         title: Text(isEn ? 'About FragmentTime' : '关于 FragmentTime'),
       ),
       body: ListView(

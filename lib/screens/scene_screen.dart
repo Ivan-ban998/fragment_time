@@ -44,13 +44,22 @@ class SceneScreen extends StatelessWidget {
 
     return Scaffold(
       appBar: AppBar(
+        backgroundColor: GlassStyle.glassAppBarBg,
+        foregroundColor: GlassStyle.glassAppBarFg,
+        elevation: GlassStyle.glassAppBarElevation,
         title: Text(
           '${userType.icon} $userTypeName',
           style: TextStyle(fontSize: 18 * _scale),
         ),
-        leading: IconButton(
-          icon: Icon(Icons.arrow_back, size: 24 * _scale),
-          onPressed: () => Navigator.pop(context),
+        leading: Material(
+          color: Colors.white.withOpacity(0.6),
+          shape: const CircleBorder(),
+          child: IconButton(
+            icon: Icon(Icons.arrow_back, size: 24 * _scale, color: AppTheme.primary),
+            padding: EdgeInsets.all(12 * _scale),
+            constraints: BoxConstraints.tightFor(width: 48 * _scale, height: 48 * _scale),
+            onPressed: () => Navigator.pop(context),
+          ),
         ),
       ),
       // 6/14 v5.4: 选场景页背景加白叠

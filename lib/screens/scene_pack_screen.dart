@@ -1,5 +1,6 @@
 // 6/9 场景包 screen — 用户选 5 篇 → 命名 → 一键进
 import 'package:flutter/material.dart';
+import '../theme/glass_decoration.dart';
 import '../models/models.dart';
 import '../services/local_subscription_service.dart';
 import '../services/news_service.dart';
@@ -47,6 +48,9 @@ class _ScenePackScreenState extends State<ScenePackScreen> {
 
     return Scaffold(
       appBar: AppBar(
+        backgroundColor: GlassStyle.glassAppBarBg,
+        foregroundColor: GlassStyle.glassAppBarFg,
+        elevation: GlassStyle.glassAppBarElevation,
         title: Text(widget.isEn ? 'Scene Pack' : '场景包'),
       ),
       body: FutureBuilder<List<ContentItem>>(

@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import '../theme/glass_decoration.dart';
 import '../models/models.dart';
 import '../theme/app_theme.dart';
 import '../services/local_subscription_service.dart';
@@ -85,6 +86,9 @@ class _MySubscriptionsScreenState extends State<MySubscriptionsScreen>
     final isEn = widget.isEn;
     return Scaffold(
       appBar: AppBar(
+        backgroundColor: GlassStyle.glassAppBarBg,
+        foregroundColor: GlassStyle.glassAppBarFg,
+        elevation: GlassStyle.glassAppBarElevation,
         title: Text(
           isEn ? 'My Saved' : '我的收藏',
           style: TextStyle(fontSize: 18 * scale),
