@@ -240,18 +240,20 @@ class _TinderRecommendationStackState extends State<TinderRecommendationStack>
       child: BackdropFilter(
         filter: ImageFilter.blur(sigmaX: 25, sigmaY: 25),
         child: Container(
-          decoration: BoxDecoration(
-            color: Colors.white.withOpacity(0.9),
+          // 6/18 改: 用 glassFrosted (白透 0.65 + 双层阴影 + 顶亮) 替平涂白 0.9
+          decoration: GlassStyle.glassFrosted(
+            opacity: 0.65,
+            radius: 16,
+          ),
+          // 6/18 改: 玻璃卡外加 1.2px 高光边 (liquidTopHighlight 顶亮弧)
+          foregroundDecoration: BoxDecoration(
             borderRadius: BorderRadius.circular(16),
-            border: Border.all(color: Colors.black.withOpacity(0.05), width: 1),
-            boxShadow: [
-              // 6/15 v2: 0 4 12 0.08 (Tinder 真实阴影)
-              BoxShadow(
-                color: Colors.black.withOpacity(0.08),
-                blurRadius: 12,
-                offset: const Offset(0, 4),
+            border: Border(
+              top: BorderSide(
+                color: Colors.white.withOpacity(isDark ? 0.20 : 0.50),
+                width: 1.2,
               ),
-            ],
+            ),
           ),
           child: Material(
             color: Colors.transparent,
@@ -385,15 +387,11 @@ class _TinderRecommendationStackState extends State<TinderRecommendationStack>
   }
 
   // 按内容类型给 2 色渐变
+  // 6/18 改: 渐变统色浅米黄 (顺 6/15 颜色宪法 ≤ 400 + 36Kr 风格)
+  // 全部 5 类型用同一对米黄: 深米 #F5EDD8 → 极浅米 #FAF6E8
+  // 区别靠小 icon (article/book, audio/headphones, video/play, short/flash, card/style)
   List<Color> _gradForContent(ContentItem item) {
-    switch (item.contentType.name) {
-      case 'article': return [const Color(0xFF7C5CFC), const Color(0xFFA48BFF)];
-      case 'audio':   return [const Color(0xFF0891B2), const Color(0xFF67E8F9)];
-      case 'video':   return [const Color(0xFFEA580C), const Color(0xFFFDBA74)];
-      case 'short':   return [const Color(0xFF16A34A), const Color(0xFF86EFAC)];
-      case 'card':    return [const Color(0xFFDB2777), const Color(0xFFFBCFE8)];
-      default:        return [const Color(0xFF6B7280), const Color(0xFFD1D5DB)];
-    }
+    return const [Color(0xFFF5EDD8), Color(0xFFFAF6E8)];
   }  Widget _buildActionRow(ContentItem item) {
     final btnSize = widget.isElderlyMode ? 64.0 : 52.0;
     final iconSize = widget.isElderlyMode ? 30.0 : 24.0;
