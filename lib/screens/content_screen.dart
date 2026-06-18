@@ -190,14 +190,22 @@ class _ContentScreenState extends State<ContentScreen> {
   }
 
   // 6/15 加: 借鉴"不做手机控"番茄钟 — 老人友好正反馈
+  // 6/18 改: FAB 挪到左下角, 让 tinder 3 按钮 (❌/👆/❤️) 在右下角居中
   Widget _buildCompleteFab(BuildContext context) {
-    return FloatingActionButton.extended(
-      onPressed: _markComplete,
-      backgroundColor: AppTheme.primary,
-      icon: const Icon(Icons.celebration, color: Colors.white),
-      label: Text(
-        isEn ? 'I read it' : '读完啦',
-        style: const TextStyle(color: Colors.white, fontWeight: FontWeight.w600),
+    return Align(
+      alignment: Alignment.bottomLeft,
+      child: Padding(
+        padding: EdgeInsets.only(left: 16, bottom: 16 * _scale),
+        child: FloatingActionButton.extended(
+          heroTag: 'complete-fab',
+          onPressed: _markComplete,
+          backgroundColor: AppTheme.primary,
+          icon: const Icon(Icons.celebration, color: Colors.white),
+          label: Text(
+            isEn ? 'I read it' : '读完啦',
+            style: const TextStyle(color: Colors.white, fontWeight: FontWeight.w600),
+          ),
+        ),
       ),
     );
   }
