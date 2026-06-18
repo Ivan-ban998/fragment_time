@@ -261,6 +261,23 @@ class _ContentScreenState extends State<ContentScreen> {
 
     return Scaffold(
       extendBodyBehindAppBar: true,
+      // 6/19 加: AppBar 玻璃 + 返回箭头 (与 8 屏统一, content_screen 之前缺)
+      appBar: AppBar(
+        backgroundColor: GlassStyle.glassAppBarBg,
+        foregroundColor: GlassStyle.glassAppBarFg,
+        elevation: GlassStyle.glassAppBarElevation,
+        title: Text(title, style: TextStyle(fontSize: 16 * _scale, fontWeight: FontWeight.w600, color: AppTheme.primary)),
+        leading: Material(
+          color: Colors.white.withOpacity(0.6),
+          shape: const CircleBorder(),
+          child: IconButton(
+            icon: Icon(Icons.arrow_back, size: 24 * _scale, color: AppTheme.primary),
+            padding: EdgeInsets.all(12 * _scale),
+            constraints: BoxConstraints.tightFor(width: 48 * _scale, height: 48 * _scale),
+            onPressed: () => Navigator.pop(context),
+          ),
+        ),
+      ),
       body: Container(
         decoration: BoxDecoration(
           gradient: _sceneBgColor() == null ? _sceneBgGradient : null,
@@ -272,8 +289,8 @@ class _ContentScreenState extends State<ContentScreen> {
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                Text(title, style: TextStyle(fontSize: 18 * _scale, fontWeight: FontWeight.w600)),
-                SizedBox(height: 12 * _scale),
+                // 6/19 删: body 里重复的 title Text (AppBar 已经显示)
+                SizedBox(height: 8 * _scale),
                 Expanded(
                   child: SingleChildScrollView(
                     child: Text(
