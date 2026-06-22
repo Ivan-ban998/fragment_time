@@ -1,11 +1,16 @@
 // lib/widgets/tinder_recommendation_stack.dart
-// 6/13 Tinder 风格推荐卡
-// 一次只看 1 张大卡（顶），后面 2 张缩略压在下面
-// 三个动作：
-//   1) ❌ 点不喜：自动推下一张 + 写 pref_dismissed
-//   2) ❤️ 点收藏：写 pref_liked + 弹 snackbar + 调 LocalSubscriptionService.subscribe
-//   3) 👆 点卡片 = 进详情/听/跳原站（调原来 onTap 逻辑）
-// 老人模式：按钮加大（minSize 56x56）；普通模式按钮标准
+// 6/22 重写: 借鉴别的 AI 那个 537 行简化版的 GestureDetector 模式 (整卡包 GestureDetector,
+//   onTap = 闭包 push prefill, onPan 跟 _dragOffset + _animateOut 飞出).
+// 改用 GestureDetector 替换 6/16 那个 InkWell + IgnorePointer 嵌套 (1.5h 改 5 次没验过).
+//
+// 父 widget 接口 (ContentScreen 调用) 不变:
+//   onTapItem: (it) async { await Navigator.push(...) }  ← 闭包
+//   onAllDismissed: ()  ← 6 张全看完
+//
+// 三个动作:
+//   1) ❌ Icons.close = 跳过 (推下一张, 写 pref_dismissed)
+//   2) 👆 Icons.touch_app = 详情 (调 widget.onTapItem 闭包 push prefill)
+//   3) ❤️ Icons.favorite = 收藏 (LocalSubscriptionService.subscribe + snackbar)
 
 import 'package:flutter/material.dart';
 import '../models/models.dart';
@@ -13,7 +18,6 @@ import '../services/user_preference_service.dart';
 import '../services/eye_protection_scope.dart';
 import '../services/local_subscription_service.dart';
 import '../theme/glass_decoration.dart';
-import 'dart:ui';
 
 class TinderRecommendationStack extends StatefulWidget {
   final List<ContentItem> items;
@@ -30,7 +34,7 @@ class TinderRecommendationStack extends StatefulWidget {
     required this.userType,
     required this.scene,
     required this.isEn,
-    required this.isElderlyMode,
+    this.isElderlyMode = false,
     this.onTapItem,
     this.onAllDismissed,
   });
@@ -40,146 +44,161 @@ class TinderRecommendationStack extends StatefulWidget {
       _TinderRecommendationStackState();
 }
 
-class _TinderRecommendationStackState extends State<TinderRecommendationStack>
-    with SingleTickerProviderStateMixin {
-  late List<ContentItem> _items;
-  int _topIndex = 0; // 当前顶卡在 _items 里的 index
-  late AnimationController _swipeCtrl;
-  bool _swiping = false;
-
-  // 已交互过的 id（view + like + dismiss）—— 都不再推
-  Set<String> _seenIds = {};
-
-  double get _scale => widget.isElderlyMode ? 1.3 : 1.0;
+class _TinderRecommendationStackState extends State<TinderRecommendationStack> {
+  int _topIndex = 0;
+  // 拖拽状态 (借鉴 537 行简化版)
+  Offset _dragOffset = Offset.zero;
+  double _dragAngle = 0;
+  bool _isDragging = false;
+  // 6/16 老版: 已交互 ids (view + like + dismiss)
+  final Set<String> _seenIds = {};
 
   @override
   void initState() {
     super.initState();
-    _swipeCtrl = AnimationController(
-      vsync: this,
-      duration: const Duration(milliseconds: 350),
-    );
-    _items = List.from(widget.items);
-    // 老人模式强制按钮（不接 swipe gesture）
+    // 父 widget 传 items
   }
 
-  @override
-  void dispose() {
-    _swipeCtrl.dispose();
-    super.dispose();
+  void _onPanStart(DragStartDetails d) {
+    setState(() => _isDragging = true);
   }
 
-  void _animateOut({required bool toLeft, required VoidCallback onDone}) {
-    if (_swiping) return;
-    _swiping = true;
-    final begin = 0.0;
-    final end = 1.0;
-    _swipeCtrl
-      ..reset()
-      ..forward()
-      .whenComplete(() {
-        _swiping = false;
-        onDone();
-      });
-  }
-
-  Future<void> _onDismiss(ContentItem item) async {
+  void _onPanUpdate(DragUpdateDetails d) {
     setState(() {
-      _seenIds.add(item.id);
-      _topIndex = (_topIndex + 1).clamp(0, _items.length - 1);
+      _dragOffset += d.delta;
+      _dragAngle = _dragOffset.dx * 0.0008;
     });
-    await UserPreferenceService.instance.record(
-      action: PrefAction.dismiss,
-      item: item,
-      userType: widget.userType,
-      scene: widget.scene,
-    );
+  }
+
+  void _onPanEnd(DragEndDetails d) {
+    final dx = _dragOffset.dx;
+    if (dx < -80) {
+      _animateOut(const Offset(-600, -50), onLeft: true);
+    } else if (dx > 80) {
+      _animateOut(const Offset(600, -50), onLeft: false);
+    } else {
+      setState(() {
+        _dragOffset = Offset.zero;
+        _dragAngle = 0;
+        _isDragging = false;
+      });
+    }
+  }
+
+  Future<void> _animateOut(Offset direction, {required bool onLeft}) async {
+    setState(() => _dragOffset = direction);
+    // 调 pref_dismissed / pref_liked
+    if (_topIndex < _items.length) {
+      final item = _items[_topIndex];
+      try {
+        await UserPreferenceService.instance.record(
+          action: onLeft ? PrefAction.dismiss : PrefAction.like,
+          item: item,
+          userType: widget.userType,
+          scene: widget.scene,
+        );
+      } catch (_) {}
+      _seenIds.add(item.id);
+    }
+    await Future.delayed(const Duration(milliseconds: 250));
     if (!mounted) return;
-    ScaffoldMessenger.of(context).showSnackBar(
-      SnackBar(
-        content: Text(widget.isEn ? 'Skipped: ${item.title}' : '已跳过：${item.title}'),
-        duration: const Duration(seconds: 1),
-        behavior: SnackBarBehavior.floating,
-      ),
-    );
+    setState(() {
+      _topIndex++;
+      _dragOffset = Offset.zero;
+      _dragAngle = 0;
+      _isDragging = false;
+    });
     if (_topIndex >= _items.length) {
       widget.onAllDismissed?.call();
     }
+  }
+
+  // 3 圆按钮回调
+  Future<void> _onDismiss(ContentItem item) async {
+    await _animateOut(const Offset(-600, -50), onLeft: true);
   }
 
   Future<void> _onLike(ContentItem item) async {
-    setState(() {
-      _seenIds.add(item.id);
-      _topIndex = (_topIndex + 1).clamp(0, _items.length - 1);
-    });
-    await UserPreferenceService.instance.record(
-      action: PrefAction.like,
-      item: item,
-      userType: widget.userType,
-      scene: widget.scene,
-    );
-    await LocalSubscriptionService.instance.subscribe(item);
+    try {
+      await LocalSubscriptionService.instance.subscribe(item);
+      await UserPreferenceService.instance.record(
+        action: PrefAction.like,
+        item: item,
+        userType: widget.userType,
+        scene: widget.scene,
+      );
+    } catch (_) {}
+    _seenIds.add(item.id);
     if (!mounted) return;
-    ScaffoldMessenger.of(context).showSnackBar(
-      SnackBar(
-        content: Text(widget.isEn ? 'Saved: ${item.title}' : '已收藏：${item.title}'),
-        duration: const Duration(seconds: 1),
-        behavior: SnackBarBehavior.floating,
-      ),
-    );
+    setState(() => _topIndex++);
+    if (_topIndex >= _items.length) {
+      widget.onAllDismissed?.call();
+    } else {
+      // snackbar 反馈
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text(widget.isEn ? 'Saved: ${item.title}' : '已收藏：${item.title}'),
+          duration: const Duration(seconds: 1),
+          behavior: SnackBarBehavior.floating,
+        ),
+      );
+    }
+  }
+
+  Future<void> _onTapItem(ContentItem item) async {
+    if (widget.onTapItem == null) return;
+    try {
+      await widget.onTapItem!(item);
+    } catch (_) {}
+    if (!mounted) return;
+    // 详情返回后: 写 view + 推下一张
+    _seenIds.add(item.id);
+    try {
+      await UserPreferenceService.instance.record(
+        action: PrefAction.view,
+        item: item,
+        userType: widget.userType,
+        scene: widget.scene,
+      );
+    } catch (_) {}
+    if (!mounted) return;
+    setState(() => _topIndex++);
     if (_topIndex >= _items.length) {
       widget.onAllDismissed?.call();
     }
   }
 
-  /// 点入 = 进详情。看完返回后自动 skip。
-  Future<void> _onTapItem(ContentItem item) async {
-    if (widget.onTapItem == null) return;
-    // onTapItem 内部 await Navigator.push —— 详情页返回 = future 完成
-    await widget.onTapItem!(item);
-    if (!mounted) return;
-    // 详情返回后：写 view + 推下一条
-    setState(() {
-      _seenIds.add(item.id);
-      _topIndex = (_topIndex + 1).clamp(0, _items.length - 1);
-    });
-    await UserPreferenceService.instance.record(
-      action: PrefAction.view,
-      item: item,
-      userType: widget.userType,
-      scene: widget.scene,
-    );
-    if (!mounted) return;
-    if (_topIndex >= _items.length) {
-      widget.onAllDismissed?.call();
-    }
+  List<ContentItem> get _items {
+    // 过滤已 seen 的 (但保留顺序, 跳过的不删只 push 索引)
+    return widget.items;
   }
 
   @override
   Widget build(BuildContext context) {
-    final isDark = Theme.of(context).brightness == Brightness.dark;
-    final isWarm = EyeProtectionScope.of(context);
-    if (_items.isEmpty || _topIndex >= _items.length) {
-      return _buildEmpty(isDark: isDark, isWarm: isWarm);
+    final items = _items;
+    if (items.isEmpty || _topIndex >= items.length) {
+      return _buildEmpty();
     }
-    // 6/18 重构: 单卡 horizontal banner (Brien 参考图 = 1 张大横向卡, 不是 3 张叠)
-    final top = _items[_topIndex];
+    final top = items[_topIndex];
+    final mid = _topIndex + 1 < items.length ? items[_topIndex + 1] : null;
+    final bot = _topIndex + 2 < items.length ? items[_topIndex + 2] : null;
 
     return Column(
       crossAxisAlignment: CrossAxisAlignment.stretch,
+      mainAxisSize: MainAxisSize.min,
       children: [
-        // 顶部进度指示
+        // 进度
         Padding(
           padding: const EdgeInsets.symmetric(horizontal: 4),
           child: Row(
             children: [
               Text(
                 widget.isEn
-                    ? 'Discover ${_topIndex + 1} / ${_items.length}'
-                    : '发现 ${_topIndex + 1} / ${_items.length}',
+                    ? 'Discover ${_topIndex + 1} / ${items.length}'
+                    : '发现 ${_topIndex + 1} / ${items.length}',
                 style: TextStyle(
-                  fontSize: 12 * _scale,
-                  color: (isDark ? GlassStyle.onGlassPrimaryDark : GlassStyle.onGlassPrimary).withOpacity(0.85),
+                  fontSize: 12,
+                  color: Colors.black54,
                   fontWeight: FontWeight.w500,
                 ),
               ),
@@ -187,383 +206,345 @@ class _TinderRecommendationStackState extends State<TinderRecommendationStack>
           ),
         ),
         const SizedBox(height: 8),
-        // 6/19: 36Kr horizontal banner 高度 110 (跟参考图 5min 阅读卡同比例)
         SizedBox(
-          height: 110,
-          child: _buildCard(top, isTop: true, isDark: isDark, isWarm: isWarm),
-        ),
-        const SizedBox(height: 16),
-        // 6/19 重构: 拿掉 3 按钮 (36Kr 风格 feed 不需 滑卡按钮, 只点 整卡 进详情)
-      ],
-    );
-  }
-
-  Widget _buildTopCard(ContentItem item, {required bool isDark, required bool isWarm}) {
-    return _buildCard(item, isTop: true, isDark: isDark, isWarm: isWarm);
-  }
-
-  Widget _buildBackgroundCard(
-    ContentItem item, {
-    required double scale,
-    required double offsetY,
-    required double opacity,
-    required bool isDark,
-    required bool isWarm,
-  }) {
-    return Transform.translate(
-      offset: Offset(0, offsetY),
-      child: Transform.scale(
-        scale: scale,
-        child: Opacity(
-          opacity: opacity,
-          child: _buildCard(item, isTop: false, isDark: isDark, isWarm: isWarm),
-        ),
-      ),
-    );
-  }
-  Widget _buildCard(ContentItem item,
-      {double scale = 1.0, bool isTop = true, required bool isDark, required bool isWarm}) {
-    // 6/19 重构: 36Kr 风格 horizontal banner
-    // 卡底: 米黄 #F5F5DC + 大阴影 + 顶高光 (不靠 BackdropFilter, Flutter web 不生效)
-    // 文字: 深棕 #3D2817 (标题) + 灰棕 #6B5B4F (副)
-    // 右图: 浅米黄渐变 + 小 icon (非中心大 icon)
-    const cream = Color(0xFFF5F5DC);   // 卡底米黄
-    const deepBrown = Color(0xFF3D2817);  // 标题深棕
-    const grayBrown = Color(0xFF6B5B4F);  // 副文灰棕
-    const accentBlue = Color(0xFF1E40AF); // 阅读 → 蓝色链接
-    return Container(
-      decoration: BoxDecoration(
-        color: cream,
-        borderRadius: BorderRadius.circular(16),
-        // 6/19 顶高光边: 上 1.5px 亮白边
-        border: Border(
-          top: BorderSide(color: Colors.white.withOpacity(0.7), width: 1.5),
-          left: BorderSide(color: Colors.black.withOpacity(0.04), width: 0.5),
-          right: BorderSide(color: Colors.black.withOpacity(0.04), width: 0.5),
-          bottom: BorderSide(color: Colors.black.withOpacity(0.04), width: 0.5),
-        ),
-        // 6/19 大阴影 + 接触阴影
-        boxShadow: [
-          BoxShadow(
-            color: Colors.black.withOpacity(0.08),
-            blurRadius: 24,
-            offset: const Offset(0, 6),
-          ),
-          BoxShadow(
-            color: Colors.black.withOpacity(0.04),
-            blurRadius: 2,
-            offset: const Offset(0, 1),
-          ),
-        ],
-      ),
-      child: Material(
-        color: Colors.transparent,
-        child: InkWell(
-          borderRadius: BorderRadius.circular(16),
-          onTap: isTop ? () => _onTapItem(item) : null,
-          child: Row(
-            crossAxisAlignment: CrossAxisAlignment.stretch,
+          height: 460, // 借鉴简化版比例 (16+8+460+8+actionBar)
+          child: Stack(
+            alignment: Alignment.center,
             children: [
-              // 6/19 左 70% 文字区
-              Expanded(
-                child: Padding(
-                  padding: EdgeInsets.fromLTRB(
-                    16 * _scale, 12 * _scale, 12 * _scale, 12 * _scale,
-                  ),
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                    children: [
-                      // 6/19 顶行: source 右上 (不是 36氪 顶 logo, 简单文字)
-                      Align(
-                        alignment: Alignment.topRight,
-                        child: Text(
-                          item.source,
-                          style: TextStyle(
-                            fontSize: 12 * _scale,
-                            fontWeight: FontWeight.w600,
-                            color: grayBrown,
-                          ),
-                        ),
-                      ),
-                      // 6/19 中行: 标题 (深棕大字)
-                      Text(
-                        item.title,
-                        maxLines: 2,
-                        overflow: TextOverflow.ellipsis,
-                        style: TextStyle(
-                          fontSize: 17 * _scale,
-                          fontWeight: FontWeight.w700,
-                          color: deepBrown,
-                          height: 1.25,
-                        ),
-                      ),
-                      // 6/19 底行: 5min + 阅读 →  (左下 5min, 右下阅读 → 蓝色)
-                      Row(
-                        children: [
-                          Icon(Icons.access_time, size: 12, color: grayBrown),
-                          const SizedBox(width: 4),
-                          Text(
-                            item.duration,
-                            style: TextStyle(
-                              fontSize: 11 * _scale,
-                              color: grayBrown,
-                            ),
-                          ),
-                          const Spacer(),
-                          if (isTop)
-                            Text(
-                              widget.isEn ? 'Read →' : '阅读 →',
-                              style: TextStyle(
-                                fontSize: 12 * _scale,
-                                color: accentBlue,
-                                fontWeight: FontWeight.w600,
-                              ),
-                            ),
-                        ],
-                      ),
-                    ],
-                  ),
-                ),
-              ),
-              // 6/19 右 30% 图区: 浅米黄渐变 + 小 icon (不是中心大 icon)
-              SizedBox(
-                width: 90 * _scale,
-                child: Container(
-                  decoration: BoxDecoration(
-                    gradient: const LinearGradient(
-                      begin: Alignment.topLeft,
-                      end: Alignment.bottomRight,
-                      colors: [Color(0xFFFAF6E8), Color(0xFFE8DCC0)],
-                    ),
-                    borderRadius: const BorderRadius.only(
-                      topRight: Radius.circular(16),
-                      bottomRight: Radius.circular(16),
-                    ),
-                  ),
-                  child: Center(
-                    child: Icon(
-                      item.contentType.icon,
-                      size: 32 * _scale,
-                      color: deepBrown.withOpacity(0.55),
-                    ),
-                  ),
-                ),
-              ),
+              // 借鉴简化版 3 张叠放 (倒序绘制, bot 在最底)
+              if (bot != null)
+                _buildBackgroundCard(bot, offset: 2, scale: 0.94, opacity: 0.5),
+              if (mid != null)
+                _buildBackgroundCard(mid, offset: 1, scale: 0.97, opacity: 0.75),
+              _buildTopCard(top),
             ],
           ),
         ),
+        const SizedBox(height: 16),
+        // 3 圆按钮 (借鉴简化版 _actionButton 模式)
+        _buildActionBar(top),
+      ],
+    );
+  }
+
+  Widget _buildBackgroundCard(ContentItem item, {required int offset, required double scale, required double opacity}) {
+    return Positioned.fill(
+      child: Padding(
+        padding: EdgeInsets.fromLTRB(
+          16.0 + offset * 6,
+          8.0 + offset * 6,
+          16.0 + offset * 6,
+          8,
+        ),
+        child: Opacity(
+          opacity: opacity,
+          child: Transform.scale(
+            scale: scale,
+            child: IgnorePointer(
+              // 6/22 借鉴简化版: 背景卡包 IgnorePointer 避免 desktop 命中穿透
+              child: _buildCard(item, isTop: false),
+            ),
+          ),
+        ),
       ),
     );
   }
 
-  // 6/15 v2: 上半 75% 图区域 — scene 色相渐变 + 中心大 icon
-  Widget _buildImageArea(ContentItem item, {required bool isTop}) {
-    final gradColors = _gradForContent(item);
-    return Stack(
-      fit: StackFit.expand,
-      children: [
-        Container(
-          decoration: BoxDecoration(
-            gradient: LinearGradient(
-              colors: gradColors,
-              begin: Alignment.topLeft,
-              end: Alignment.bottomRight,
+  Widget _buildTopCard(ContentItem item) {
+    return Positioned.fill(
+      child: Padding(
+        padding: const EdgeInsets.fromLTRB(16, 8, 16, 8),
+        // 6/22 借鉴简化版关键: 整卡用 GestureDetector 包裹 (不是 InkWell 嵌套)
+        child: GestureDetector(
+          onPanStart: _onPanStart,
+          onPanUpdate: _onPanUpdate,
+          onPanEnd: _onPanEnd,
+          onTap: () => _onTapItem(item),
+          child: AnimatedContainer(
+            duration: _isDragging
+                ? Duration.zero
+                : const Duration(milliseconds: 250),
+            curve: Curves.easeOut,
+            transform: Matrix4.identity()
+              ..translate(_dragOffset.dx, _dragOffset.dy)
+              ..rotateZ(_dragAngle),
+            child: Stack(
+              children: [
+                _buildCard(item, isTop: true),
+                // 拖动时的 label 提示 (借鉴简化版 _buildSwipeLabel)
+                if (_dragOffset.dx < -30)
+                  Positioned(
+                    top: 24,
+                    left: 24,
+                    child: _buildSwipeLabel(
+                      widget.isEn ? 'Skip' : '跳过',
+                      Colors.red,
+                      Icons.close,
+                    ),
+                  ),
+                if (_dragOffset.dx > 30)
+                  Positioned(
+                    top: 24,
+                    right: 24,
+                    child: _buildSwipeLabel(
+                      widget.isEn ? 'Like' : '喜欢',
+                      Colors.pink,
+                      Icons.favorite,
+                    ),
+                  ),
+              ],
             ),
           ),
         ),
-        Center(
-          child: Icon(
-            item.contentType.icon,
-            size: 64 * _scale,
-            color: Colors.white.withOpacity(0.85),
-          ),
-        ),
-        if (isTop)
-          Positioned(
-            top: 12 * _scale,
-            left: 12 * _scale,
+      ),
+    );
+  }
+
+  Widget _buildSwipeLabel(String text, Color color, IconData icon) {
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+      decoration: BoxDecoration(
+        color: color.withOpacity(0.15),
+        border: Border.all(color: color, width: 2),
+        borderRadius: BorderRadius.circular(8),
+      ),
+      child: Row(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Icon(icon, color: color, size: 16),
+          const SizedBox(width: 4),
+          Text(text, style: TextStyle(color: color, fontWeight: FontWeight.bold)),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildCard(ContentItem item, {required bool isTop}) {
+    final isDark = Theme.of(context).brightness == Brightness.dark;
+    final isWarm = EyeProtectionScope.of(context);
+    final color = isWarm
+        ? const Color(0xFFFAF0E6)
+        : isDark
+            ? const Color(0xFF2A2A2A)
+            : Colors.white;
+    final textColor = isWarm
+        ? const Color(0xFF3D2817)
+        : isDark
+            ? Colors.white
+            : const Color(0xFF3D2817);
+
+    return Card(
+      elevation: isTop ? 8 : 2,
+      shadowColor: Colors.black26,
+      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
+      clipBehavior: Clip.antiAlias,
+      color: color,
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          // 6/22 简化: 上半 = 渐变 + 大 icon (scene 色相)
+          Expanded(
+            flex: 3,
             child: Container(
-              padding: EdgeInsets.symmetric(
-                  horizontal: 10 * _scale, vertical: 4 * _scale),
+              width: double.infinity,
               decoration: BoxDecoration(
-                color: Colors.black.withOpacity(0.35),
-                borderRadius: BorderRadius.circular(12),
-              ),
-              child: Text(
-                item.contentType.name,
-                style: TextStyle(
-                  fontSize: 11 * _scale,
-                  color: Colors.white,
-                  fontWeight: FontWeight.w600,
+                gradient: LinearGradient(
+                  begin: Alignment.topLeft,
+                  end: Alignment.bottomRight,
+                  colors: _gradForContent(item),
                 ),
               ),
+              child: Stack(
+                children: [
+                  Center(
+                    child: Icon(
+                      item.contentType.icon,
+                      size: 72,
+                      color: Colors.white.withOpacity(0.5),
+                    ),
+                  ),
+                  Positioned(
+                    top: 12,
+                    left: 12,
+                    child: Container(
+                      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+                      decoration: BoxDecoration(
+                        color: Colors.white.withOpacity(0.25),
+                        borderRadius: BorderRadius.circular(20),
+                      ),
+                      child: Text(
+                        item.contentType.label,
+                        style: const TextStyle(
+                          color: Colors.white,
+                          fontSize: 11,
+                          fontWeight: FontWeight.w600,
+                        ),
+                      ),
+                    ),
+                  ),
+                ],
+              ),
             ),
           ),
-      ],
+          // 下半 = 文字区 (白底 / 浅桃底 + 深棕字)
+          Expanded(
+            flex: 2,
+            child: Padding(
+              padding: const EdgeInsets.all(16),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Row(
+                    children: [
+                      Container(
+                        padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
+                        decoration: BoxDecoration(
+                          color: const Color(0xFF1A237E),
+                          borderRadius: BorderRadius.circular(4),
+                        ),
+                        child: Text(
+                          item.source,
+                          style: const TextStyle(color: Colors.white, fontSize: 11, fontWeight: FontWeight.w600),
+                        ),
+                      ),
+                      const SizedBox(width: 8),
+                      Icon(Icons.access_time, size: 11, color: textColor.withOpacity(0.6)),
+                      const SizedBox(width: 3),
+                      Text(
+                        item.duration,
+                        style: TextStyle(fontSize: 11, color: textColor.withOpacity(0.6)),
+                      ),
+                      const Spacer(),
+                      if (isTop)
+                        Text(
+                          widget.isEn ? 'Read →' : '阅读 →',
+                          style: const TextStyle(
+                            fontSize: 12,
+                            color: Color(0xFF1E40AF),
+                            fontWeight: FontWeight.w600,
+                          ),
+                        ),
+                    ],
+                  ),
+                  const SizedBox(height: 8),
+                  Text(
+                    item.title,
+                    maxLines: 2,
+                    overflow: TextOverflow.ellipsis,
+                    style: TextStyle(
+                      fontSize: 16,
+                      fontWeight: FontWeight.w700,
+                      color: textColor,
+                      height: 1.3,
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          ),
+        ],
+      ),
     );
   }
 
-  // 按内容类型给 2 色渐变
-  // 6/18 改: 渐变统色浅米黄 (顺 6/15 颜色宪法 ≤ 400 + 36Kr 风格)
-  // 全部 5 类型用同一对米黄: 深米 #F5EDD8 → 极浅米 #FAF6E8
-  // 区别靠小 icon (article/book, audio/headphones, video/play, short/flash, card/style)
   List<Color> _gradForContent(ContentItem item) {
-    return const [Color(0xFFF5EDD8), Color(0xFFFAF6E8)];
-  }  Widget _buildActionRow(ContentItem item) {
-    final btnSize = widget.isElderlyMode ? 64.0 : 52.0;
+    switch (item.contentType.name) {
+      case 'article': return [const Color(0xFF7C5CFC), const Color(0xFFA48BFF)];
+      case 'audio':   return [const Color(0xFF0891B2), const Color(0xFF67E8F9)];
+      case 'video':   return [const Color(0xFFEA580C), const Color(0xFFFDBA74)];
+      case 'short':   return [const Color(0xFF16A34A), const Color(0xFF86EFAC)];
+      case 'card':    return [const Color(0xFFDB2777), const Color(0xFFFBCFE8)];
+      default:        return [const Color(0xFF6B7280), const Color(0xFFD1D5DB)];
+    }
+  }
+
+  Widget _buildActionBar(ContentItem item) {
+    final size = widget.isElderlyMode ? 64.0 : 52.0;
     final iconSize = widget.isElderlyMode ? 30.0 : 24.0;
-    return Row(
-      mainAxisAlignment: MainAxisAlignment.spaceEvenly,
+    return Padding(
+      padding: const EdgeInsets.symmetric(horizontal: 40, vertical: 8),
+      child: Row(
+        mainAxisAlignment: MainAxisAlignment.spaceEvenly,
+        children: [
+          _actionButton(
+            icon: Icons.close,
+            color: Colors.red,
+            size: size,
+            iconSize: iconSize,
+            onTap: () => _onDismiss(item),
+            label: widget.isEn ? 'Skip' : '跳过',
+          ),
+          _actionButton(
+            icon: Icons.touch_app,
+            color: const Color(0xFF7C5CFC),
+            size: size,
+            iconSize: iconSize,
+            onTap: () => _onTapItem(item),
+            label: widget.isEn ? 'Detail' : '详情',
+          ),
+          _actionButton(
+            icon: Icons.favorite,
+            color: Colors.pink,
+            size: size,
+            iconSize: iconSize,
+            onTap: () => _onLike(item),
+            label: widget.isEn ? 'Like' : '喜欢',
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _actionButton({
+    required IconData icon,
+    required Color color,
+    required double size,
+    required double iconSize,
+    required VoidCallback onTap,
+    required String label,
+  }) {
+    return Column(
+      mainAxisSize: MainAxisSize.min,
       children: [
-        // ❌ 跳过
-        _ActionButton(
-          size: btnSize,
-          icon: Icons.close,
-          color: GlassStyle.danger,
-          tooltip: widget.isEn ? 'Skip' : '跳过',
-          onTap: () => _onDismiss(item),
+        GestureDetector(
+          onTap: onTap,
+          child: Container(
+            width: size,
+            height: size,
+            decoration: BoxDecoration(
+              shape: BoxShape.circle,
+              color: Colors.white,
+              border: Border.all(color: color.withOpacity(0.4), width: 2),
+              boxShadow: [
+                BoxShadow(
+                  color: color.withOpacity(0.15),
+                  blurRadius: 8,
+                  offset: const Offset(0, 3),
+                ),
+              ],
+            ),
+            child: Icon(icon, color: color, size: iconSize),
+          ),
         ),
-        // 👆 进入
-        _ActionButton(
-          size: btnSize,
-          icon: Icons.touch_app,
-          color: GlassStyle.accent,
-          tooltip: widget.isEn ? 'Open' : '进入',
-          onTap: () => _onTapItem(item),
-        ),
-        // ❤️ 收藏
-        _ActionButton(
-          size: btnSize,
-          icon: Icons.favorite,
-          color: const Color(0xFFFF6B9D),
-          tooltip: widget.isEn ? 'Save' : '收藏',
-          onTap: () => _onLike(item),
-        ),
+        const SizedBox(height: 4),
+        Text(label, style: TextStyle(fontSize: 11, color: color)),
       ],
     );
   }
 
-  Widget _buildEmpty({required bool isDark, required bool isWarm}) {
+  Widget _buildEmpty() {
     return Padding(
       padding: const EdgeInsets.all(24),
       child: Column(
         mainAxisSize: MainAxisSize.min,
         children: [
-          Icon(Icons.celebration, size: 48, color: (isWarm
-              ? GlassStyle.onGlassPrimaryWarm
-              : isDark
-                  ? GlassStyle.onGlassPrimaryDark
-                  : GlassStyle.onGlassPrimary).withOpacity(0.7)),
+          Icon(Icons.check_circle_outline, size: 64, color: Colors.indigo.withOpacity(0.4)),
           const SizedBox(height: 12),
           Text(
-            widget.isEn ? 'You\'ve seen them all!' : '看完啦！',
-            style: TextStyle(
-              fontSize: 18,
-              fontWeight: FontWeight.w600,
-              color: isWarm
-                  ? GlassStyle.onGlassPrimaryWarm
-                  : isDark
-                      ? GlassStyle.onGlassPrimaryDark
-                      : GlassStyle.onGlassPrimary,
-            ),
-          ),
-          const SizedBox(height: 8),
-          Text(
-            widget.isEn
-                ? 'Your preferences are saved. Coming recommendations will be smarter.'
-                : '偏好已记录，下次推荐会更懂你。',
-            textAlign: TextAlign.center,
-            style: TextStyle(
-              fontSize: 13,
-              color: (isWarm
-                      ? GlassStyle.onGlassPrimaryWarm
-                      : isDark
-                          ? GlassStyle.onGlassPrimaryDark
-                          : GlassStyle.onGlassPrimary)
-                  .withOpacity(0.7),
-            ),
+            widget.isEn ? '🎉 All done!' : '🎉 看完啦！',
+            style: const TextStyle(fontSize: 18, fontWeight: FontWeight.w600),
           ),
         ],
-      ),
-    );
-  }
-}
-
-class _ActionButton extends StatelessWidget {
-  final double size;
-  final double iconSize;
-  final IconData icon;
-  final Color color;
-  final String tooltip;
-  final VoidCallback onTap;
-
-  const _ActionButton({
-    required this.size,
-    required this.icon,
-    required this.color,
-    required this.tooltip,
-    required this.onTap,
-    this.iconSize = 24,
-  });
-
-  @override
-  Widget build(BuildContext context) {
-    // 6/14 visionOS 风格：圆形 → 大圆角胶囊(更像水滴)
-    final radius = size * 0.42; // 接近正圆但保留小角度偏移感
-    return Tooltip(
-      message: tooltip,
-      child: ClipRRect(
-        borderRadius: BorderRadius.circular(radius),
-        child: BackdropFilter(
-          // 6/14 升级：20→30 (Liquid 高模糊)
-          filter: ImageFilter.blur(sigmaX: 30, sigmaY: 30),
-          child: Material(
-            // 6/14 升级：glassLiquidButton 渐变高光
-            color: Colors.transparent,
-            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(radius)),
-            child: InkWell(
-              onTap: onTap,
-              customBorder: RoundedRectangleBorder(borderRadius: BorderRadius.circular(radius)),
-              child: Container(
-                width: size,
-                height: size,
-                decoration: GlassStyle.glassLiquidButton(
-                  radius: radius,
-                  borderColor: color.withOpacity(0.45),
-                ),
-                child: Stack(
-                  alignment: Alignment.center,
-                  children: [
-                    // 6/14 顶亮高光：上半部圆弧白渐变
-                    Positioned.fill(
-                      child: ClipRRect(
-                        borderRadius: BorderRadius.circular(radius),
-                        child: Align(
-                          alignment: Alignment.topCenter,
-                          child: Container(
-                            height: size * 0.4,
-                            decoration: BoxDecoration(
-                              gradient: LinearGradient(
-                                begin: Alignment.topCenter,
-                                end: Alignment.bottomCenter,
-                                colors: [
-                                  Colors.white.withOpacity(0.35),
-                                  Colors.white.withOpacity(0),
-                                ],
-                              ),
-                            ),
-                          ),
-                        ),
-                      ),
-                    ),
-                    Icon(icon, color: color, size: iconSize),
-                  ],
-                ),
-              ),
-            ),
-          ),
-        ),
       ),
     );
   }
