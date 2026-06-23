@@ -1,7 +1,8 @@
 // lib/widgets/tinder_recommendation_stack.dart
-// 6/22 重写: 借鉴别的 AI 那个 537 行简化版的 GestureDetector 模式 (整卡包 GestureDetector,
-//   onTap = 闭包 push prefill, onPan 跟 _dragOffset + _animateOut 飞出).
-// 改用 GestureDetector 替换 6/16 那个 InkWell + IgnorePointer 嵌套 (1.5h 改 5 次没验过).
+// 6/22 重写: 借鉴别的 AI 那个 410 行简化版 (interactive: true/false 模式).
+// 23:07 借鉴版 _buildCardContent(item, interactive: true) = 内部按 interactive 控制 onPressed + 事件分发.
+// 我 17:34 这版 GestureDetector 在 _buildTopCard 外层 = 背景卡 _buildBackgroundCard 自然无 GestureDetector = 已实现 interactive: false 分离.
+// IgnorePointer 冗余, 删.
 //
 // 父 widget 接口 (ContentScreen 调用) 不变:
 //   onTapItem: (it) async { await Navigator.push(...) }  ← 闭包
@@ -189,7 +190,7 @@ class _TinderRecommendationStackState extends State<TinderRecommendationStack> {
       children: [
         // 进度
         Padding(
-          padding: const EdgeInsets.symmetric(horizontal: 4),
+          padding: const EdgeInsets.symmetric(horizontal: 8),
           child: Row(
             children: [
               Text(
@@ -207,7 +208,7 @@ class _TinderRecommendationStackState extends State<TinderRecommendationStack> {
         ),
         const SizedBox(height: 8),
         SizedBox(
-          height: 460, // 借鉴简化版比例 (16+8+460+8+actionBar)
+          height: 240, // 6/23 Brien 反馈 tinder 卡太大,460→360→320→240
           child: Stack(
             alignment: Alignment.center,
             children: [
@@ -228,22 +229,23 @@ class _TinderRecommendationStackState extends State<TinderRecommendationStack> {
   }
 
   Widget _buildBackgroundCard(ContentItem item, {required int offset, required double scale, required double opacity}) {
+    // 6/22 借鉴 Brien 那个 23:07 简化版: 背景卡不包 GestureDetector (外层 none) = 不能点 + 不穿透
+    // 23:07 内部 _buildCardContent(item, interactive: false) 是为了 "阅读" 按钮不显示 + 事件不传递
+    // 我 17:34 这版 GestureDetector 在 _buildTopCard 外层, 背景卡 _buildBackgroundCard 自然无 GestureDetector = 已实现 interactive: false
+    // IgnorePointer 冗余, 删
     return Positioned.fill(
       child: Padding(
         padding: EdgeInsets.fromLTRB(
-          16.0 + offset * 6,
+          48.0 + offset * 6,
           8.0 + offset * 6,
-          16.0 + offset * 6,
+          48.0 + offset * 6,
           8,
         ),
         child: Opacity(
           opacity: opacity,
           child: Transform.scale(
             scale: scale,
-            child: IgnorePointer(
-              // 6/22 借鉴简化版: 背景卡包 IgnorePointer 避免 desktop 命中穿透
-              child: _buildCard(item, isTop: false),
-            ),
+            child: _buildCard(item, isTop: false),
           ),
         ),
       ),
@@ -253,7 +255,7 @@ class _TinderRecommendationStackState extends State<TinderRecommendationStack> {
   Widget _buildTopCard(ContentItem item) {
     return Positioned.fill(
       child: Padding(
-        padding: const EdgeInsets.fromLTRB(16, 8, 16, 8),
+        padding: const EdgeInsets.fromLTRB(48, 8, 48, 8), // 6/23 Brien 反馈瘦,16→48
         // 6/22 借鉴简化版关键: 整卡用 GestureDetector 包裹 (不是 InkWell 嵌套)
         child: GestureDetector(
           onPanStart: _onPanStart,
@@ -333,19 +335,22 @@ class _TinderRecommendationStackState extends State<TinderRecommendationStack> {
             ? Colors.white
             : const Color(0xFF3D2817);
 
-    return Card(
-      elevation: isTop ? 8 : 2,
-      shadowColor: Colors.black26,
-      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
-      clipBehavior: Clip.antiAlias,
-      color: color,
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          // 6/22 简化: 上半 = 渐变 + 大 icon (scene 色相)
-          Expanded(
-            flex: 3,
-            child: Container(
+    return SizedBox(
+      height: 240,
+      child: Card(
+        elevation: isTop ? 8 : 2,
+        shadowColor: Colors.black26,
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
+        clipBehavior: Clip.antiAlias,
+        color: color,
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            // 6/22 简化: 上半 = 渐变 + 大 icon (scene 色相) - 6/23 修: 不能用 Expanded (父无 bounded height) 改固定高度
+            // 6/23 Brien 反馈封面太厚,200→150→120
+            SizedBox(
+              height: 120,
+              child: Container(
               width: double.infinity,
               decoration: BoxDecoration(
                 gradient: LinearGradient(
@@ -359,7 +364,7 @@ class _TinderRecommendationStackState extends State<TinderRecommendationStack> {
                   Center(
                     child: Icon(
                       item.contentType.icon,
-                      size: 72,
+                      size: 44, // 6/23 封面变薄,icon 72→56→44
                       color: Colors.white.withOpacity(0.5),
                     ),
                   ),
@@ -386,11 +391,11 @@ class _TinderRecommendationStackState extends State<TinderRecommendationStack> {
               ),
             ),
           ),
-          // 下半 = 文字区 (白底 / 浅桃底 + 深棕字)
-          Expanded(
-            flex: 2,
+          // 下半 = 文字区 (白底 / 浅桃底 + 深棕字) - 6/23 修: 固定高度
+          SizedBox(
+            height: 120,
             child: Padding(
-              padding: const EdgeInsets.all(16),
+              padding: const EdgeInsets.all(12),  // 6/23 Brien 反馈 content 保持 120,16→12 收紧 padding
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
@@ -432,10 +437,10 @@ class _TinderRecommendationStackState extends State<TinderRecommendationStack> {
                     maxLines: 2,
                     overflow: TextOverflow.ellipsis,
                     style: TextStyle(
-                      fontSize: 16,
+                      fontSize: 14,  // 6/23 content 收紧,16→14
                       fontWeight: FontWeight.w700,
                       color: textColor,
-                      height: 1.3,
+                      height: 1.25,  // 行高也收紧
                     ),
                   ),
                 ],
@@ -444,7 +449,7 @@ class _TinderRecommendationStackState extends State<TinderRecommendationStack> {
           ),
         ],
       ),
-    );
+    ));
   }
 
   List<Color> _gradForContent(ContentItem item) {

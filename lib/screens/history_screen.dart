@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import '../theme/app_theme.dart';
 import '../theme/glass_decoration.dart';
 import '../services/history_service.dart';
+import '../widgets/skeleton.dart';
 import 'content_reader_screen.dart';
 
 /// 6/7 步骤 2：阅读历史
@@ -98,7 +99,15 @@ class _HistoryScreenState extends State<HistoryScreen> {
         ],
       ),
       body: _loading
-          ? const Center(child: CircularProgressIndicator())
+          // 6/23: 骨架屏替换 loading 圈
+          ? ListView.builder(
+              padding: const EdgeInsets.all(16),
+              itemCount: 4,
+              itemBuilder: (_, __) => const Padding(
+                padding: EdgeInsets.only(bottom: 10),
+                child: ListItemSkeleton(),
+              ),
+            )
           : _items.isEmpty
               ? Center(
                   child: Padding(
