@@ -5,6 +5,7 @@ import '../theme/app_theme.dart';
 import '../services/content_aggregator.dart';
 import '../services/local_subscription_service.dart';
 import '../services/analytics_service.dart';
+import '../widgets/skeleton.dart';
 import 'content_reader_screen.dart';
 
 class SearchScreen extends StatefulWidget {

@@ -4,6 +4,7 @@ import '../theme/app_theme.dart';
 import '../theme/glass_decoration.dart';
 import '../services/analytics_service.dart';
 import '../services/local_subscription_service.dart';
+import '../services/time_aware_recommender.dart';
 import 'scene_screen.dart';
 import 'content_screen.dart';
 
@@ -172,6 +173,68 @@ class UserTypeScreen extends StatelessWidget {
                 subtitleText,
                 style: TextStyle(fontSize: 14 * scale, color: AppTheme.textLight),
               ),
+              SizedBox(height: 12 * scale),
+              // 6/23: 按时段推荐 banner — 从精简版学来
+              Builder(builder: (_) {
+                final rec = TimeAwareRecommender.current;
+                return Container(
+                  margin: EdgeInsets.only(bottom: 12 * scale),
+                  padding: EdgeInsets.symmetric(horizontal: 14 * scale, vertical: 10 * scale),
+                  decoration: BoxDecoration(
+                    color: AppTheme.primary.withOpacity(0.08),
+                    borderRadius: BorderRadius.circular(12),
+                    border: Border.all(color: AppTheme.primary.withOpacity(0.2)),
+                  ),
+                  child: Row(children: [
+                    Icon(Icons.auto_awesome, size: 14 * scale, color: AppTheme.primary),
+                    SizedBox(width: 6),
+                    Expanded(
+                      child: Text(
+                        isEn
+                            ? 'Right now, we recommend: ${rec.label}'
+                            : '根据现在的时间,推荐你: ${rec.label}',
+                        style: TextStyle(
+                          fontSize: 12 * scale,
+                          color: AppTheme.primary,
+                          fontWeight: FontWeight.w500,
+                        ),
+                      ),
+                    ),
+                    GestureDetector(
+                      onTap: () {
+                        AnalyticsService.instance.track(
+                          AnalyticsService.EVT_USER_TYPE_SELECT,
+                          props: {'userType': rec.userType.name, 'source': 'time_recommend_banner'},
+                        );
+                        onUserTypeSelected(rec.userType);
+                        // 6/23 fix: 跟 _TodayPickCard 一致，跳到 SceneScreen — 之前没跳所以点不开
+                        Navigator.push(
+                          context,
+                          MaterialPageRoute(
+                            builder: (_) => SceneScreen(
+                              userType: rec.userType,
+                              isInternational: isInternational,
+                              isElderlyMode: isElderlyMode,
+                              languageCode: languageCode,
+                            ),
+                          ),
+                        );
+                      },
+                      child: Container(
+                        padding: EdgeInsets.symmetric(horizontal: 10 * scale, vertical: 4 * scale),
+                        decoration: BoxDecoration(
+                          color: AppTheme.primary,
+                          borderRadius: BorderRadius.circular(20),
+                        ),
+                        child: Text(
+                          isEn ? 'Go' : '去逛逛',
+                          style: TextStyle(color: Colors.white, fontSize: 11 * scale, fontWeight: FontWeight.bold),
+                        ),
+                      ),
+                    ),
+                  ]),
+                );
+              }),
               SizedBox(height: 12 * scale),
               // 6/9 A：今日推荐 hero 按钮 — 0 步选角色，直接给 1 条内容
               _TodayPickCard(

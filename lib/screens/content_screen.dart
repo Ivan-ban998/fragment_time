@@ -115,7 +115,10 @@ class _ContentScreenState extends State<ContentScreen> {
     _loadInProgress();
     _loadTodayCount();
     _loadTlDr();
-    _startLlm();
+    // 6/23: prefillItem != null 跳过 LLM,避免重生成跟描述冲突
+    if (widget.prefillItem == null) {
+      _startLlm();
+    }
     _recordOpen();
     _startProgressTimer();
     _bodyScroll.addListener(_onBodyScroll);
@@ -233,6 +236,7 @@ class _ContentScreenState extends State<ContentScreen> {
   Future<void> _writeProgress(int p) async {
     if (_aiContentItem == null) return;
     if (p <= _progress) return;
+    if (!mounted) return;  // 6/23: 防御 setState after dispose
     setState(() => _progress = p);
     try {
       await LocalSubscriptionService.instance.updateProgress(_aiContentItem!, p);
@@ -471,16 +475,15 @@ class _ContentScreenState extends State<ContentScreen> {
                     isEn: isEn,
                     isElderlyMode: widget.isElderlyMode,
                     onTapItem: (it) async {
+                      // 6/23 修: 之前 push ContentScreen(prefillItem: it) — 会递归起同一个 screen,LLM/进度/timer 二次跑,崩或回到角色选择
+                      // 现在 push ContentReaderScreen (专门 detail 屏,接管 item)
                       await Navigator.push(
                         context,
                         MaterialPageRoute(
-                          builder: (_) => ContentScreen(
-                            userType: widget.userType,
-                            scene: widget.scene,
-                            isInternational: widget.isInternational,
+                          builder: (_) => ContentReaderScreen(
+                            item: it,
                             isElderlyMode: widget.isElderlyMode,
-                            languageCode: widget.languageCode,
-                            prefillItem: it,
+                            isEn: isEn,
                           ),
                         ),
                       );
