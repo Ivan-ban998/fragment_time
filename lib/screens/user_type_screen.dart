@@ -7,6 +7,7 @@ import '../services/local_subscription_service.dart';
 import '../services/time_aware_recommender.dart';
 import 'scene_screen.dart';
 import 'content_screen.dart';
+import 'topic_onboarding_screen.dart';
 
 class UserTypeScreen extends StatefulWidget {
   final dynamic config;
@@ -355,14 +356,26 @@ class _UserTypeScreenState extends State<UserTypeScreen> {
                                   AnalyticsService.instance.track(AnalyticsService.EVT_USER_TYPE_SELECT,
                                       props: {'userType': ut.type.name});
                                   widget.onUserTypeSelected(ut.type);
+                                  // 6/24 v15: 角色选完 → 话题 onboarding (可跳过) → SceneScreen
                                   Navigator.push(
                                     context,
                                     MaterialPageRoute(
-                                      builder: (_) => SceneScreen(
-                                        userType: ut.type,
-                                        isInternational: widget.isInternational,
+                                      builder: (_) => TopicOnboardingScreen(
+                                        isEn: isEn,
                                         isElderlyMode: widget.isElderlyMode,
-                                        languageCode: widget.languageCode,
+                                        onComplete: () {
+                                          Navigator.pushReplacement(
+                                            context,
+                                            MaterialPageRoute(
+                                              builder: (_) => SceneScreen(
+                                                userType: ut.type,
+                                                isInternational: widget.isInternational,
+                                                isElderlyMode: widget.isElderlyMode,
+                                                languageCode: widget.languageCode,
+                                              ),
+                                            ),
+                                          );
+                                        },
                                       ),
                                     ),
                                   );
