@@ -335,7 +335,8 @@ class _UserTypeScreenState extends State<UserTypeScreen> {
                       LayoutBuilder(
                         builder: (context, constraints) {
                           final w = constraints.maxWidth;
-                          final cols = w >= 480 ? 3 : 2;
+                          // 6/24 v2 亮点: 老人模式 1 列大卡 (1.6 宽高比, 字号自动放大)
+                          final cols = widget.isElderlyMode ? 1 : (w >= 480 ? 3 : 2);
                           return GridView.builder(
                             shrinkWrap: true,
                             physics: const NeverScrollableScrollPhysics(),
@@ -343,7 +344,7 @@ class _UserTypeScreenState extends State<UserTypeScreen> {
                               crossAxisCount: cols,
                               mainAxisSpacing: 16 * scale,
                               crossAxisSpacing: 16 * scale,
-                              childAspectRatio: cols == 3 ? 1.4 : 1.0,
+                              childAspectRatio: cols == 1 ? 2.4 : (cols == 3 ? 1.4 : 1.0),
                             ),
                             itemCount: primaryTypes.length,
                             itemBuilder: (context, index) {
