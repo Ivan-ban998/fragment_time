@@ -7,6 +7,7 @@ import '../models/study_group.dart';
 import '../services/study_group_service.dart';
 import '../services/handle_service.dart';
 import '../theme/app_theme.dart';
+import '../widgets/skeleton.dart';
 import 'content_reader_screen.dart';
 
 class StudyGroupScreen extends StatefulWidget {
@@ -151,7 +152,7 @@ class _StudyGroupScreenState extends State<StudyGroupScreen> {
         future: _future,
         builder: (context, snap) {
           if (!snap.hasData) {
-            return const Center(child: CircularProgressIndicator());
+            return const CardSkeleton();
           }
           final groups = snap.data!;
           if (groups.isEmpty) {
