@@ -83,11 +83,8 @@ class _UserTypeScreenState extends State<UserTypeScreen> {
             UserTypeIntl(UserType.child, '儿童', '启蒙故事/科普'),
           ];
 
-    // 6/24 B 方案：前 5 桶（学生/上班族/创业者/宝爸宝妈/儿童）默认显，退休人群折叠到"其他"
-    final primaryTypes = widget.isInternational
-        ? [userTypes[0], userTypes[1], userTypes[2], userTypes[3], userTypes[5]] // student/office/entrepreneur/parent/child
-        : [userTypes[0], userTypes[1], userTypes[2], userTypes[3], userTypes[5]];
-    final moreTypes = [userTypes[4]]; // senior
+    // 6/24 v11: 6 个角色平等 (老人回 6 桶)，卡片缩小一屏显全
+    final allUserTypes = userTypes; // student/office/entrepreneur/parent/senior/child
 
     final titleText = widget.isInternational
         ? '碎片时间'
@@ -336,19 +333,19 @@ class _UserTypeScreenState extends State<UserTypeScreen> {
                         builder: (context, constraints) {
                           final w = constraints.maxWidth;
                           // 6/24 v2 亮点: 老人模式 1 列大卡 (1.6 宽高比, 字号自动放大)
-                          final cols = widget.isElderlyMode ? 1 : (w >= 480 ? 3 : 2);
+                          final cols = widget.isElderlyMode ? 1 : (w >= 360 ? 3 : 2);
                           return GridView.builder(
                             shrinkWrap: true,
                             physics: const NeverScrollableScrollPhysics(),
                             gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
                               crossAxisCount: cols,
-                              mainAxisSpacing: 16 * scale,
-                              crossAxisSpacing: 16 * scale,
-                              childAspectRatio: cols == 1 ? 2.4 : (cols == 3 ? 1.4 : 1.0),
+                              mainAxisSpacing: 12 * scale,
+                              crossAxisSpacing: 12 * scale,
+                              childAspectRatio: cols == 1 ? 2.0 : (cols == 3 ? 1.5 : 1.2),
                             ),
-                            itemCount: primaryTypes.length,
+                            itemCount: allUserTypes.length,
                             itemBuilder: (context, index) {
-                              final ut = primaryTypes[index];
+                              final ut = allUserTypes[index];
                               final isSelected = widget.selectedUserType == ut.type;
                               return _UserTypeCard(
                                 userType: ut,
@@ -374,56 +371,6 @@ class _UserTypeScreenState extends State<UserTypeScreen> {
                             },
                           );
                         },
-                      ),
-                      SizedBox(height: 8 * scale),
-                      // 6/24 B 方案：折叠"其他人群"区 — ExpansionTile
-                      Theme(
-                        data: Theme.of(context).copyWith(dividerColor: Colors.transparent),
-                        child: ExpansionTile(
-                          initiallyExpanded: _showAllTypes,
-                          onExpansionChanged: (expanded) {
-                            setState(() => _showAllTypes = expanded);
-                          },
-                          tilePadding: EdgeInsets.symmetric(horizontal: 4 * scale),
-                          leading: Icon(Icons.expand_more, color: AppTheme.textLight, size: 20 * scale),
-                          title: Text(
-                            isEn
-                                ? (_showAllTypes ? 'Hide other identities' : 'More identities')
-                                : (_showAllTypes ? '收起其他人群' : '我属于其他人群'),
-                            style: TextStyle(
-                              fontSize: 13 * scale,
-                              color: AppTheme.textLight,
-                              fontWeight: FontWeight.w500,
-                            ),
-                          ),
-                          children: moreTypes.map((ut) {
-                            final isSelected = widget.selectedUserType == ut.type;
-                            return Padding(
-                              padding: EdgeInsets.only(bottom: 12 * scale),
-                              child: _UserTypeCard(
-                                userType: ut,
-                                scale: scale,
-                                isSelected: isSelected,
-                                onTap: () {
-                                  AnalyticsService.instance.track(AnalyticsService.EVT_USER_TYPE_SELECT,
-                                      props: {'userType': ut.type.name});
-                                  widget.onUserTypeSelected(ut.type);
-                                  Navigator.push(
-                                    context,
-                                    MaterialPageRoute(
-                                      builder: (_) => SceneScreen(
-                                        userType: ut.type,
-                                        isInternational: widget.isInternational,
-                                        isElderlyMode: widget.isElderlyMode,
-                                        languageCode: widget.languageCode,
-                                      ),
-                                    ),
-                                  );
-                                },
-                              ),
-                            );
-                          }).toList(),
-                        ),
                       ),
                     ],
                   ),

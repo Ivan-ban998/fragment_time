@@ -19,6 +19,9 @@ class MySubscriptionsScreen extends StatefulWidget {
     this.isEn = false,
   });
 
+  // 6/24 v8: GlobalKey 让详情页订阅后能 reload
+  static final reloadKey = GlobalKey<_MySubscriptionsScreenState>();
+
   @override
   State<MySubscriptionsScreen> createState() => _MySubscriptionsScreenState();
 }
@@ -30,6 +33,12 @@ class _MySubscriptionsScreenState extends State<MySubscriptionsScreen>
   bool _loading = true;
   int _followingPlatforms = 0;
   int _followingCategories = 0;
+
+  // 6/24 v8: 公开方法, main.dart 切 tab 时调用
+  void reload() {
+    debugPrint('[MySubs] reload() called, _items.length=${_items.length}');
+    _load();
+  }
 
   @override
   void initState() {
@@ -85,7 +94,10 @@ class _MySubscriptionsScreenState extends State<MySubscriptionsScreen>
   Widget build(BuildContext context) {
     final scale = widget.isElderlyMode ? 1.3 : 1.0;
     final isEn = widget.isEn;
-    return Scaffold(
+    // 6/24 v14: ListenableBuilder 监听 service — 任何 subscribe/unsubscribe 触发自动 rebuild
+    return ListenableBuilder(
+      listenable: LocalSubscriptionService.instance,
+      builder: (context, _) => Scaffold(
       appBar: AppBar(
         backgroundColor: GlassStyle.glassAppBarBg,
         foregroundColor: GlassStyle.glassAppBarFg,
@@ -192,6 +204,7 @@ class _MySubscriptionsScreenState extends State<MySubscriptionsScreen>
                 ),
               ],
             ),
+      ),
     );
   }
 

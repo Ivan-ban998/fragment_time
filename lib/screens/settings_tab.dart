@@ -28,6 +28,9 @@ class SettingsTab extends StatelessWidget {
   final Future<void> Function() onToggleElderlyMode;
   final Future<void> Function() onToggleTheme;
   final Future<void> Function() onToggleEyeProtection;
+  // 6/24 v12: 切换角色 — main.dart 提供
+  final UserType? selectedUserType;
+  final Future<void> Function() onChangeUserType;
 
   const SettingsTab({
     super.key,
@@ -40,6 +43,8 @@ class SettingsTab extends StatelessWidget {
     required this.onToggleElderlyMode,
     required this.onToggleTheme,
     required this.onToggleEyeProtection,
+    this.selectedUserType,
+    required this.onChangeUserType,
   });
 
   // 6/10 加: 编辑 handle dialog
@@ -243,6 +248,20 @@ class SettingsTab extends StatelessWidget {
             SizedBox(height: 24 * scale),
             Card(
               child: Column(children: [
+                // 6/24 v12: 切换角色 — 弹出 6 角色选择对话框
+                ListTile(
+                  leading: Icon(Icons.people_outline, size: 24 * scale),
+                  title: Text(isEn ? 'My Identity' : '我的身份', style: TextStyle(fontSize: 16 * scale)),
+                  subtitle: Text(
+                    selectedUserType != null
+                        ? (isEn ? _userTypeNameEn(selectedUserType!) : _userTypeNameZh(selectedUserType!))
+                        : (isEn ? 'Tap to choose' : '点选'),
+                    style: TextStyle(fontSize: 13 * scale),
+                  ),
+                  trailing: const Icon(Icons.chevron_right),
+                  onTap: onChangeUserType, // 6/24 v12: main.dart 提供
+                ),
+                Divider(height: 1),
                 ListTile(
                   leading: Icon(Icons.language, size: 24 * scale),
                   title: Text(isEn ? 'Region' : '地区模式', style: TextStyle(fontSize: 16 * scale)),
@@ -799,6 +818,29 @@ class _WeeklyRecapCard extends StatelessWidget {
         ],
       ),
     );
+  }
+}
+
+// 6/24 v12: 角色名 helper
+String _userTypeNameZh(UserType t) {
+  switch (t) {
+    case UserType.student: return '学生';
+    case UserType.officeWorker: return '上班族';
+    case UserType.entrepreneur: return '创业者';
+    case UserType.parent: return '宝爸宝妈';
+    case UserType.senior: return '退休人群';
+    case UserType.child: return '儿童';
+  }
+}
+
+String _userTypeNameEn(UserType t) {
+  switch (t) {
+    case UserType.student: return 'Student';
+    case UserType.officeWorker: return 'Office Worker';
+    case UserType.entrepreneur: return 'Entrepreneur';
+    case UserType.parent: return 'Parent';
+    case UserType.senior: return 'Senior';
+    case UserType.child: return 'Child';
   }
 }
 
