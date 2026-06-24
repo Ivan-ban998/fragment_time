@@ -8,6 +8,7 @@ import 'theme/glass_decoration.dart';
 import 'services/local_subscription_service.dart';
 import 'services/locale_service.dart';
 import 'services/motivation_service.dart';
+import 'services/llm_service.dart';
 import 'services/audio_play_service.dart';
 import 'services/analytics_service.dart';
 import 'services/theme_preference_service.dart';
@@ -221,7 +222,98 @@ class _MainHomeScreenState extends State<MainHomeScreen> {
     _recordOpen();
     _checkOnboarding();
     _startEyeTimer();
+    // 6/24 AI 私教: 启动时检查是否要生成周回顾 (周日 20:00 之后)
+    _checkWeeklyRecap();
+    // 6/24 AI 私教 亮点: 启动时生成 1 句鼓励, 首页顶部 banner
+    _loadDailyEncouragement();
     AnalyticsService.instance.track(AnalyticsService.EVT_APP_OPEN);
+  }
+
+  // 6/24 AI 私教 亮点: 1 句鼓励 banner
+  String? _dailyEncouragement;
+  String? _dailyQuote; // 6/24 v3 亮点: 每日名言
+
+  Future<void> _loadDailyEncouragement() async {
+    try {
+      // adapter: 把 LlmService.generateStream 收成 Future<String>
+      Future<String> llmCall(String prompt) async {
+        final buffer = StringBuffer();
+        await for (final chunk in LlmService.generateStream(
+          userType: _selectedUserType ?? UserType.student,
+          scene: Scene.learn,
+          languageCode: _languageCode,
+          isInternational: _isInternational,
+        )) {
+          buffer.write(chunk);
+        }
+        return buffer.toString();
+      }
+
+      // 并行调两个 LLM
+      final results = await Future.wait([
+        _streakService.getDailyEncouragement(isEn: isEn, llmCall: llmCall),
+        _streakService.getDailyQuote(isEn: isEn, llmCall: llmCall),
+      ]);
+      if (!mounted) return;
+      setState(() {
+        _dailyEncouragement = results[0];
+        _dailyQuote = results[1];
+      });
+    } catch (e) {
+      debugPrint('AI 私教 加载失败: $e');
+    }
+  }
+
+  // 6/24 AI 私教: 调用 LLM 生成本周总结 (周日 20:00 之后 + 本周未生成)
+  // 最小版: 不做后台 timer, 启动时一次性检查
+  Future<void> _checkWeeklyRecap() async {
+    try {
+      // adapter: 把 LlmService.generateStream 收成 Future<String>
+      Future<String> llmCall(String prompt) async {
+        final buffer = StringBuffer();
+        await for (final chunk in LlmService.generateStream(
+          userType: _selectedUserType ?? UserType.student,
+          scene: Scene.learn,
+          languageCode: _languageCode,
+          isInternational: _isInternational,
+        )) {
+          buffer.write(chunk);
+        }
+        return buffer.toString();
+      }
+
+      final recap = await _streakService.maybeGenerateWeeklyRecap(
+        isEn: isEn,
+        llmCall: llmCall,
+      );
+      if (recap == null || recap.isEmpty || !mounted) return;
+      // 弹窗显示 LLM 总结
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        if (!mounted) return;
+        showDialog(
+          context: context,
+          builder: (_) => AlertDialog(
+            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
+            title: Row(children: [
+              const Icon(Icons.auto_awesome, color: Colors.deepPurple, size: 22),
+              const SizedBox(width: 8),
+              Text(isEn ? 'Weekly recap' : '本周回顾',
+                  style: const TextStyle(fontSize: 18, fontWeight: FontWeight.w700)),
+            ]),
+            content: Text(recap, style: const TextStyle(fontSize: 14, height: 1.5)),
+            actions: [
+              TextButton(
+                onPressed: () => Navigator.pop(context),
+                child: Text(isEn ? 'Got it' : '收下'),
+              ),
+            ],
+          ),
+        );
+      });
+    } catch (e) {
+      // 静默失败, 不打扰用户
+      debugPrint('AI 私教 周回顾生成失败: $e');
+    }
   }
 
   // 6/12 加: 检查是否首启
@@ -388,6 +480,21 @@ class _MainHomeScreenState extends State<MainHomeScreen> {
               selectedUserType: _selectedUserType,
               onUserTypeSelected: _onUserTypeSelected,
               onSkip: () => setState(() => _showOnboarding = false),
+            ),
+          // 6/24 AI 私教 亮点: 顶部鼓励 + 名言 banner, 只在 Tab 0 显
+          if (_selectedIndex == 0 && (_dailyEncouragement != null || _dailyQuote != null))
+            Positioned(
+              top: 0,
+              left: 0,
+              right: 0,
+              child: SafeArea(
+                child: _DailyEncouragementBanner(
+                  text: _dailyEncouragement ?? '',
+                  quote: _dailyQuote,
+                  isEn: isEn,
+                  isElderlyMode: _isElderlyMode,
+                ),
+              ),
             ),
         ],
       ),
@@ -613,5 +720,82 @@ class _AutoQuizWrapperState extends State<_AutoQuizWrapper> {
   @override
   Widget build(BuildContext context) {
     return ContentReaderScreen(item: widget.item);
+  }
+}
+
+// 6/24 AI 私教 亮点: 1 句鼓励 banner — 顶部飘条, 玻璃磨砂风格
+// 6/24 v3 升级: 鼓励 + 名言 2 行
+class _DailyEncouragementBanner extends StatelessWidget {
+  final String text;
+  final String? quote;
+  final bool isEn;
+  final bool isElderlyMode;
+  const _DailyEncouragementBanner({
+    required this.text,
+    this.quote,
+    required this.isEn,
+    required this.isElderlyMode,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    final scale = isElderlyMode ? 1.3 : 1.0;
+    return Container(
+      margin: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+      padding: EdgeInsets.symmetric(horizontal: 14 * scale, vertical: 10 * scale),
+      decoration: BoxDecoration(
+        gradient: const LinearGradient(
+          colors: [Color(0xFF7C5CFC), Color(0xFFA48BFF)],
+          begin: Alignment.topLeft,
+          end: Alignment.bottomRight,
+        ),
+        borderRadius: BorderRadius.circular(16),
+        boxShadow: [
+          BoxShadow(
+            color: const Color(0xFF7C5CFC).withOpacity(0.25),
+            blurRadius: 10,
+            offset: const Offset(0, 3),
+          ),
+        ],
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          // 鼓励
+          Row(
+            children: [
+              const Icon(Icons.auto_awesome, color: Colors.white, size: 18),
+              const SizedBox(width: 8),
+              Expanded(
+                child: Text(
+                  text,
+                  style: TextStyle(
+                    color: Colors.white,
+                    fontSize: 13 * scale,
+                    fontWeight: FontWeight.w500,
+                    fontStyle: FontStyle.italic,
+                  ),
+                ),
+              ),
+            ],
+          ),
+          // 名言 (6/24 v3)
+          if (quote != null) ...[
+            SizedBox(height: 6 * scale),
+            Padding(
+              padding: const EdgeInsets.only(left: 26),
+              child: Text(
+                '“$quote”',
+                style: TextStyle(
+                  color: Colors.white.withOpacity(0.85),
+                  fontSize: 11 * scale,
+                  fontWeight: FontWeight.w400,
+                ),
+              ),
+            ),
+          ],
+        ],
+      ),
+    );
   }
 }
