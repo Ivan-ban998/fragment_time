@@ -157,3 +157,103 @@
 ---
 
 _2026-06-07 由 Brien 点头立宪。小O 起草。_
+
+## 六、未来想做但还没做（备忘，不动 §1-§9）
+
+### 简单模式 vs 完整模式（6/23 23 Brien 提）
+
+**背景**：6/23 Brien 想起可以加"简单模式（功能简单）/完整模式（目前）"。
+
+**理由**：
+- 老人/不熟技术用户/第一次用 = 0 步看到内容
+- 习惯用 App 的用户 = 现有 5 桶 × 4 scene = 20 桶选
+- 现有 user_type_screen 选 userType 是 3 步流程的第一步，决策成本高
+
+**3 个方案 (6/23 推 B)**:
+- A) 加 mode toggle - **不推荐**：跟老年模式概念重叠
+- B) 改造 user_type_screen = 默认显示时段推荐卡 + 5 桶用 ExpansionTile 默认收起 - **推荐**:
+  - 复用 6/23 已做的时段推荐 banner (TimeAwareRecommender)
+  - 老人/第一次用 = 0 步看到内容（banner 1 步到位）
+  - 熟练用户 = 下拉找完整 5 桶
+  - 跟宪法 "老年友好" 定位对齐
+- C) 把完整模式藏 Settings 入口 - 备选
+
+**状态** (6/23 20:39 收手)：
+- **今晚没动代码**（11.5h 疲劳 + 改 Stateless→Stateful 风险 = 6/16 SOUL 错报事故重演）
+- **TODO 明天做**：
+  1. user_type_screen 改 Stateful（加 `_showAllTypes` 状态）
+  2. 顶部 banner 已经在（TimeAwareRecommender）
+  3. 5 桶 GridView 用 ExpansionTile 包裹
+  4. 不动 main.dart + 不动 Settings 联动（最小版本）
+  5. build 验证后 commit 推上
+
+**SOUL #28 (新增)**：23h 后想做"产品方向"改动，先写宪法备忘，**不动代码**。
+
+---
+
+_2026-06-23 23:00 (Brien 工作 12h 后) 添加。_
+
+
+### 6.2 多模型 fallback + 分级（6/23 20:52 Brien 提）
+
+**背景**：6/23 20:43 Brien 提"openclaw 用 MiniMax 太耗 token,能不能部署本地模型"。20:52 Brien 点到真问题——**单点失败**："token 限额用完,你就歇菜了"。
+
+**核心**：不是省钱,是 **高可用**。多模型分担 = MiniMax 限额/挂时降级到本地。
+
+**现状 (6/23 20:43 查)**：
+- NAS (DXP4800+) = Intel Pentium Gold 8505 (6 核,**无独立 GPU**), RAM 15Gi
+- **Ollama 已在跑**（端口 11434）, 5 个本地模型已下：
+  - qwen2.5:14b (8.9 GB Q4 量化) - 主力
+  - qwen2.5:7b (4.7 GB Q4)
+  - deepseek-r1:7b
+  - deepseek-r1:1.5b (1.1 GB, 轻量)
+  - ollama:latest
+- **openclaw 现在用 MiniMax-M3** (从 runtime 看) - 单点
+- fragment_time 项目的 `services/llm_service.dart` 已经在用 Ollama (100.89.204.123:11434)
+- **NAS 装着的本地模型 0 浪费** (openclaw 没用)
+
+**3 个方案**：
+
+| 方案 | 描述 | 优点 | 缺点 |
+|---|---|---|---|
+| A. 简单 fallback | MiniMax 失败 → 14B 本地 | 0 改 MiniMax 行为, 高可用 | 本地慢 (Pentium Gold 无 GPU) |
+| B. 按任务分级 | 心跳/cron 走 7B 本地 (0 token), 交互走 MiniMax | 真省 token | 7B 处理复杂 bug 排查失忆 (6/22 那种) |
+| **C. A + B 组合** | 心跳/cron → 7B, 交互 → MiniMax 优先 + 失败降级 14B | **省 70%+ token + 不停摆** | 配置复杂 |
+
+**推荐 C** (20:52 我推): fallback + 分级 一起上。
+
+**部署方案 (骨架, 6/23 20:52 列, 不动配置)**：
+
+#### 阶段 1: openclaw 配置 fallback 链
+- 改 openclaw agentId 模型路由
+- 优先 MiniMax-M3 → 失败 → Ollama qwen2.5:14b (127.0.0.1:11434) → 失败 → deepseek-r1:7b
+- 测试: 模拟 MiniMax 限额 (用本地 token 烧光) → 自动降级
+
+#### 阶段 2: 任务分级
+- **心跳 / cron / "读 + 简单判断"** → qwen2.5:7b (本地, 0 token)
+- **交互 (你发的消息) / bug 排查 / 长推理** → MiniMax 优先 + 14B fallback
+- 配置: openclaw 的 cron / heartbeat 用独立 agentId, 走本地
+
+#### 阶段 3: 监控
+- 跑 1 周看 token 节省多少
+- 看哪些任务 7B 跑得好, 哪些必须 14B / MiniMax
+- 调优路由
+
+**明天 TODO (6/24)**:
+1. [ ] 改 openclaw agentId 模型路由 (找 docs, 不动 MiniMax 默认)
+2. [ ] heartbeat / cron 改 7B 本地
+3. [ ] 交互 fallback 到 14B (测限额降级)
+4. [ ] 跑 1 周看数据
+5. [ ] 调优
+
+**风险**：
+- **改 openclaw 配置 = 容易改坏** (6/16 SOUL 错报事故根因 = 改一堆没 build)。先 dry-run, 不直接生效。
+- 本地模型无 GPU = **推理慢** (Q4 14B 在 Pentium Gold ≈ 5-10 token/s)。简单任务够, 复杂任务会卡。
+- 7B 质量降 = 6/22 那种 5 次盲改可能重演（7B 看不懂 box_2d 坐标图）。
+
+**SOUL #29 (新增)**：openclaw 配置改动 = 风险高, **先 dry-run**（不真改, 写新 config 试）, 别直接覆盖现有。
+
+---
+
+_2026-06-23 20:52 (Brien 12h 工作后) 添加。_
+

@@ -150,14 +150,13 @@ class _SearchScreenState extends State<SearchScreen> {
               ),
               SizedBox(height: 8 * scale),
               if (_isLoading)
-                Padding(
-                  padding: EdgeInsets.all(8 * scale),
-                  child: Center(
-                    child: SizedBox(
-                      width: 20 * scale,
-                      height: 20 * scale,
-                      child: const CircularProgressIndicator(strokeWidth: 2),
-                    ),
+                // 6/23: 骨架屏替换 loading 圈
+                ListView.builder(
+                  padding: EdgeInsets.all(16 * scale),
+                  itemCount: 4,
+                  itemBuilder: (_, __) => Padding(
+                    padding: EdgeInsets.only(bottom: 10 * scale),
+                    child: const ListItemSkeleton(),
                   ),
                 )
               else if (_lastQuery.isNotEmpty && _results.isEmpty)

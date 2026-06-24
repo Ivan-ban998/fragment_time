@@ -5,6 +5,7 @@ import 'package:url_launcher/url_launcher.dart';
 import '../models/models.dart';
 import '../theme/app_theme.dart';
 import '../services/subscription_service.dart';
+import '../widgets/skeleton.dart';
 import 'content_reader_screen.dart';
 
 class SubscriptionScreen extends StatefulWidget {
@@ -105,7 +106,15 @@ class _SubscriptionScreenState extends State<SubscriptionScreen> {
         ],
       ),
       body: _loading
-          ? const Center(child: CircularProgressIndicator())
+          // 6/23: 骨架屏替换 loading 圈
+          ? ListView.builder(
+              padding: const EdgeInsets.all(16),
+              itemCount: 4,
+              itemBuilder: (_, __) => const Padding(
+                padding: EdgeInsets.only(bottom: 10),
+                child: ListItemSkeleton(),
+              ),
+            )
           : SingleChildScrollView(
               padding: const EdgeInsets.all(20),
               child: Column(

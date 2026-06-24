@@ -8,7 +8,7 @@ import '../services/time_aware_recommender.dart';
 import 'scene_screen.dart';
 import 'content_screen.dart';
 
-class UserTypeScreen extends StatelessWidget {
+class UserTypeScreen extends StatefulWidget {
   final dynamic config;
   final bool isInternational;
   final bool isElderlyMode;
@@ -34,12 +34,38 @@ class UserTypeScreen extends StatelessWidget {
     required this.onUserTypeSelected,
   });
 
-  bool get isEn => languageCode == 'en';
-  double get scale => isElderlyMode ? 1.3 : 1.0;
+  @override
+  State<UserTypeScreen> createState() => _UserTypeScreenState();
+}
+
+class _UserTypeScreenState extends State<UserTypeScreen> {
+  // 6/24 B 方案：完整模式 — 5 桶默认 + 老人默认折叠其余桶
+  late bool _showAllTypes;
+
+  @override
+  void initState() {
+    super.initState();
+    // 6/24 B 方案：老人默认折叠，非老人默认展开
+    _showAllTypes = !widget.isElderlyMode;
+  }
+
+  @override
+  void didUpdateWidget(UserTypeScreen oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    // 切换老人模式时同步默认行为
+    if (oldWidget.isElderlyMode != widget.isElderlyMode) {
+      setState(() {
+        _showAllTypes = !widget.isElderlyMode;
+      });
+    }
+  }
+
+  bool get isEn => widget.languageCode == 'en';
+  double get scale => widget.isElderlyMode ? 1.3 : 1.0;
 
   @override
   Widget build(BuildContext context) {
-    final userTypes = isInternational
+    final userTypes = widget.isInternational
         ? [
             UserTypeIntl(UserType.student, 'Student', 'Exam prep & studies'),
             UserTypeIntl(UserType.officeWorker, 'Office Worker', 'Career & commute'),
@@ -57,15 +83,25 @@ class UserTypeScreen extends StatelessWidget {
             UserTypeIntl(UserType.child, '儿童', '启蒙故事/科普'),
           ];
 
-    final titleText = isInternational
+    // 6/24 B 方案：前 5 桶（学生/上班族/创业者/宝爸宝妈/儿童）默认显，退休人群折叠到"其他"
+    final primaryTypes = widget.isInternational
+        ? [userTypes[0], userTypes[1], userTypes[2], userTypes[3], userTypes[5]] // student/office/entrepreneur/parent/child
+        : [userTypes[0], userTypes[1], userTypes[2], userTypes[3], userTypes[5]];
+    final moreTypes = [userTypes[4]]; // senior
+
+    final titleText = widget.isInternational
         ? '碎片时间'
         : '碎片时间';
 
     final subtitleText = isEn
-        ? 'Select your identity to find content for you'
-        : '选择你的身份，找到适合你的碎片时间内容';
+        ? (widget.isElderlyMode
+            ? 'Tap your identity to start'
+            : 'Select your identity to find content for you')
+        : (widget.isElderlyMode
+            ? '点一下你的身份开始'
+            : '选择你的身份，找到适合你的碎片时间内容');
 
-    final copyrightFooter = config.copyrightFooter as String;
+    final copyrightFooter = widget.config.copyrightFooter as String;
 
     // 6/14 v5.4: 选角色页背景加白叠 (跟 content 一致, 不闷)
     return Container(
@@ -94,7 +130,7 @@ class UserTypeScreen extends StatelessWidget {
                   ),
                   // Language toggle
                   GestureDetector(
-                    onTap: onToggleLanguage,
+                    onTap: widget.onToggleLanguage,
                     child: Container(
                       padding: EdgeInsets.symmetric(horizontal: 10 * scale, vertical: 6 * scale),
                       decoration: BoxDecoration(
@@ -121,11 +157,11 @@ class UserTypeScreen extends StatelessWidget {
                   SizedBox(width: 8 * scale),
                   // International toggle
                   GestureDetector(
-                    onTap: onToggleInternational,
+                    onTap: widget.onToggleInternational,
                     child: Container(
                       padding: EdgeInsets.symmetric(horizontal: 10 * scale, vertical: 6 * scale),
                       decoration: BoxDecoration(
-                        color: isInternational ? AppTheme.primary : Colors.grey[300],
+                        color: widget.isInternational ? AppTheme.primary : Colors.grey[300],
                         borderRadius: BorderRadius.circular(16),
                       ),
                       child: Row(
@@ -134,15 +170,15 @@ class UserTypeScreen extends StatelessWidget {
                           Icon(
                             Icons.public,
                             size: 16 * scale,
-                            color: isInternational ? Colors.white : Colors.grey[600],
+                            color: widget.isInternational ? Colors.white : Colors.grey[600],
                           ),
                           SizedBox(width: 4),
                           Text(
-                            isInternational ? 'INTL' : 'CN',
+                            widget.isInternational ? 'INTL' : 'CN',
                             style: TextStyle(
                               fontSize: 12 * scale,
                               fontWeight: FontWeight.w600,
-                              color: isInternational ? Colors.white : Colors.grey[700],
+                              color: widget.isInternational ? Colors.white : Colors.grey[700],
                             ),
                           ),
                         ],
@@ -152,17 +188,17 @@ class UserTypeScreen extends StatelessWidget {
                   SizedBox(width: 8 * scale),
                   // Elderly mode toggle
                   GestureDetector(
-                    onTap: onToggleElderlyMode,
+                    onTap: widget.onToggleElderlyMode,
                     child: Container(
                       padding: EdgeInsets.all(6 * scale),
                       decoration: BoxDecoration(
-                        color: isElderlyMode ? Colors.orange : Colors.grey[300],
+                        color: widget.isElderlyMode ? Colors.orange : Colors.grey[300],
                         shape: BoxShape.circle,
                       ),
                       child: Icon(
                         Icons.elderly,
                         size: 16 * scale,
-                        color: isElderlyMode ? Colors.white : Colors.grey[600],
+                        color: widget.isElderlyMode ? Colors.white : Colors.grey[600],
                       ),
                     ),
                   ),
@@ -206,16 +242,16 @@ class UserTypeScreen extends StatelessWidget {
                           AnalyticsService.EVT_USER_TYPE_SELECT,
                           props: {'userType': rec.userType.name, 'source': 'time_recommend_banner'},
                         );
-                        onUserTypeSelected(rec.userType);
+                        widget.onUserTypeSelected(rec.userType);
                         // 6/23 fix: 跟 _TodayPickCard 一致，跳到 SceneScreen — 之前没跳所以点不开
                         Navigator.push(
                           context,
                           MaterialPageRoute(
                             builder: (_) => SceneScreen(
                               userType: rec.userType,
-                              isInternational: isInternational,
-                              isElderlyMode: isElderlyMode,
-                              languageCode: languageCode,
+                              isInternational: widget.isInternational,
+                              isElderlyMode: widget.isElderlyMode,
+                              languageCode: widget.languageCode,
                             ),
                           ),
                         );
@@ -241,18 +277,18 @@ class UserTypeScreen extends StatelessWidget {
                 scale: scale,
                 isEn: isEn,
                 onTap: () {
-                  final type = selectedUserType ?? UserType.student;
+                  final type = widget.selectedUserType ?? UserType.student;
                   AnalyticsService.instance.track(AnalyticsService.EVT_USER_TYPE_SELECT,
                       props: {'userType': type.name, 'source': 'today_pick'});
-                  onUserTypeSelected(type);
+                  widget.onUserTypeSelected(type);
                   Navigator.push(
                     context,
                     MaterialPageRoute(
                       builder: (_) => SceneScreen(
                         userType: type,
-                        isInternational: isInternational,
-                        isElderlyMode: isElderlyMode,
-                        languageCode: languageCode,
+                        isInternational: widget.isInternational,
+                        isElderlyMode: widget.isElderlyMode,
+                        languageCode: widget.languageCode,
                       ),
                     ),
                   );
@@ -263,7 +299,7 @@ class UserTypeScreen extends StatelessWidget {
               _InProgressRow(scale: scale, isEn: isEn),
               SizedBox(height: 12 * scale),
               // Streak message + greeting
-              if (streakMessage.isNotEmpty) ...[
+              if (widget.streakMessage.isNotEmpty) ...[
                 Center(
                   child: Container(
                     padding: EdgeInsets.symmetric(horizontal: 16 * scale, vertical: 8 * scale),
@@ -280,7 +316,7 @@ class UserTypeScreen extends StatelessWidget {
                         ),
                         SizedBox(width: 8 * scale),
                         Text(
-                          streakMessage,
+                          widget.streakMessage,
                           style: TextStyle(fontSize: 13 * scale, color: AppTheme.primary, fontWeight: FontWeight.w600),
                         ),
                       ],
@@ -289,47 +325,107 @@ class UserTypeScreen extends StatelessWidget {
                 ),
                 SizedBox(height: 8 * scale),
               ],
-              // 6/15 改: 屏宽 ≥480 用 3 列 (扁卡) 否则 2 列 (方卡), 一页显示全
+              // 6/24 B 方案：5 桶主区 + 1 桶折叠（老人模式默认折叠，老人以外默认展开）
               Expanded(
-                child: LayoutBuilder(
-                  builder: (context, constraints) {
-                    final w = constraints.maxWidth;
-                    final cols = w >= 480 ? 3 : 2;
-                    return GridView.builder(
-                      gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
-                        crossAxisCount: cols,
-                        mainAxisSpacing: 16 * scale,
-                        crossAxisSpacing: 16 * scale,
-                        childAspectRatio: cols == 3 ? 1.4 : 1.0,
+                child: SingleChildScrollView(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      // 5 桶主区
+                      LayoutBuilder(
+                        builder: (context, constraints) {
+                          final w = constraints.maxWidth;
+                          final cols = w >= 480 ? 3 : 2;
+                          return GridView.builder(
+                            shrinkWrap: true,
+                            physics: const NeverScrollableScrollPhysics(),
+                            gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
+                              crossAxisCount: cols,
+                              mainAxisSpacing: 16 * scale,
+                              crossAxisSpacing: 16 * scale,
+                              childAspectRatio: cols == 3 ? 1.4 : 1.0,
+                            ),
+                            itemCount: primaryTypes.length,
+                            itemBuilder: (context, index) {
+                              final ut = primaryTypes[index];
+                              final isSelected = widget.selectedUserType == ut.type;
+                              return _UserTypeCard(
+                                userType: ut,
+                                scale: scale,
+                                isSelected: isSelected,
+                                onTap: () {
+                                  AnalyticsService.instance.track(AnalyticsService.EVT_USER_TYPE_SELECT,
+                                      props: {'userType': ut.type.name});
+                                  widget.onUserTypeSelected(ut.type);
+                                  Navigator.push(
+                                    context,
+                                    MaterialPageRoute(
+                                      builder: (_) => SceneScreen(
+                                        userType: ut.type,
+                                        isInternational: widget.isInternational,
+                                        isElderlyMode: widget.isElderlyMode,
+                                        languageCode: widget.languageCode,
+                                      ),
+                                    ),
+                                  );
+                                },
+                              );
+                            },
+                          );
+                        },
                       ),
-                      itemCount: userTypes.length,
-                      itemBuilder: (context, index) {
-                        final ut = userTypes[index];
-                        final isSelected = selectedUserType == ut.type;
-                        return _UserTypeCard(
-                          userType: ut,
-                          scale: scale,
-                          isSelected: isSelected,
-                          onTap: () {
-                            AnalyticsService.instance.track(AnalyticsService.EVT_USER_TYPE_SELECT,
-                                props: {'userType': ut.type.name});
-                            onUserTypeSelected(ut.type);
-                            Navigator.push(
-                              context,
-                              MaterialPageRoute(
-                                builder: (_) => SceneScreen(
-                                  userType: ut.type,
-                                  isInternational: isInternational,
-                                  isElderlyMode: isElderlyMode,
-                                  languageCode: languageCode,
-                                ),
+                      SizedBox(height: 8 * scale),
+                      // 6/24 B 方案：折叠"其他人群"区 — ExpansionTile
+                      Theme(
+                        data: Theme.of(context).copyWith(dividerColor: Colors.transparent),
+                        child: ExpansionTile(
+                          initiallyExpanded: _showAllTypes,
+                          onExpansionChanged: (expanded) {
+                            setState(() => _showAllTypes = expanded);
+                          },
+                          tilePadding: EdgeInsets.symmetric(horizontal: 4 * scale),
+                          leading: Icon(Icons.expand_more, color: AppTheme.textLight, size: 20 * scale),
+                          title: Text(
+                            isEn
+                                ? (_showAllTypes ? 'Hide other identities' : 'More identities')
+                                : (_showAllTypes ? '收起其他人群' : '我属于其他人群'),
+                            style: TextStyle(
+                              fontSize: 13 * scale,
+                              color: AppTheme.textLight,
+                              fontWeight: FontWeight.w500,
+                            ),
+                          ),
+                          children: moreTypes.map((ut) {
+                            final isSelected = widget.selectedUserType == ut.type;
+                            return Padding(
+                              padding: EdgeInsets.only(bottom: 12 * scale),
+                              child: _UserTypeCard(
+                                userType: ut,
+                                scale: scale,
+                                isSelected: isSelected,
+                                onTap: () {
+                                  AnalyticsService.instance.track(AnalyticsService.EVT_USER_TYPE_SELECT,
+                                      props: {'userType': ut.type.name});
+                                  widget.onUserTypeSelected(ut.type);
+                                  Navigator.push(
+                                    context,
+                                    MaterialPageRoute(
+                                      builder: (_) => SceneScreen(
+                                        userType: ut.type,
+                                        isInternational: widget.isInternational,
+                                        isElderlyMode: widget.isElderlyMode,
+                                        languageCode: widget.languageCode,
+                                      ),
+                                    ),
+                                  );
+                                },
                               ),
                             );
-                          },
-                        );
-                      },
-                    );
-                  },
+                          }).toList(),
+                        ),
+                      ),
+                    ],
+                  ),
                 ),
               ),
 

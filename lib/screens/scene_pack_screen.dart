@@ -5,6 +5,7 @@ import '../models/models.dart';
 import '../services/local_subscription_service.dart';
 import '../services/news_service.dart';
 import '../theme/app_theme.dart';
+import '../widgets/skeleton.dart';
 import 'content_reader_screen.dart';
 
 class ScenePackScreen extends StatefulWidget {
@@ -56,7 +57,7 @@ class _ScenePackScreenState extends State<ScenePackScreen> {
       body: FutureBuilder<List<ContentItem>>(
         future: _itemsFuture,
         builder: (context, snap) {
-          if (!snap.hasData) return const Center(child: CircularProgressIndicator());
+          if (!snap.hasData) return const CardSkeleton();
           final items = snap.data!;
           return Column(
             children: [
