@@ -444,6 +444,17 @@ class _MainHomeScreenState extends State<MainHomeScreen> {
       final t = DateTime.fromMillisecondsSinceEpoch(h.readAt);
       return now.difference(t).inDays <= 7;
     }).take(10).toList();
+
+    // 6/24 v16: 名言 LLM 升级 — 调 LLM 生成 3 个相关关键词作为 sheet 顶部提示
+    List<String>? llmKeywords;
+    if (_dailyQuote != null && _dailyQuote!.isNotEmpty) {
+      try {
+        llmKeywords = await _getLLMKeywordsForQuote(_dailyQuote!);
+      } catch (_) {
+        llmKeywords = null;
+      }
+    }
+
     if (!mounted) return;
     if (recent.isEmpty) {
       ScaffoldMessenger.of(context).showSnackBar(
@@ -463,8 +474,28 @@ class _MainHomeScreenState extends State<MainHomeScreen> {
         isEn: isEn,
         encouragement: _dailyEncouragement ?? '',
         quote: _dailyQuote,
+        llmKeywords: llmKeywords, // 6/24 v16
       ),
     );
+  }
+
+  // 6/24 v16: LLM 提取名言相关关键词 (最多 3 个)
+  Future<List<String>?> _getLLMKeywordsForQuote(String quote) async {
+    try {
+      final prompt = isEn
+          ? 'Given this quote: "$quote"\nReturn 3 short related topic keywords (1-3 words each), comma-separated. NO explanation, NO quotes, NO labels.'
+          : '名言: "$quote"\n返回 3 个相关话题关键词（每个 1-3 字），用逗号分隔。不要解释，不要引号。';
+      final raw = await LlmService.generateRaw(prompt, isEn: isEn);
+      if (raw.isEmpty) return null;
+      return raw
+          .split(RegExp(r'[,，、\n]'))
+          .map((s) => s.trim())
+          .where((s) => s.isNotEmpty && s.length <= 8)
+          .take(3)
+          .toList();
+    } catch (_) {
+      return null;
+    }
   }
 
   Future<void> _showChangeUserTypeDialog() async {
@@ -1106,11 +1137,13 @@ class _QuoteDetailSheet extends StatelessWidget {
   final bool isEn;
   final String encouragement;
   final String? quote;
+  final List<String>? llmKeywords; // 6/24 v16
   const _QuoteDetailSheet({
     required this.recent,
     required this.isEn,
     required this.encouragement,
     required this.quote,
+    this.llmKeywords,
   });
 
   @override
@@ -1170,6 +1203,32 @@ class _QuoteDetailSheet extends StatelessWidget {
                     fontStyle: FontStyle.italic,
                     color: Colors.grey[700],
                   ),
+                ),
+              ),
+            // 6/24 v16: LLM 提取的 3 个相关关键词
+            if (llmKeywords != null && llmKeywords!.isNotEmpty)
+              Padding(
+                padding: const EdgeInsets.only(bottom: 12),
+                child: Wrap(
+                  spacing: 6,
+                  runSpacing: 6,
+                  children: [
+                    Text(
+                      isEn ? 'Related: ' : '相关: ',
+                      style: TextStyle(fontSize: 11, color: Colors.grey[600]),
+                    ),
+                    ...llmKeywords!.map((kw) => Container(
+                      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+                      decoration: BoxDecoration(
+                        color: const Color(0xFF7C5CFC).withOpacity(0.1),
+                        borderRadius: BorderRadius.circular(8),
+                      ),
+                      child: Text(
+                        kw,
+                        style: const TextStyle(fontSize: 11, color: Color(0xFF7C5CFC), fontWeight: FontWeight.w500),
+                      ),
+                    )),
+                  ],
                 ),
               ),
             const SizedBox(height: 8),
