@@ -3,6 +3,7 @@ import '../models/models.dart';
 import '../theme/app_theme.dart';
 import '../theme/glass_decoration.dart';
 import '../services/analytics_service.dart';
+import '../services/time_aware_recommender.dart';
 import 'content_screen.dart';
 
 class SceneScreen extends StatelessWidget {
@@ -74,6 +75,40 @@ class SceneScreen extends StatelessWidget {
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
+              // 6/24 v12: 顶部推荐区 (时段推荐 banner + 今日推荐 hero)
+              _TimeRecommendBanner(
+                userType: userType,
+                scale: _scale,
+                isEn: isEn,
+                isInternational: isInternational,
+                isElderlyMode: isElderlyMode,
+                languageCode: languageCode,
+              ),
+              SizedBox(height: 12 * _scale),
+              // 6/24 v12: “现在看什么?” hero 卡
+              _TodayPickCard(
+                scale: _scale,
+                isEn: isEn,
+                onTap: () {
+                  AnalyticsService.instance.track(
+                    AnalyticsService.EVT_USER_TYPE_SELECT,
+                    props: {'userType': userType.name, 'source': 'today_pick_scene'},
+                  );
+                  Navigator.push(
+                    context,
+                    MaterialPageRoute(
+                      builder: (_) => ContentScreen(
+                        userType: userType,
+                        scene: TimeAwareRecommender.current.scene,
+                        isInternational: isInternational,
+                        isElderlyMode: isElderlyMode,
+                        languageCode: languageCode,
+                      ),
+                    ),
+                  );
+                },
+              ),
+              SizedBox(height: 20 * _scale),
               Text(
                 '${DailyMessage.getGreeting(isEn)} ${userTypeName}',
                 style: TextStyle(fontSize: 18 * _scale, fontWeight: FontWeight.bold),
@@ -83,7 +118,7 @@ class SceneScreen extends StatelessWidget {
                 isEn ? 'What would you like to do?' : '选择你现在想干嘛',
                 style: TextStyle(fontSize: 14 * _scale, color: AppTheme.textLight),
               ),
-              SizedBox(height: 24 * _scale),
+              SizedBox(height: 16 * _scale),
               Expanded(
                 child: GridView.builder(
                   gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
@@ -217,5 +252,190 @@ class DailyMessage {
     } else {
       return isEn ? 'Good night' : '晚安';
     }
+  }
+}
+
+// 6/24 v12: SceneScreen 顶部时段推荐 banner — 按时段推荐一个场景
+class _TimeRecommendBanner extends StatelessWidget {
+  final UserType userType;
+  final double scale;
+  final bool isEn;
+  final bool isInternational;
+  final bool isElderlyMode;
+  final String languageCode;
+
+  const _TimeRecommendBanner({
+    required this.userType,
+    required this.scale,
+    required this.isEn,
+    required this.isInternational,
+    required this.isElderlyMode,
+    required this.languageCode,
+  });
+
+  String _sceneLabel(Scene s) {
+    switch (s) {
+      case Scene.learn: return isEn ? 'Learn Something' : '学点东西';
+      case Scene.listen: return isEn ? 'Listen' : '听一听';
+      case Scene.relax: return isEn ? 'Relax' : '放松一下';
+      case Scene.workout: return isEn ? 'Workout' : '动一动';
+    }
+  }
+
+  Color _sceneColor(Scene s) {
+    switch (s) {
+      case Scene.learn: return Colors.blue;
+      case Scene.listen: return Colors.purple;
+      case Scene.relax: return Colors.green;
+      case Scene.workout: return Colors.orange;
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final rec = TimeAwareRecommender.current;
+    final color = _sceneColor(rec.scene);
+    return GestureDetector(
+      onTap: () {
+        AnalyticsService.instance.track(
+          AnalyticsService.EVT_SCENE_SELECT,
+          props: {'userType': userType.name, 'scene': rec.scene.name, 'source': 'time_recommend_banner'},
+        );
+        Navigator.push(
+          context,
+          MaterialPageRoute(
+            builder: (_) => ContentScreen(
+              userType: userType,
+              scene: rec.scene,
+              isInternational: isInternational,
+              isElderlyMode: isElderlyMode,
+              languageCode: languageCode,
+            ),
+          ),
+        );
+      },
+      child: Container(
+        margin: EdgeInsets.only(bottom: 4 * scale),
+        padding: EdgeInsets.symmetric(horizontal: 14 * scale, vertical: 10 * scale),
+        decoration: BoxDecoration(
+          color: color.withOpacity(0.08),
+          borderRadius: BorderRadius.circular(12),
+          border: Border.all(color: color.withOpacity(0.2)),
+        ),
+        child: Row(children: [
+          Icon(Icons.auto_awesome, size: 14 * scale, color: color),
+          SizedBox(width: 6),
+          Expanded(
+            child: Text(
+              isEn
+                  ? 'Right now, we recommend: ${rec.label}'
+                  : '根据现在的时间，推荐你：${_sceneLabel(rec.scene)}',
+              style: TextStyle(
+                fontSize: 12 * scale,
+                color: color,
+                fontWeight: FontWeight.w500,
+              ),
+            ),
+          ),
+          Container(
+            padding: EdgeInsets.symmetric(horizontal: 10 * scale, vertical: 4 * scale),
+            decoration: BoxDecoration(
+              color: color,
+              borderRadius: BorderRadius.circular(20),
+            ),
+            child: Text(
+              isEn ? 'Go' : '去逛逛',
+              style: TextStyle(color: Colors.white, fontSize: 11 * scale, fontWeight: FontWeight.bold),
+            ),
+          ),
+        ]),
+      ),
+    );
+  }
+}
+
+// 6/24 v12: 从 user_type_screen 复制过来的 “现在看什么?” hero 卡
+class _TodayPickCard extends StatelessWidget {
+  final double scale;
+  final bool isEn;
+  final VoidCallback onTap;
+
+  const _TodayPickCard({
+    required this.scale,
+    required this.isEn,
+    required this.onTap,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return GestureDetector(
+      onTap: onTap,
+      child: Container(
+        padding: EdgeInsets.symmetric(horizontal: 16 * scale, vertical: 14 * scale),
+        decoration: BoxDecoration(
+          gradient: const LinearGradient(
+            colors: [Color(0xFF7C5CFC), Color(0xFFA48BFF)],
+            begin: Alignment.topLeft,
+            end: Alignment.bottomRight,
+          ),
+          borderRadius: BorderRadius.circular(20),
+          boxShadow: [
+            BoxShadow(
+              color: const Color(0xFF7C5CFC).withOpacity(0.3),
+              blurRadius: 12,
+              offset: const Offset(0, 4),
+            ),
+          ],
+        ),
+        child: Row(
+          children: [
+            Icon(Icons.auto_awesome, color: Colors.white, size: 28 * scale),
+            SizedBox(width: 12 * scale),
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    isEn ? '"What should I read now?"' : '"现在看什么？"',
+                    style: TextStyle(
+                      color: Colors.white.withOpacity(0.85),
+                      fontSize: 11 * scale,
+                      fontStyle: FontStyle.italic,
+                    ),
+                  ),
+                  SizedBox(height: 2),
+                  Text(
+                    isEn ? 'Tap to start — 5 min story' : '点一下，5 分钟开始读',
+                    style: TextStyle(
+                      color: Colors.white,
+                      fontSize: 16 * scale,
+                      fontWeight: FontWeight.w600,
+                    ),
+                    maxLines: 2,
+                    overflow: TextOverflow.ellipsis,
+                  ),
+                ],
+              ),
+            ),
+            SizedBox(width: 8 * scale),
+            Container(
+              padding: EdgeInsets.symmetric(horizontal: 14 * scale, vertical: 8 * scale),
+              decoration: BoxDecoration(
+                color: Colors.white,
+                borderRadius: BorderRadius.circular(20 * scale),
+              ),
+              child: Text(
+                isEn ? 'Start' : '开始',
+                style: TextStyle(
+                  color: const Color(0xFF7C5CFC),
+                  fontSize: 13 * scale,
+                  fontWeight: FontWeight.w700,
+                ),
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
   }
 }

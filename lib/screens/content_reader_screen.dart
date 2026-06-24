@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/foundation.dart';
 import 'package:url_launcher/url_launcher.dart';
+import 'dart:async';
 import 'dart:ui';
 import '../models/models.dart';
 import '../theme/app_theme.dart';
@@ -44,15 +45,59 @@ class _ContentReaderScreenState extends State<ContentReaderScreen> {
   bool _showAchievementBanner = false;
   bool _isCompleted = false; // 进页面时已有 progress=100
 
+  // 6/24 v7: HUD 计时 — 顶角显示阅读时长
+  late DateTime _openTime;
+  Timer? _hudTimer;
+  String _hudText = '0:00';
+
   @override
   void initState() {
     super.initState();
+    _openTime = DateTime.now();
     _initTts();
     _checkSubscribed();
     _recordHistory();
     _scrollCtrl.addListener(_onScroll);
     // 6/14 进页时若已 100 -> 显示"已读完"banner
     _isCompleted = widget.item.progress >= 100;
+    // 6/24 v7: HUD 计时 — 每秒更新
+    _hudTimer = Timer.periodic(const Duration(seconds: 1), (_) {
+      if (!mounted) return;
+      setState(() {
+        final elapsed = DateTime.now().difference(_openTime);
+        _hudText = _formatDuration(elapsed);
+      });
+    });
+    // 6/24 修: post-frame 查短文章 (maxScrollExtent=0), 进页面立即 mark
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      _checkShortArticle();
+    });
+  }
+
+  // 6/24 v7: 格式化时长 (mm:ss 或 hh:mm:ss)
+  String _formatDuration(Duration d) {
+    final h = d.inHours;
+    final m = d.inMinutes.remainder(60);
+    final s = d.inSeconds.remainder(60);
+    if (h > 0) {
+      return '$h:$m:${s.toString().padLeft(2, '0')}';
+    }
+    return '$m:${s.toString().padLeft(2, '0')}';
+  }
+
+  // 6/24 修: 短文章检 (不用 scroll, 文章本身就能全显)
+  void _checkShortArticle() {
+    if (!mounted || _markCompleteDone) return;
+    if (!_scrollCtrl.hasClients) return;
+    try {
+      final pos = _scrollCtrl.position;
+      if (pos.maxScrollExtent <= 0) {
+        _markCompleteDone = true;
+        _markComplete();
+      }
+    } catch (_) {
+      // 动画中 / dispose 后, 静默
+    }
   }
 
   Future<void> _recordHistory() async {
@@ -64,31 +109,44 @@ class _ContentReaderScreenState extends State<ContentReaderScreen> {
   @override
   void dispose() {
     _tts.stop();
+    _markCompleteTimer?.cancel();
+    _hudTimer?.cancel();
     _scrollCtrl.removeListener(_onScroll);
     _scrollCtrl.dispose();
     super.dispose();
   }
 
   // 6/14 scroll 到底 -> 写 progress=100 + 弹成就 banner 3s
+  // 6/24 修: try-catch + Timer 防卡死
   void _onScroll() {
     if (_markCompleteDone) return;
     if (!_scrollCtrl.hasClients) return;
-    final pos = _scrollCtrl.position;
-    // 距离底 <= 80px 算"到底"（避免 1px 抖动）
-    if (pos.pixels >= pos.maxScrollExtent - 80) {
-      _markCompleteDone = true;
-      _markComplete();
+    try {
+      final pos = _scrollCtrl.position;
+      // 距离底 <= 80px 算"到底"（避免 1px 抖动）
+      if (pos.pixels >= pos.maxScrollExtent - 80) {
+        _markCompleteDone = true;
+        _markComplete();
+      }
+    } catch (_) {
+      // position 出错, 静默
     }
   }
 
+  Timer? _markCompleteTimer;
   Future<void> _markComplete() async {
-    await LocalSubscriptionService.instance.updateProgress(widget.item, 100);
-    if (!mounted) return;
-    setState(() => _showAchievementBanner = true);
-    // 3 秒后淡出
-    Future.delayed(const Duration(seconds: 3), () {
-      if (mounted) setState(() => _showAchievementBanner = false);
-    });
+    try {
+      await LocalSubscriptionService.instance.updateProgress(widget.item, 100);
+      if (!mounted) return;
+      setState(() => _showAchievementBanner = true);
+      // 3 秒后淡出
+      _markCompleteTimer?.cancel();
+      _markCompleteTimer = Timer(const Duration(seconds: 3), () {
+        if (mounted) setState(() => _showAchievementBanner = false);
+      });
+    } catch (e) {
+      debugPrint('详情页 mark complete 失败: $e');
+    }
   }
 
   Future<void> _initTts() async {
@@ -351,6 +409,34 @@ class _ContentReaderScreenState extends State<ContentReaderScreen> {
           ],
         ),
         actions: [
+          // 6/24 v7: HUD 计时 — 顶角显示阅读时长 (m:ss 或 h:mm:ss)
+          Padding(
+            padding: EdgeInsets.symmetric(horizontal: 8 * scale, vertical: 12 * scale),
+            child: Container(
+              padding: EdgeInsets.symmetric(horizontal: 10 * scale, vertical: 4 * scale),
+              decoration: BoxDecoration(
+                color: AppTheme.primary.withOpacity(0.12),
+                borderRadius: BorderRadius.circular(12),
+                border: Border.all(color: AppTheme.primary.withOpacity(0.3)),
+              ),
+              child: Row(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  Icon(Icons.timer_outlined, size: 14 * scale, color: AppTheme.primary),
+                  SizedBox(width: 4 * scale),
+                  Text(
+                    _hudText,
+                    style: TextStyle(
+                      fontSize: 12 * scale,
+                      color: AppTheme.primary,
+                      fontWeight: FontWeight.w600,
+                      fontFeatures: const [FontFeature.tabularFigures()],
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          ),
           // 6/8 加：分享按钮
           IconButton(
             icon: Icon(Icons.share, size: 24 * scale),

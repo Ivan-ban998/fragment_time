@@ -1,8 +1,11 @@
 import 'dart:convert';
+import 'package:flutter/foundation.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import '../models/models.dart';
 
-class LocalSubscriptionService {
+// 6/24 v14: extends ChangeNotifier — subscribe/unsubscribe 通知 listeners
+// 让 MySubscriptionsScreen 用 context.watch 自动 rebuild
+class LocalSubscriptionService extends ChangeNotifier {
   static final LocalSubscriptionService instance = LocalSubscriptionService._();
   LocalSubscriptionService._();
 
@@ -115,6 +118,8 @@ class LocalSubscriptionService {
     final prefs = await SharedPreferences.getInstance();
     final jsonList = items.map((item) => _itemToJson(item)).toList();
     await prefs.setString(_key, jsonEncode(jsonList));
+    // 6/24 v14: 通知 listeners (MySubscriptionsScreen 自动 rebuild)
+    notifyListeners();
   }
 
   Map<String, dynamic> _itemToJson(ContentItem item) {

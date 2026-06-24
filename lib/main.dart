@@ -1,11 +1,13 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/foundation.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 import 'dart:async';
 import 'dart:ui';
 import 'models/models.dart';
 import 'theme/app_theme.dart';
 import 'theme/glass_decoration.dart';
 import 'services/local_subscription_service.dart';
+import 'services/history_service.dart';
 import 'services/locale_service.dart';
 import 'services/motivation_service.dart';
 import 'services/llm_service.dart';
@@ -148,9 +150,12 @@ class _MainHomeScreenState extends State<MainHomeScreen> {
   static final globalKey = GlobalKey<State<MainHomeScreen>>();
 
   /// 公开方法：切到指定 Tab (0=首页 1=搜索 2=收藏 3=设置)
+  /// 6/24 v8: 切到收藏 Tab 时 reload 刷新刚订阅的内容
   void setTab(int index) {
     if (!mounted) return;
     setState(() => _selectedIndex = index);
+    // 6/24 v14: IndexedStack 一直挂载, reload 路径不可靠
+    // 改为: LocalSubscriptionService 用 ChangeNotifier, MySubscriptionsScreen watch 自动 rebuild
   }
   Future<void> _cycleThemeMode() async {
     final next = widget.themeMode == ThemeMode.system
@@ -429,6 +434,93 @@ class _MainHomeScreenState extends State<MainHomeScreen> {
     await _localeService.setSelectedUserType(type);
   }
 
+  // 6/24 v12: 设置 Tab "我的身份" — 弹出 6 角色选择
+  // 6/24 v13: 点击 banner 名言/鼓励 → 弹底部 Sheet, 显示今天读过的相关推荐
+  Future<void> _showQuoteDetailSheet() async {
+    // 拉今天的历史 (推荐相关)
+    final all = await HistoryService.instance.getAll();
+    final now = DateTime.now();
+    final recent = all.where((h) {
+      final t = DateTime.fromMillisecondsSinceEpoch(h.readAt);
+      return now.difference(t).inDays <= 7;
+    }).take(10).toList();
+    if (!mounted) return;
+    if (recent.isEmpty) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text(isEn
+            ? 'Read a few items first — then tap this for related content.'
+            : '先看几篇文章/听几个内容，再点这里看相关推荐。')),
+      );
+      return;
+    }
+    if (!mounted) return;
+    showModalBottomSheet(
+      context: context,
+      backgroundColor: Colors.transparent,
+      isScrollControlled: true,
+      builder: (ctx) => _QuoteDetailSheet(
+        recent: recent,
+        isEn: isEn,
+        encouragement: _dailyEncouragement ?? '',
+        quote: _dailyQuote,
+      ),
+    );
+  }
+
+  Future<void> _showChangeUserTypeDialog() async {
+    final picked = await showDialog<UserType>(
+      context: context,
+      builder: (ctx) {
+        final isEn = _languageCode == 'en';
+        return AlertDialog(
+          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
+          title: Text(isEn ? 'Choose your identity' : '选择你的身份'),
+          content: SizedBox(
+            width: 320,
+            child: GridView.count(
+              shrinkWrap: true,
+              crossAxisCount: 2,
+              mainAxisSpacing: 8,
+              crossAxisSpacing: 8,
+              childAspectRatio: 2.2,
+              children: UserType.values.map((t) {
+                final isSelected = _selectedUserType == t;
+                return InkWell(
+                  borderRadius: BorderRadius.circular(12),
+                  onTap: () => Navigator.pop(ctx, t),
+                  child: Container(
+                    padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 6),
+                    decoration: BoxDecoration(
+                      color: isSelected ? AppTheme.primary.withOpacity(0.1) : Colors.grey[100],
+                      borderRadius: BorderRadius.circular(12),
+                      border: Border.all(
+                        color: isSelected ? AppTheme.primary : Colors.transparent,
+                        width: 1.5,
+                      ),
+                    ),
+                    child: Center(
+                      child: Text(
+                        isEn ? _userTypeNameEn(t) : _userTypeNameZh(t),
+                        style: TextStyle(
+                          fontSize: 13,
+                          fontWeight: isSelected ? FontWeight.w600 : FontWeight.w500,
+                          color: isSelected ? AppTheme.primary : Colors.black87,
+                        ),
+                      ),
+                    ),
+                  ),
+                );
+              }).toList(),
+            ),
+          ),
+        );
+      },
+    );
+    if (picked != null && picked != _selectedUserType) {
+      await _onUserTypeSelected(picked);
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
     final config = _isInternational ? AppConfig.global : AppConfig.domestic;
@@ -439,13 +531,14 @@ class _MainHomeScreenState extends State<MainHomeScreen> {
           IndexedStack(
             index: _selectedIndex,
             children: [
-              UserTypeScreen(
+              // 6/24 v12: Tab 0 — 已选角色 → SceneScreen (顶推荐 + 4 场景), 未选 → UserTypeScreen
+              _Tab0Switcher(
+                selectedUserType: _selectedUserType,
                 config: config,
                 isInternational: _isInternational,
                 isElderlyMode: _isElderlyMode,
                 languageCode: _languageCode,
                 streakMessage: _streakMessage,
-                selectedUserType: _selectedUserType,
                 onToggleInternational: _toggleInternational,
                 onToggleLanguage: _toggleLanguage,
                 onToggleElderlyMode: _toggleElderlyMode,
@@ -457,6 +550,7 @@ class _MainHomeScreenState extends State<MainHomeScreen> {
                 isInternational: _isInternational,
               ),
               MySubscriptionsScreen(
+                key: MySubscriptionsScreen.reloadKey, // 6/24 v8: reload 刷新
                 isElderlyMode: _isElderlyMode,
                 isEn: isEn,
               ),
@@ -470,6 +564,8 @@ class _MainHomeScreenState extends State<MainHomeScreen> {
                 onToggleElderlyMode: _toggleElderlyMode,
                 onToggleTheme: _cycleThemeMode,
                 onToggleEyeProtection: _toggleEyeProtection,
+                selectedUserType: _selectedUserType, // 6/24 v12
+                onChangeUserType: _showChangeUserTypeDialog, // 6/24 v12
               ),
             ],
           ),
@@ -493,6 +589,7 @@ class _MainHomeScreenState extends State<MainHomeScreen> {
                   quote: _dailyQuote,
                   isEn: isEn,
                   isElderlyMode: _isElderlyMode,
+                  onTapDetail: _showQuoteDetailSheet, // 6/24 v13
                 ),
               ),
             ),
@@ -725,67 +822,192 @@ class _AutoQuizWrapperState extends State<_AutoQuizWrapper> {
 
 // 6/24 AI 私教 亮点: 1 句鼓励 banner — 顶部飘条, 玻璃磨砂风格
 // 6/24 v3 升级: 鼓励 + 名言 2 行
-class _DailyEncouragementBanner extends StatelessWidget {
+// 6/24 v6: ❤️ 收藏按钮 - 把鼓励 + 名言当一条收藏存到 Tab 2
+class _DailyEncouragementBanner extends StatefulWidget {
   final String text;
   final String? quote;
   final bool isEn;
   final bool isElderlyMode;
+  final VoidCallback onTapDetail; // 6/24 v13: 点 banner 弹相关推荐
   const _DailyEncouragementBanner({
     required this.text,
     this.quote,
     required this.isEn,
     required this.isElderlyMode,
+    required this.onTapDetail,
   });
 
   @override
-  Widget build(BuildContext context) {
-    final scale = isElderlyMode ? 1.3 : 1.0;
-    return Container(
-      margin: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
-      padding: EdgeInsets.symmetric(horizontal: 14 * scale, vertical: 10 * scale),
-      decoration: BoxDecoration(
-        gradient: const LinearGradient(
-          colors: [Color(0xFF7C5CFC), Color(0xFFA48BFF)],
-          begin: Alignment.topLeft,
-          end: Alignment.bottomRight,
-        ),
-        borderRadius: BorderRadius.circular(16),
-        boxShadow: [
-          BoxShadow(
-            color: const Color(0xFF7C5CFC).withOpacity(0.25),
-            blurRadius: 10,
-            offset: const Offset(0, 3),
+  State<_DailyEncouragementBanner> createState() => _DailyEncouragementBannerState();
+}
+
+class _DailyEncouragementBannerState extends State<_DailyEncouragementBanner> {
+  bool _saved = false;
+  bool _loaded = false;
+
+  @override
+  void initState() {
+    super.initState();
+    _loadSaved();
+  }
+
+  // 6/24 v9: 从 SharedPreferences 读今日是否已收藏 (重启后保持 ❤️)
+  Future<void> _loadSaved() async {
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      final now = DateTime.now();
+      final key = 'encourage_saved_${now.year}-${now.month}-${now.day}';
+      if (prefs.getBool(key) ?? false) {
+        if (mounted) setState(() => _saved = true);
+      }
+      _loaded = true;
+    } catch (_) {
+      _loaded = true;
+    }
+  }
+
+  // 6/24 v6: 收藏鼓励+名言 当一条 ContentItem 到 Tab 2
+  Future<void> _onSave() async {
+    if (_saved) return;
+    final now = DateTime.now();
+    final id = 'encourage_${now.year}-${now.month}-${now.day}';
+    final title = widget.isEn
+        ? 'AI ${now.month}/${now.day} encouragement'
+        : 'AI ${now.month}月${now.day}日鼓励';
+    final desc = widget.quote != null
+        ? '${widget.text}\n\n“${widget.quote}”'
+        : widget.text;
+    final item = ContentItem(
+      id: id,
+      title: title,
+      description: desc,
+      duration: widget.isEn ? '1 min read' : '1 分钟阅读',
+      source: widget.isEn ? 'AI Companion' : 'AI 私教',
+      sourceType: ContentSource.rss,
+      contentType: ContentType.card,
+      lastReadAt: now,
+    );
+    try {
+      await LocalSubscriptionService.instance.subscribe(item);
+      if (!mounted) return;
+      // 6/24 v9: 持久化已收藏标记 (重启后保持 ❤️)
+      try {
+        final prefs = await SharedPreferences.getInstance();
+        final key = 'encourage_saved_${now.year}-${now.month}-${now.day}';
+        await prefs.setBool(key, true);
+      } catch (_) {}
+      if (!mounted) return;
+      setState(() => _saved = true);
+      // 6/24 v9: 弹 SnackBar + "查看" 按钮 (跳 Tab 2)
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text(widget.isEn
+              ? 'Saved to Favorites'
+              : '已收藏到 “收藏”'),
+          duration: const Duration(seconds: 3),
+          action: SnackBarAction(
+            label: widget.isEn ? 'View' : '查看',
+            onPressed: () {
+              // 6/24 v9: 切到 Tab 2 (收藏)
+              navigateToMainTab(2);
+            },
           ),
-        ],
-      ),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          // 鼓励
-          Row(
-            children: [
-              const Icon(Icons.auto_awesome, color: Colors.white, size: 18),
-              const SizedBox(width: 8),
-              Expanded(
-                child: Text(
-                  text,
-                  style: TextStyle(
-                    color: Colors.white,
-                    fontSize: 13 * scale,
-                    fontWeight: FontWeight.w500,
-                    fontStyle: FontStyle.italic,
+        ),
+      );
+      Future.delayed(const Duration(milliseconds: 1500), () {
+        if (mounted) setState(() {});
+      });
+    } catch (e) {
+      debugPrint('banner 保存失败: $e');
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final scale = widget.isElderlyMode ? 1.3 : 1.0;
+    return GestureDetector(
+      // 6/24 v13: 点 banner → 弹相关推荐 sheet
+      onTap: widget.onTapDetail,
+      child: Container(
+        margin: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+        padding: EdgeInsets.symmetric(horizontal: 14 * scale, vertical: 10 * scale),
+        decoration: BoxDecoration(
+          gradient: const LinearGradient(
+            colors: [Color(0xFF7C5CFC), Color(0xFFA48BFF)],
+            begin: Alignment.topLeft,
+            end: Alignment.bottomRight,
+          ),
+          borderRadius: BorderRadius.circular(16),
+          boxShadow: [
+            BoxShadow(
+              color: const Color(0xFF7C5CFC).withOpacity(0.25),
+              blurRadius: 10,
+              offset: const Offset(0, 3),
+            ),
+          ],
+        ),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            // 鼓励
+            Row(
+              children: [
+                const Icon(Icons.auto_awesome, color: Colors.white, size: 18),
+                const SizedBox(width: 8),
+                Expanded(
+                  child: Text(
+                    widget.text,
+                    style: TextStyle(
+                      color: Colors.white,
+                      fontSize: 13 * scale,
+                      fontWeight: FontWeight.w500,
+                      fontStyle: FontStyle.italic,
+                    ),
                   ),
                 ),
-              ),
-            ],
-          ),
+                // 6/24 v6: ❤️ 收藏按钮
+                GestureDetector(
+                  onTap: _onSave, // 独立 onTap, 不触发 _showDetailSheet
+                  child: AnimatedSwitcher(
+                    duration: const Duration(milliseconds: 200),
+                    child: _saved
+                        ? Icon(
+                            Icons.favorite,
+                            key: const ValueKey('saved'),
+                            color: Colors.white,
+                            size: 20 * scale,
+                          )
+                        : Row(
+                            key: const ValueKey('unsaved'),
+                            mainAxisSize: MainAxisSize.min,
+                            children: [
+                              Icon(
+                                Icons.favorite_border,
+                                color: Colors.white,
+                                size: 20 * scale,
+                              ),
+                              SizedBox(width: 4 * scale),
+                              Text(
+                                widget.isEn ? 'Save' : '收藏',
+                                style: TextStyle(
+                                  color: Colors.white,
+                                  fontSize: 11 * scale,
+                                  fontWeight: FontWeight.w500,
+                                ),
+                              ),
+                            ],
+                          ),
+                  ),
+                ),
+              ],
+            ),
           // 名言 (6/24 v3)
-          if (quote != null) ...[
+          if (widget.quote != null) ...[
             SizedBox(height: 6 * scale),
             Padding(
               padding: const EdgeInsets.only(left: 26),
               child: Text(
-                '“$quote”',
+                '“${widget.quote}”',
                 style: TextStyle(
                   color: Colors.white.withOpacity(0.85),
                   fontSize: 11 * scale,
@@ -794,7 +1016,203 @@ class _DailyEncouragementBanner extends StatelessWidget {
               ),
             ),
           ],
-        ],
+          ],
+      ),
+      ),
+    );
+  }
+}
+
+// 6/24 v12: Tab 0 切换 — 已选角色 → ContentScreen, 未选 → UserTypeScreen
+// 用 AnimatedSwitcher 保持 state, 用 ValueKey 防重建丢失
+class _Tab0Switcher extends StatelessWidget {
+  final UserType? selectedUserType;
+  final dynamic config;
+  final bool isInternational;
+  final bool isElderlyMode;
+  final String languageCode;
+  final String streakMessage;
+  final VoidCallback onToggleInternational;
+  final VoidCallback onToggleLanguage;
+  final VoidCallback onToggleElderlyMode;
+  final ValueChanged<UserType> onUserTypeSelected;
+
+  const _Tab0Switcher({
+    required this.selectedUserType,
+    required this.config,
+    required this.isInternational,
+    required this.isElderlyMode,
+    required this.languageCode,
+    required this.streakMessage,
+    required this.onToggleInternational,
+    required this.onToggleLanguage,
+    required this.onToggleElderlyMode,
+    required this.onUserTypeSelected,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    if (selectedUserType == null) {
+      return UserTypeScreen(
+        key: const ValueKey('user_type_screen'),
+        config: config,
+        isInternational: isInternational,
+        isElderlyMode: isElderlyMode,
+        languageCode: languageCode,
+        streakMessage: streakMessage,
+        selectedUserType: selectedUserType,
+        onToggleInternational: onToggleInternational,
+        onToggleLanguage: onToggleLanguage,
+        onToggleElderlyMode: onToggleElderlyMode,
+        onUserTypeSelected: onUserTypeSelected,
+      );
+    }
+    return SceneScreen(
+      key: const ValueKey('scene_screen'),
+      userType: selectedUserType!,
+      isInternational: isInternational,
+      isElderlyMode: isElderlyMode,
+      languageCode: languageCode,
+    );
+  }
+}
+
+// 6/24 v12: 6 角色名 helper (供 _showChangeUserTypeDialog 使用)
+String _userTypeNameZh(UserType t) {
+  switch (t) {
+    case UserType.student: return '学生';
+    case UserType.officeWorker: return '上班族';
+    case UserType.entrepreneur: return '创业者';
+    case UserType.parent: return '宝爸宝妈';
+    case UserType.senior: return '退休人群';
+    case UserType.child: return '儿童';
+  }
+}
+
+String _userTypeNameEn(UserType t) {
+  switch (t) {
+    case UserType.student: return 'Student';
+    case UserType.officeWorker: return 'Office Worker';
+    case UserType.entrepreneur: return 'Entrepreneur';
+    case UserType.parent: return 'Parent';
+    case UserType.senior: return 'Senior';
+    case UserType.child: return 'Child';
+  }
+}
+
+// 6/24 v13: 名言点开弹底部 Sheet — 显示近 7 天相关推荐
+class _QuoteDetailSheet extends StatelessWidget {
+  final List<HistoryItem> recent;
+  final bool isEn;
+  final String encouragement;
+  final String? quote;
+  const _QuoteDetailSheet({
+    required this.recent,
+    required this.isEn,
+    required this.encouragement,
+    required this.quote,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return DraggableScrollableSheet(
+      initialChildSize: 0.6,
+      minChildSize: 0.4,
+      maxChildSize: 0.9,
+      expand: false,
+      builder: (context, scrollCtrl) => Container(
+        decoration: const BoxDecoration(
+          color: Colors.white,
+          borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
+        ),
+        child: ListView(
+          controller: scrollCtrl,
+          padding: const EdgeInsets.fromLTRB(20, 16, 20, 32),
+          children: [
+            Center(
+              child: Container(
+                width: 40, height: 4,
+                decoration: BoxDecoration(
+                  color: Colors.grey[300],
+                  borderRadius: BorderRadius.circular(2),
+                ),
+              ),
+            ),
+            const SizedBox(height: 16),
+            Row(children: [
+              const Icon(Icons.auto_awesome, color: Color(0xFF7C5CFC), size: 20),
+              const SizedBox(width: 8),
+              Text(
+                isEn ? 'Related to today' : '今天的相关内容',
+                style: const TextStyle(fontSize: 18, fontWeight: FontWeight.w700),
+              ),
+            ]),
+            const SizedBox(height: 8),
+            if (encouragement.isNotEmpty)
+              Padding(
+                padding: const EdgeInsets.only(bottom: 6),
+                child: Text(
+                  '“$encouragement”',
+                  style: TextStyle(
+                    fontSize: 13,
+                    fontStyle: FontStyle.italic,
+                    color: Colors.grey[700],
+                  ),
+                ),
+              ),
+            if (quote != null)
+              Padding(
+                padding: const EdgeInsets.only(bottom: 16),
+                child: Text(
+                  '“$quote”',
+                  style: TextStyle(
+                    fontSize: 13,
+                    fontStyle: FontStyle.italic,
+                    color: Colors.grey[700],
+                  ),
+                ),
+              ),
+            const SizedBox(height: 8),
+            ...recent.map((h) => Padding(
+                padding: const EdgeInsets.only(bottom: 10),
+                child: Card(
+                  elevation: 0,
+                  color: const Color(0xFF7C5CFC).withOpacity(0.06),
+                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
+                  child: Padding(
+                    padding: const EdgeInsets.all(12),
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text(
+                          h.title,
+                          style: const TextStyle(fontSize: 14, fontWeight: FontWeight.w600),
+                          maxLines: 2,
+                          overflow: TextOverflow.ellipsis,
+                        ),
+                        const SizedBox(height: 4),
+                        Row(children: [
+                          Icon(
+                            ContentType.values.firstWhere(
+                              (c) => c.name == h.contentTypeName,
+                              orElse: () => ContentType.article,
+                            ).icon,
+                            size: 14,
+                            color: Colors.grey[600],
+                          ),
+                          const SizedBox(width: 4),
+                          Text(
+                            '${h.duration} · ${h.source}',
+                            style: TextStyle(fontSize: 11, color: Colors.grey[600]),
+                          ),
+                        ]),
+                      ],
+                    ),
+                  ),
+                ),
+              )),
+          ],
+        ),
       ),
     );
   }

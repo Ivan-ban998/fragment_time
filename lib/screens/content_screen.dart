@@ -215,10 +215,10 @@ class _ContentScreenState extends State<ContentScreen> {
     _onAllSixDismissed();
   }
 
-  // 进度追踪: 详情 push 后 30s 写 20%, scroll 到底写 100%
+  // 6/24 改: 进度追踪阶梯 0/30/60/100 — 60s 后才记 30% (避免开了就走)
   void _startProgressTimer() {
-    _progressTimer = Timer(const Duration(seconds: 30), () {
-      _writeProgress(20);
+    _progressTimer = Timer(const Duration(seconds: 60), () {
+      _writeProgress(30);
     });
   }
 
