@@ -29,14 +29,14 @@ class MySubscriptionsScreen extends StatefulWidget {
 }
 
 class _MySubscriptionsScreenState extends State<MySubscriptionsScreen>
-    with WidgetsBindingObserver {
+    with WidgetsBindingObserver, TickerProviderStateMixin {
   final LocalSubscriptionService _subService = LocalSubscriptionService.instance;
   List<ContentItem> _items = [];
   bool _loading = true;
   int _followingPlatforms = 0;
   int _followingCategories = 0;
   String _handle = '@你'; // 6/25 昵称扩展: 顶部显示
-  int _filterIndex = 0; // 6/25 筛选: 0=全部 1=内容 2=名言
+  late TabController _tabController; // 6/25 A: 子 Tab 切换 (内容/名言/关注)
 
   // 6/24 v8: 公开方法, main.dart 切 tab 时调用
   void reload() {
@@ -47,6 +47,7 @@ class _MySubscriptionsScreenState extends State<MySubscriptionsScreen>
   @override
   void initState() {
     super.initState();
+    _tabController = TabController(length: 3, vsync: this);
     WidgetsBinding.instance.addObserver(this);
     _load();
   }
@@ -73,6 +74,7 @@ class _MySubscriptionsScreenState extends State<MySubscriptionsScreen>
 
   @override
   void dispose() {
+    _tabController.dispose();
     WidgetsBinding.instance.removeObserver(this);
     super.dispose();
   }
@@ -173,151 +175,116 @@ class _MySubscriptionsScreenState extends State<MySubscriptionsScreen>
             ],
           ),
         ],
+        // 6/25 A: 顶部 TabBar (内容/名言/关注)
+        bottom: TabBar(
+          controller: _tabController,
+          labelColor: AppTheme.primary,
+          unselectedLabelColor: AppTheme.textLight,
+          indicatorColor: AppTheme.primary,
+          indicatorWeight: 3,
+          labelStyle: TextStyle(fontSize: 14 * scale, fontWeight: FontWeight.w600),
+          tabs: [
+            Tab(icon: Icon(Icons.article_outlined, size: 18 * scale), text: isEn ? 'Articles' : '内容'),
+            Tab(icon: Icon(Icons.format_quote, size: 18 * scale), text: isEn ? 'Quotes' : '名言'),
+            Tab(icon: Icon(Icons.subscriptions, size: 18 * scale), text: isEn ? 'Following' : '关注'),
+          ],
+        ),
       ),
-      body: _loading
-          // 6/23: 骨架屏替换 loading 圈
-          ? ListView.builder(
-              padding: const EdgeInsets.all(16),
-              itemCount: 4,
-              itemBuilder: (_, __) => const Padding(
-                padding: EdgeInsets.only(bottom: 10),
-                child: ListItemSkeleton(),
-              ),
-            )
-          : Column(
-              children: [
-                // 6/25 筛选: FilterChip 分 全部/内容/名言
-                _buildFilterChips(scale, isEn),
-                _buildFollowSummary(scale, isEn),
-                Expanded(
-                  child: _items.isEmpty
-                      ? _buildEmpty(scale, isEn)
-                      : (_filterIndex == 0
-                          // 6/25: 全部 = 按 [名言, 内容] 分组显示 (CustomScrollView + SliverList)
-                          ? CustomScrollView(
-                              slivers: [_buildGroupedList(scale, isEn)],
-                            )
-                          : // 内容 / 名言 过滤后不需要分组, 原 ListView 即可
-                          ListView.separated(
-                              padding: EdgeInsets.all(16 * scale),
-                              itemCount: _filteredItems().length,
-                              separatorBuilder: (_, __) => SizedBox(height: 12 * scale),
-                              itemBuilder: (context, index) {
-                                final item = _filteredItems()[index];
-                                return _SubscribedCard(
-                                  item: item,
-                                  scale: scale,
-                                  isEn: isEn,
-                                  onTap: () {
-                                    Navigator.push(
-                                      context,
-                                      MaterialPageRoute(
-                                        builder: (_) => ContentReaderScreen(
-                                          item: item,
-                                          isElderlyMode: widget.isElderlyMode,
-                                          isEn: isEn,
-                                        ),
-                                      ),
-                                    );
-                                  },
-                                  onRemove: () => _unsubscribe(item),
-                                );
-                              },
-                            )),
+      body: TabBarView(
+          controller: _tabController,
+          children: [
+            // Tab 1: 内容收藏
+            _buildSavedTab(scale, isEn, contentOnly: true),
+            // Tab 2: 名言收藏
+            _buildSavedTab(scale, isEn, quotesOnly: true),
+            // Tab 3: 关注管理 (跳转)
+            _buildFollowingTab(scale, isEn),
+          ],
+        ),
+      ),
+    );
+  }
+
+  // 6/25 A: 收藏 Tab (内容 / 名言)
+  Widget _buildSavedTab(double scale, bool isEn, {bool contentOnly = false, bool quotesOnly = false}) {
+    final filtered = contentOnly
+        ? _items.where((it) => !it.id.startsWith('encourage_')).toList()
+        : quotesOnly
+            ? _items.where((it) => it.id.startsWith('encourage_')).toList()
+            : _items;
+
+    if (_loading) {
+      return ListView.builder(
+        padding: const EdgeInsets.all(16),
+        itemCount: 4,
+        itemBuilder: (_, __) => const Padding(
+          padding: EdgeInsets.only(bottom: 10),
+          child: ListItemSkeleton(),
+        ),
+      );
+    }
+    if (filtered.isEmpty) {
+      return _buildEmpty(scale, isEn, contentOnly: contentOnly, quotesOnly: quotesOnly);
+    }
+    return ListView.separated(
+      padding: EdgeInsets.all(16 * scale),
+      itemCount: filtered.length,
+      separatorBuilder: (_, __) => SizedBox(height: 12 * scale),
+      itemBuilder: (context, index) {
+        final item = filtered[index];
+        return _SubscribedCard(
+          item: item,
+          scale: scale,
+          isEn: isEn,
+          onTap: () {
+            Navigator.push(
+              context,
+              MaterialPageRoute(
+                builder: (_) => ContentReaderScreen(
+                  item: item,
+                  isElderlyMode: widget.isElderlyMode,
+                  isEn: isEn,
                 ),
-              ],
-            ),
-      ),
-    );
-  }
-
-  // 6/25 筛选: 顶部 3 个 FilterChip (全部/内容/名言)
-  Widget _buildFilterChips(double scale, bool isEn) {
-    final counts = _filterCounts();
-    final labels = isEn
-        ? ['All', 'Articles', 'Quotes']
-        : ['全部', '内容', '名言'];
-    return Padding(
-      padding: EdgeInsets.fromLTRB(16 * scale, 12 * scale, 16 * scale, 0),
-      child: Row(
-        children: List.generate(3, (i) {
-          final selected = _filterIndex == i;
-          return Padding(
-            padding: EdgeInsets.only(right: 8 * scale),
-            child: FilterChip(
-              label: Text('${labels[i]} ${counts[i]}'),
-              selected: selected,
-              onSelected: (_) => setState(() => _filterIndex = i),
-              selectedColor: AppTheme.primary.withOpacity(0.2),
-              checkmarkColor: AppTheme.primary,
-              labelStyle: TextStyle(
-                color: selected ? AppTheme.primary : AppTheme.textDark,
-                fontSize: 13 * scale,
-                fontWeight: selected ? FontWeight.w600 : FontWeight.w400,
               ),
-              padding: EdgeInsets.symmetric(horizontal: 8 * scale, vertical: 0),
-            ),
-          );
-        }),
-      ),
+            );
+          },
+          onRemove: () => _unsubscribe(item),
+        );
+      },
     );
   }
 
-  // 6/25 筛选 helper: 返回按 _filterIndex 过滤后的列表
-  // 0=全部 1=内容 (非 encourage_) 2=名言 (encourage_)
-  List<ContentItem> _filteredItems() {
-    if (_filterIndex == 0) return _items;
-    if (_filterIndex == 1) {
-      return _items.where((it) => !it.id.startsWith('encourage_')).toList();
-    }
-    return _items.where((it) => it.id.startsWith('encourage_')).toList();
-  }
-
-  // 6/25 列表分组: _filterIndex==0 时按 [名言, 内容] 分段
-  Widget _buildGroupedList(double scale, bool isEn) {
-    final quotes = _items.where((it) => it.id.startsWith('encourage_')).toList();
-    final content = _items.where((it) => !it.id.startsWith('encourage_')).toList();
-    final slivers = <Widget>[];
-
-    if (quotes.isNotEmpty) {
-      slivers.add(_buildSectionHeader(
-        isEn ? 'QUOTES (${quotes.length})' : '名言收藏 (${quotes.length})',
-        Icons.format_quote,
-        scale,
-      ));
-      slivers.addAll(quotes.map((it) => _buildCard(it, scale, isEn)));
-    }
-    if (content.isNotEmpty) {
-      slivers.add(_buildSectionHeader(
-        isEn ? 'ARTICLES (${content.length})' : '内容收藏 (${content.length})',
-        Icons.article_outlined,
-        scale,
-      ));
-      slivers.addAll(content.map((it) => _buildCard(it, scale, isEn)));
-    }
-    return SliverPadding(
-      padding: EdgeInsets.symmetric(horizontal: 16 * scale),
-      sliver: SliverList(
-        delegate: SliverChildListDelegate(slivers),
-      ),
-    );
-  }
-
-  // 6/25 分组 section header
-  Widget _buildSectionHeader(String label, IconData icon, double scale) {
-    return Padding(
-      padding: EdgeInsets.fromLTRB(4 * scale, 12 * scale, 4 * scale, 8 * scale),
-      child: Row(
+  // 6/25 A: 关注 Tab (跳 SubscriptionScreen 复用现有功能)
+  Widget _buildFollowingTab(double scale, bool isEn) {
+    return SingleChildScrollView(
+      child: Column(
         children: [
-          Icon(icon, size: 14 * scale, color: AppTheme.primary),
-          SizedBox(width: 6 * scale),
-          Text(
-            label,
-            style: TextStyle(
-              fontSize: 12 * scale,
-              fontWeight: FontWeight.w700,
-              color: AppTheme.primary,
-              letterSpacing: 0.5,
+          _buildFollowSummary(scale, isEn),
+          const SizedBox(height: 24),
+          // 说明卡
+          Padding(
+            padding: EdgeInsets.symmetric(horizontal: 16 * scale),
+            child: Container(
+              padding: EdgeInsets.all(14 * scale),
+              decoration: BoxDecoration(
+                color: AppTheme.primary.withOpacity(0.04),
+                borderRadius: BorderRadius.circular(12),
+                border: Border.all(color: AppTheme.primary.withOpacity(0.15)),
+              ),
+              child: Row(
+                children: [
+                  Icon(Icons.info_outline, size: 18 * scale, color: AppTheme.primary),
+                  SizedBox(width: 10 * scale),
+                  Expanded(
+                    child: Text(
+                      isEn
+                          ? 'Click "Manage Following" above to add or remove platforms / categories.'
+                          : '点击上方"管理关注"按钮可添加或删除平台 / 类目。',
+                      style: TextStyle(fontSize: 13 * scale, color: AppTheme.textDark),
+                    ),
+                  ),
+                ],
+              ),
             ),
           ),
         ],
@@ -325,38 +292,9 @@ class _MySubscriptionsScreenState extends State<MySubscriptionsScreen>
     );
   }
 
-  // 6/25 分组: 抽出的单卡构建 (跟原来 inline 一样, 但用 Padding 包)
-  Widget _buildCard(ContentItem item, double scale, bool isEn) {
-    return Padding(
-      padding: EdgeInsets.only(bottom: 12 * scale),
-      child: _SubscribedCard(
-        item: item,
-        scale: scale,
-        isEn: isEn,
-        onTap: () {
-          Navigator.push(
-            context,
-            MaterialPageRoute(
-              builder: (_) => ContentReaderScreen(
-                item: item,
-                isElderlyMode: widget.isElderlyMode,
-                isEn: isEn,
-              ),
-            ),
-          );
-        },
-        onRemove: () => _unsubscribe(item),
-      ),
-    );
-  }
+// 6/25 A: 分组/卡片 helper 删了 (TabBar 子视图取代, 简化)
 
-  // 6/25 筛选 helper: 返回各分类计数 [全部, 内容, 名言]
-  List<int> _filterCounts() {
-    final all = _items.length;
-    final content = _items.where((it) => !it.id.startsWith('encourage_')).length;
-    final quotes = all - content;
-    return [all, content, quotes];
-  }
+  // 6/25 筛选 helper 删了 (用 TabBar 替代, 不需要计数)
 
   Widget _buildFollowSummary(double scale, bool isEn) {
     return InkWell(
@@ -414,7 +352,17 @@ class _MySubscriptionsScreenState extends State<MySubscriptionsScreen>
     );
   }
 
-  Widget _buildEmpty(double scale, bool isEn) {
+  Widget _buildEmpty(double scale, bool isEn, {bool contentOnly = false, bool quotesOnly = false}) {
+    final msg = quotesOnly
+        ? (isEn ? 'No quotes saved' : '还没有名言收藏')
+        : contentOnly
+            ? (isEn ? 'No articles saved' : '还没有内容收藏')
+            : (isEn ? 'No saved items yet' : '还没有收藏');
+    final hint = quotesOnly
+        ? (isEn ? 'Tap ❤️ on the banner to save today\'s quote.' : '点击首页 banner ❤️ 收藏今日名言。')
+        : contentOnly
+            ? (isEn ? 'Tap 🔖 on any article to save it here.' : '在内容页点击 🔖 添加到这里。')
+            : (isEn ? 'Tap the bookmark icon on any article to save it here.' : '在内容页点击 🔖 图标添加到这里');
     return Center(
       child: Padding(
         padding: EdgeInsets.all(24 * scale),
@@ -424,14 +372,12 @@ class _MySubscriptionsScreenState extends State<MySubscriptionsScreen>
             Icon(Icons.bookmark_border, size: 64 * scale, color: AppTheme.textLight.withOpacity(0.4)),
             SizedBox(height: 16 * scale),
             Text(
-              isEn ? 'No saved items yet' : '还没有收藏',
+              msg,
               style: TextStyle(fontSize: 18 * scale, fontWeight: FontWeight.w600, color: AppTheme.textLight),
             ),
             SizedBox(height: 8 * scale),
             Text(
-              isEn
-                  ? 'Tap the bookmark icon on any article to save it here.'
-                  : '在内容页点击 🔖 图标添加到这里',
+              hint,
               textAlign: TextAlign.center,
               style: TextStyle(fontSize: 13 * scale, color: AppTheme.textLight),
             ),
