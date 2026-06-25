@@ -248,7 +248,7 @@ class _UserTypeScreenState extends State<UserTypeScreen> {
                   AnalyticsService.instance.track(AnalyticsService.EVT_USER_TYPE_SELECT,
                       props: {'userType': type.name, 'source': 'today_pick'});
                   widget.onUserTypeSelected(type);
-                  Navigator.push(
+                  Navigator.pushReplacement(
                     context,
                     MaterialPageRoute(
                       builder: (_) => SceneScreen(
