@@ -70,7 +70,8 @@ class LlmService {
         ],
         'options': {
           'temperature': 0.8,
-          'num_predict': 500,
+          // 6/25 Brien '生成的东西占了太多页面': 500→250 token, 减少页面占用
+          'num_predict': 250,
         },
         // 6/25 E: keep_alive 10 分钟 — 模型常驻内存, 避免每次冷启动 30-60s
         'keep_alive': '10m',
