@@ -11,26 +11,47 @@ class TimeRecommendation {
 }
 
 class TimeAwareRecommender {
-  /// 根据当前时间返回推荐
-  static TimeRecommendation recommendAt(DateTime now) {
+  /// 根据当前时间 + 当前用户角色返回推荐
+  /// 6/25 修 bug: 之前只硬编码 6 种 userType 不看当前选择, 用户选上班族也会推荐学生党
+  static TimeRecommendation recommendAt(DateTime now, {UserType? currentUserType}) {
     final h = now.hour;
+    final ut = currentUserType ?? UserType.student;
+    final name = _userTypeNameZh(ut);
 
+    // 根据时间推荐场景 (不强制 userType, 用当前选的角色名拼接)
+    Scene scene;
+    String label;
     if (h >= 7 && h < 9) {
-      return const TimeRecommendation(UserType.officeWorker, Scene.listen, '上班族 - 听一听');
+      scene = Scene.listen; // 早间通勤听
+      label = '$name - 听一听';
+    } else if (h >= 9 && h < 12) {
+      scene = Scene.learn; // 上午学习
+      label = '$name - 学点东西';
+    } else if (h >= 12 && h < 14) {
+      scene = Scene.relax; // 午休放松
+      label = '$name - 放松一下';
+    } else if (h >= 14 && h < 18) {
+      scene = Scene.learn; // 下午继续学
+      label = '$name - 学点东西';
+    } else if (h >= 18 && h < 21) {
+      scene = Scene.listen; // 下班通勤听
+      label = '$name - 听一听';
+    } else {
+      scene = Scene.relax; // 夜深放松
+      label = '$name - 放松一下';
     }
-    if (h >= 9 && h < 12) {
-      return const TimeRecommendation(UserType.entrepreneur, Scene.learn, '创业者 - 学点东西');
+    return TimeRecommendation(ut, scene, label);
+  }
+
+  static String _userTypeNameZh(UserType t) {
+    switch (t) {
+      case UserType.student: return '学生党';
+      case UserType.officeWorker: return '上班族';
+      case UserType.entrepreneur: return '创业者';
+      case UserType.parent: return '宝爸宝妈';
+      case UserType.senior: return '退休人群';
+      case UserType.child: return '小朋友';
     }
-    if (h >= 12 && h < 14) {
-      return const TimeRecommendation(UserType.officeWorker, Scene.relax, '上班族 - 放松一下');
-    }
-    if (h >= 14 && h < 18) {
-      return const TimeRecommendation(UserType.student, Scene.learn, '学生党 - 学点东西');
-    }
-    if (h >= 18 && h < 21) {
-      return const TimeRecommendation(UserType.officeWorker, Scene.listen, '上班族 - 听一听');
-    }
-    return const TimeRecommendation(UserType.senior, Scene.relax, '退休人群 - 放松一下');
   }
 
   /// 字符串描述 (遵守宪法: 不用 emoji 字符)
@@ -44,5 +65,6 @@ class TimeAwareRecommender {
     return '夜深了,摸鱼前看点有用的';
   }
 
+  /// 默认用 student (调用方应该传 currentUserType)
   static TimeRecommendation get current => recommendAt(DateTime.now());
 }
