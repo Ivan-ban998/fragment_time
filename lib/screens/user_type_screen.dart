@@ -594,7 +594,8 @@ class _InProgressRowState extends State<_InProgressRow> {
           final item = _items[i];
           return GestureDetector(
             onTap: () {
-              Navigator.push(
+              // 6/26 Brien 00:33 修: 续读点入也用 pushReplacement, 返回不会回 UserTypeScreen
+              Navigator.pushReplacement(
                 context,
                 MaterialPageRoute(
                   builder: (_) => ContentScreen(
