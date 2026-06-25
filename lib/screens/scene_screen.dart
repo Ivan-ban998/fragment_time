@@ -4,9 +4,10 @@ import '../theme/app_theme.dart';
 import '../theme/glass_decoration.dart';
 import '../services/analytics_service.dart';
 import '../services/time_aware_recommender.dart';
+import '../services/handle_service.dart';
 import 'content_screen.dart';
 
-class SceneScreen extends StatelessWidget {
+class SceneScreen extends StatefulWidget {
   final UserType userType;
   final bool isInternational;
   final bool isElderlyMode;
@@ -20,8 +21,34 @@ class SceneScreen extends StatelessWidget {
     required this.languageCode,
   });
 
-  double get _scale => isElderlyMode ? 1.3 : 1.0;
-  bool get isEn => languageCode == 'en';
+  @override
+  State<SceneScreen> createState() => _SceneScreenState();
+}
+
+class _SceneScreenState extends State<SceneScreen> {
+  String _handle = '@你'; // 6/25 联动昵称
+
+  @override
+  void initState() {
+    super.initState();
+    _loadHandle();
+  }
+
+  Future<void> _loadHandle() async {
+    try {
+      final h = await HandleService().get();
+      if (!mounted) return;
+      setState(() => _handle = h);
+    } catch (_) {}
+  }
+
+  UserType get userType => widget.userType;
+  bool get isInternational => widget.isInternational;
+  bool get isElderlyMode => widget.isElderlyMode;
+  String get languageCode => widget.languageCode;
+
+  double get _scale => widget.isElderlyMode ? 1.3 : 1.0;
+  bool get isEn => widget.languageCode == 'en';
 
   @override
   Widget build(BuildContext context) {
@@ -39,10 +66,7 @@ class SceneScreen extends StatelessWidget {
             SceneIntl(Scene.workout, '动一动', '告别久坐，活动筋骨', Colors.orange),
           ];
 
-    final userTypeName = isInternational
-        ? _getUserTypeName(userType)
-        : _getUserTypeName(userType);
-
+    // 6/25 联动昵称: userTypeName 删了 (AppBar + 欢迎语都改用 _handle)
     return Scaffold(
       appBar: AppBar(
         backgroundColor: GlassStyle.glassAppBarBg,
@@ -50,7 +74,8 @@ class SceneScreen extends StatelessWidget {
         elevation: GlassStyle.glassAppBarElevation,
         title: Text(
           // 6/19 修: 删 userType.icon (IconData 不能跟 String 直接拼接, 6/19 00:16 Brien 反馈 'IconData(U+0E6F2)' bug)
-          userTypeName,
+          // 6/25 联动昵称: 用 handle 而不是 userTypeName
+          _handle,
           style: TextStyle(fontSize: 18 * _scale),
         ),
         leading: Material(
@@ -110,7 +135,8 @@ class SceneScreen extends StatelessWidget {
               ),
               SizedBox(height: 20 * _scale),
               Text(
-                '${DailyMessage.getGreeting(isEn)} ${userTypeName}',
+                // 6/25 联动昵称: '上午好, @你' 而不是 '上午好, 上班族'
+                '${DailyMessage.getGreeting(isEn)} $_handle',
                 style: TextStyle(fontSize: 18 * _scale, fontWeight: FontWeight.bold),
               ),
               SizedBox(height: 4 * _scale),
