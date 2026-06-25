@@ -1,0 +1,26 @@
+version: "3.8"
+
+# 6/25 上线 Phase 2 准备
+# Cloudflare Tunnel 反代 fragment_time_good (LAN 9090) 到公网
+# 不需要公网 IP (但你 NAS 有 183.210.250.219, 也行)
+# 不需要备案 (Cloudflare 走海外节点)
+# 不需要改 80/443 (系统 nginx 占着, cloudflared 直连 CF 边缘, 绕过)
+
+services:
+  cloudflared:
+    image: cloudflare/cloudflared:2024.5.0
+    container_name: ft-cloudflared
+    restart: unless-stopped
+    command: tunnel --no-autoupdate run
+    environment:
+      # TUNNEL_TOKEN 来自 Cloudflare Zero Trust dashboard
+      # https://one.dash.cloudflare.com/ > Networks > Tunnels > Create
+      # 选 "Cloudflared" connector, 复制 token 粘到 .env
+      - TUNNEL_TOKEN=${TUNNEL_TOKEN}
+    networks:
+      - ft-net
+    # 不映射端口 (cloudflared 主动 outbound 连 CF 边缘)
+
+networks:
+  ft-net:
+    driver: bridge

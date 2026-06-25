@@ -1,0 +1,27 @@
+# 6/25 Cloudflare Tunnel 配置示例
+# 这个文件**不直接用** -- 实际部署时 cloudflared 在 Cloudflare dashboard 配置
+# 这里只展示 9090 反代 + HTTPS 自动证书的逻辑
+
+# 在 Cloudflare dashboard 配置的入口规则 (Public Hostname):
+#   Subdomain: app
+#   Domain: fengpietai.com (你买的)
+#   Service Type: HTTP
+#   URL: host.docker.internal:9090  (容器内访问 host 网络的 9090)
+#     或者: 172.17.0.1:9090  (docker 默认 bridge gateway)
+#     或者: 192.168.1.20:9090  (LAN 直连, 不推荐)
+#
+# 自动 HTTPS: Cloudflare Zero Trust 默认签发证书, 不需要 Let's Encrypt
+#
+# 反代走 cloudflared 主动 outbound, 绕过 NAS 80/443 被系统 nginx 占用的问题
+
+# 5 个常见配置错误 (Brien 真踩过的):
+# 1. URL 写成 localhost:9090 -- 容器内 localhost = 容器自己, 找不到 host 上的 9090
+#    修: 用 host.docker.internal:9090 (Mac/Win) 或 172.17.0.1:9090 (Linux docker)
+# 2. 端口填 HTTPS 443 -- cloudflared 不需要暴露 443
+#    修: 保持 HTTP 9090, CF 边缘自动 HTTPS
+# 3. 忘记在 Cloudflare DNS 加 CNAME
+#    修: 在你域名 fengpietai.com 加 CNAME app → <tunnel-id>.cfargotunnel.com
+# 4. Tunnel token 过期
+#    修: token 不过期, 但删除 tunnel 后需要重生成
+# 5. WebSocket 不通 (如果未来加实时功能)
+#    修: dashboard 加 "Websocket" 开关
