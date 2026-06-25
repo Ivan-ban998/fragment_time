@@ -192,32 +192,41 @@ class _MySubscriptionsScreenState extends State<MySubscriptionsScreen>
                 Expanded(
                   child: _items.isEmpty
                       ? _buildEmpty(scale, isEn)
-                      : ListView.separated(
-                          padding: EdgeInsets.all(16 * scale),
-                          itemCount: _filteredItems().length,
-                          separatorBuilder: (_, __) => SizedBox(height: 12 * scale),
-                          itemBuilder: (context, index) {
-                            final item = _filteredItems()[index];
-                            return _SubscribedCard(
-                              item: item,
-                              scale: scale,
-                              isEn: isEn,
-                              onTap: () {
-                                Navigator.push(
-                                  context,
-                                  MaterialPageRoute(
-                                    builder: (_) => ContentReaderScreen(
-                                      item: item,
-                                      isElderlyMode: widget.isElderlyMode,
-                                      isEn: isEn,
-                                    ),
-                                  ),
+                      : (_filterIndex == 0
+                          // 6/25: 全部 = 按 [名言, 内容] 分组显示
+                          ? ListView(
+                              padding: EdgeInsets.symmetric(horizontal: 16 * scale),
+                              children: [
+                                _buildGroupedList(scale, isEn),
+                              ],
+                            )
+                          : // 内容 / 名言 过滤后不需要分组, 原 ListView 即可
+                          ListView.separated(
+                              padding: EdgeInsets.all(16 * scale),
+                              itemCount: _filteredItems().length,
+                              separatorBuilder: (_, __) => SizedBox(height: 12 * scale),
+                              itemBuilder: (context, index) {
+                                final item = _filteredItems()[index];
+                                return _SubscribedCard(
+                                  item: item,
+                                  scale: scale,
+                                  isEn: isEn,
+                                  onTap: () {
+                                    Navigator.push(
+                                      context,
+                                      MaterialPageRoute(
+                                        builder: (_) => ContentReaderScreen(
+                                          item: item,
+                                          isElderlyMode: widget.isElderlyMode,
+                                          isEn: isEn,
+                                        ),
+                                      ),
+                                    );
+                                  },
+                                  onRemove: () => _unsubscribe(item),
                                 );
                               },
-                              onRemove: () => _unsubscribe(item),
-                            );
-                          },
-                        ),
+                            )),
                 ),
               ],
             ),
@@ -265,6 +274,80 @@ class _MySubscriptionsScreenState extends State<MySubscriptionsScreen>
       return _items.where((it) => !it.id.startsWith('encourage_')).toList();
     }
     return _items.where((it) => it.id.startsWith('encourage_')).toList();
+  }
+
+  // 6/25 列表分组: _filterIndex==0 时按 [名言, 内容] 分段
+  Widget _buildGroupedList(double scale, bool isEn) {
+    final quotes = _items.where((it) => it.id.startsWith('encourage_')).toList();
+    final content = _items.where((it) => !it.id.startsWith('encourage_')).toList();
+    final slivers = <Widget>[];
+
+    if (quotes.isNotEmpty) {
+      slivers.add(_buildSectionHeader(
+        isEn ? 'QUOTES (${quotes.length})' : '名言收藏 (${quotes.length})',
+        Icons.format_quote,
+        scale,
+      ));
+      slivers.addAll(quotes.map((it) => _buildCard(it, scale, isEn)));
+    }
+    if (content.isNotEmpty) {
+      slivers.add(_buildSectionHeader(
+        isEn ? 'ARTICLES (${content.length})' : '内容收藏 (${content.length})',
+        Icons.article_outlined,
+        scale,
+      ));
+      slivers.addAll(content.map((it) => _buildCard(it, scale, isEn)));
+    }
+    return SliverList(
+      delegate: SliverChildListDelegate(slivers),
+    );
+  }
+
+  // 6/25 分组 section header
+  Widget _buildSectionHeader(String label, IconData icon, double scale) {
+    return Padding(
+      padding: EdgeInsets.fromLTRB(4 * scale, 12 * scale, 4 * scale, 8 * scale),
+      child: Row(
+        children: [
+          Icon(icon, size: 14 * scale, color: AppTheme.primary),
+          SizedBox(width: 6 * scale),
+          Text(
+            label,
+            style: TextStyle(
+              fontSize: 12 * scale,
+              fontWeight: FontWeight.w700,
+              color: AppTheme.primary,
+              letterSpacing: 0.5,
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  // 6/25 分组: 抽出的单卡构建 (跟原来 inline 一样, 但用 Padding 包)
+  Widget _buildCard(ContentItem item, double scale, bool isEn) {
+    return Padding(
+      padding: EdgeInsets.only(bottom: 12 * scale),
+      child: _SubscribedCard(
+        item: item,
+        scale: scale,
+        isEn: isEn,
+        onTap: () {
+          Navigator.push(
+            context,
+            MaterialPageRoute(
+              builder: (_) => ContentReaderScreen(
+                item: item,
+                isElderlyMode: widget.isElderlyMode,
+                isEn: isEn,
+              ),
+            ),
+          );
+        },
+        onRemove: () => _unsubscribe(item),
+      ),
+    );
   }
 
   // 6/25 筛选 helper: 返回各分类计数 [全部, 内容, 名言]
