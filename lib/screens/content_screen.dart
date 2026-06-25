@@ -30,6 +30,7 @@ import '../services/content_aggregator.dart';
 import '../services/tts_service.dart';
 import '../services/share_service.dart';
 import '../services/analytics_service.dart';
+import '../services/news_service.dart';
 import '../widgets/tinder_recommendation_stack.dart';
 import '../widgets/iframe_video_view.dart';
 import '../widgets/quiz_panel.dart';
@@ -174,6 +175,13 @@ class _ContentScreenState extends State<ContentScreen> {
         onDone: () {
           if (!mounted) return;
           _llmFallbackTimer?.cancel();
+          // 6/25 锁死角色匹配: 生成完成后检测内容是否跟当前 userType 匹配
+          // 1.5b 质量不够时可能输出学生内容给上班族, 检测后 fallback
+          if (_buf.length > 30 && !_isRoleMatch(_buf, widget.userType)) {
+            // 内容错位: 重置 buf 并调假数据桶
+            debugPrint('[LLM] 内容错位 fallback: userType=${widget.userType.name}');
+            _loadFakeContent();
+          }
         },
       );
     } catch (e) {
@@ -191,6 +199,50 @@ class _ContentScreenState extends State<ContentScreen> {
           : '⚠️ 在线 AI 暂不可用\n\n为你推荐预制内容。 (原因: $reason)';
       _loading = false;
     });
+  }
+
+  // 6/25 锁死角色匹配: 检测 LLM 生成内容是否跟当前 userType 匹配
+  // 1.5b 模型偶尔输出学生内容给上班族, 检测后 fallback
+  bool _isRoleMatch(String content, UserType currentType) {
+    // 学生专属关键词 (其他角色不该出现)
+    const studentKeywords = [
+      '高考', '中考', '考试', '作业', '课本', '老师', '学生党', ' K12', '学校',
+      '学习规划', '学习策略', '高效学习', '考试技巧', '学生',
+      'exam', 'homework', 'school', 'study plan',
+    ];
+    // 儿童专属关键词
+    const childKeywords = [
+      '小朋友', '幼儿园', '小儿', ' 幼', '儿童',
+      'kid', 'children',
+    ];
+    // 创业专属 (不该出现上班族/退休)
+    // 老年专属 (不该出现学生/儿童)
+    final lower = content.toLowerCase();
+    if (currentType == UserType.student || currentType == UserType.child) {
+      return true; // 这些角色反而可能需要这些关键词
+    }
+    for (final k in studentKeywords) {
+      if (lower.contains(k.toLowerCase())) return false;
+    }
+    for (final k in childKeywords) {
+      if (lower.contains(k.toLowerCase())) return false;
+    }
+    return true;
+  }
+
+  // 6/25 fallback: LLM 内容错位 → 调 NewsService 假数据桶
+  Future<void> _loadFakeContent() async {
+    try {
+      final results = await NewsService().getRecommendations(widget.userType, widget.scene);
+      if (!mounted || results.isEmpty) return;
+      final item = results.first;
+      setState(() {
+        _buf = '${item.title}\n\n${item.description ?? ''}';
+        _aiContentItem = item;
+      });
+    } catch (e) {
+      debugPrint('[LLM] _loadFakeContent error: $e');
+    }
   }
 
   // 加载推荐 6 条 (用 ContentAggregator 6 张看完换 6 张)
