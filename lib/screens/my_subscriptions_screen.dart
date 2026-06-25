@@ -5,6 +5,7 @@ import '../theme/app_theme.dart';
 import '../services/local_subscription_service.dart';
 import '../services/subscription_service.dart';
 import '../services/pack_io_helpers.dart';
+import '../services/handle_service.dart';
 import '../widgets/skeleton.dart';
 import 'content_reader_screen.dart';
 import 'subscription_screen.dart';
@@ -33,6 +34,7 @@ class _MySubscriptionsScreenState extends State<MySubscriptionsScreen>
   bool _loading = true;
   int _followingPlatforms = 0;
   int _followingCategories = 0;
+  String _handle = '@你'; // 6/25 昵称扩展: 顶部显示
 
   // 6/24 v8: 公开方法, main.dart 切 tab 时调用
   void reload() {
@@ -56,11 +58,13 @@ class _MySubscriptionsScreenState extends State<MySubscriptionsScreen>
     final items = await _subService.getSubscribedItems();
     final sources = await SubscriptionService.instance.getSubscribedSources();
     final categories = await SubscriptionService.instance.getSubscribedCategories();
+    final handle = await HandleService().get();
     if (!mounted) return;
     setState(() {
       _items = items;
       _followingPlatforms = sources.length;
       _followingCategories = categories.length;
+      _handle = handle;
       _loading = false;
     });
   }
@@ -236,8 +240,8 @@ class _MySubscriptionsScreenState extends State<MySubscriptionsScreen>
                 children: [
                   Text(
                     isEn
-                        ? 'Following ${_followingPlatforms} platforms · ${_followingCategories} categories · ${_items.length} saved'
-                        : '已关注 ${_followingPlatforms} 个平台 · ${_followingCategories} 个类目 · ${_items.length} 篇收藏',
+                        ? '${_handle}·s collection · Following ${_followingPlatforms} platforms · ${_followingCategories} categories · ${_items.length} saved'
+                        : '${_handle}的收藏 · 已关注 ${_followingPlatforms} 个平台 · ${_followingCategories} 个类目 · ${_items.length} 篇',
                     style: TextStyle(
                       fontSize: 13 * scale,
                       fontWeight: FontWeight.w600,

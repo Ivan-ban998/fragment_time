@@ -15,6 +15,7 @@ import 'services/audio_play_service.dart';
 import 'services/analytics_service.dart';
 import 'services/theme_preference_service.dart';
 import 'services/eye_protection_scope.dart';
+import 'services/handle_service.dart';
 import 'screens/user_type_screen.dart';
 import 'screens/onboarding_screen.dart';
 import 'screens/scene_screen.dart';
@@ -231,12 +232,22 @@ class _MainHomeScreenState extends State<MainHomeScreen> {
     _checkWeeklyRecap();
     // 6/24 AI 私教 亮点: 启动时生成 1 句鼓励, 首页顶部 banner
     _loadDailyEncouragement();
+    // 6/25 昵称扩展: 启动时加载 handle
+    _loadHandle();
     AnalyticsService.instance.track(AnalyticsService.EVT_APP_OPEN);
+  }
+
+  // 6/25 昵称扩展: 加载 handle (banner / 收藏 tab / 分享卡都用)
+  Future<void> _loadHandle() async {
+    final h = await HandleService().get();
+    if (!mounted) return;
+    setState(() => _handle = h);
   }
 
   // 6/24 AI 私教 亮点: 1 句鼓励 banner
   String? _dailyEncouragement;
   String? _dailyQuote; // 6/24 v3 亮点: 每日名言
+  String _handle = HandleService.defaultHandle; // 6/25 昵称扩展: 从 HandleService 加载
 
   Future<void> _loadDailyEncouragement() async {
     try {
@@ -302,7 +313,7 @@ class _MainHomeScreenState extends State<MainHomeScreen> {
             title: Row(children: [
               const Icon(Icons.auto_awesome, color: Colors.deepPurple, size: 22),
               const SizedBox(width: 8),
-              Text(isEn ? 'Weekly recap' : '本周回顾',
+              Text(isEn ? 'Weekly recap · $_handle' : '$_handle 的本周回顾',
                   style: const TextStyle(fontSize: 18, fontWeight: FontWeight.w700)),
             ]),
             content: Text(recap, style: const TextStyle(fontSize: 14, height: 1.5)),
@@ -620,6 +631,7 @@ class _MainHomeScreenState extends State<MainHomeScreen> {
                   quote: _dailyQuote,
                   isEn: isEn,
                   isElderlyMode: _isElderlyMode,
+                  handle: _handle, // 6/25 昵称扩展
                   onTapDetail: _showQuoteDetailSheet, // 6/24 v13
                 ),
               ),
@@ -859,12 +871,14 @@ class _DailyEncouragementBanner extends StatefulWidget {
   final String? quote;
   final bool isEn;
   final bool isElderlyMode;
+  final String handle; // 6/25: 昵称 (从 HandleService 传入)
   final VoidCallback onTapDetail; // 6/24 v13: 点 banner 弹相关推荐
   const _DailyEncouragementBanner({
     required this.text,
     this.quote,
     required this.isEn,
     required this.isElderlyMode,
+    required this.handle,
     required this.onTapDetail,
   });
 
@@ -987,7 +1001,8 @@ class _DailyEncouragementBannerState extends State<_DailyEncouragementBanner> {
                 const SizedBox(width: 8),
                 Expanded(
                   child: Text(
-                    widget.text,
+                    // 6/25 昵称扩展: 鼓励文本前加 '@你,' 让用户感觉 AI 在叫自己
+                    '${widget.handle}${widget.isEn ? ', ' : ','} ${widget.text}',
                     style: TextStyle(
                       color: Colors.white,
                       fontSize: 13 * scale,

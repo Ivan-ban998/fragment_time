@@ -22,10 +22,10 @@ class ShareService {
 
   /// 6/8 分享：把 content item 渲染成 1080×1920 卡片图，下载到本地
   /// 失败回退：复制内容摘要到剪贴板
-  Future<bool> shareContent(ContentItem item, {bool isEn = false}) async {
+  Future<bool> shareContent(ContentItem item, {bool isEn = false, String handle = '@你'}) async {
     try {
       // 1. 渲染 widget 到 PNG
-      final bytes = await _renderCard(item, isEn: isEn);
+      final bytes = await _renderCard(item, isEn: isEn, handle: handle);
       // 2. 触发下载
       final filename = _filenameFor(item, isEn);
       _downloadBytes(bytes, filename);
@@ -47,18 +47,18 @@ class ShareService {
     return 'fragmenttime_${safe}.png';
   }
 
-  Future<Uint8List> _renderCard(ContentItem item, {required bool isEn}) async {
+  Future<Uint8List> _renderCard(ContentItem item, {required bool isEn, String handle = '@你'}) async {
     // 渲染器：直接用 CustomPainter 画到 ui.Picture
     final recorder = ui.PictureRecorder();
     final canvas = Canvas(recorder, const Rect.fromLTWH(0, 0, 1080, 1920));
-    _drawCard(canvas, Size(1080, 1920), item, isEn);
+    _drawCard(canvas, Size(1080, 1920), item, isEn, handle);
     final picture = recorder.endRecording();
     final img = await picture.toImage(1080, 1920);
     final byteData = await img.toByteData(format: ui.ImageByteFormat.png);
     return byteData!.buffer.asUint8List();
   }
 
-  void _drawCard(Canvas canvas, Size size, ContentItem item, bool isEn) {
+  void _drawCard(Canvas canvas, Size size, ContentItem item, bool isEn, String handle) {
     final w = size.width, h = size.height;
 
     // 1. 背景：紫渐变（与主 app 一致）
@@ -119,6 +119,15 @@ class ShareService {
     }
 
     // 7. 底部水印
+    // 6/25 昵称扩展: 分享者标记
+    _drawText(
+      canvas,
+      isEn ? '$handle · Shared via Fragment Time' : '$handle · 分享自 碎片时间',
+      Offset(cardPadding, h - 180),
+      color: Colors.white.withOpacity(0.95),
+      size: 30,
+      weight: FontWeight.w600,
+    );
     _drawText(
       canvas,
       isEn ? 'Fragment Time · fragmenttime.app' : '碎片时间 · fragmenttime.app',

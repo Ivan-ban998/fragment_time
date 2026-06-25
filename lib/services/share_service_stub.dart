@@ -26,7 +26,7 @@ class ShareService {
     // noop
   }
 
-  Future<bool> shareContent(ContentItem item, {required bool isEn}) async {
+  Future<bool> shareContent(ContentItem item, {required bool isEn, String handle = '@你'}) async {
     // noop on android
     return false;
   }
