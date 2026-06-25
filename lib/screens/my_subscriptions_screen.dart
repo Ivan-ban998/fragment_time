@@ -36,6 +36,7 @@ class _MySubscriptionsScreenState extends State<MySubscriptionsScreen>
   int _followingPlatforms = 0;
   int _followingCategories = 0;
   String _handle = '@你'; // 6/25 昵称扩展: 顶部显示
+  int _filterIndex = 0; // 6/25 筛选: 0=全部 1=内容 2=名言
 
   // 6/24 v8: 公开方法, main.dart 切 tab 时调用
   void reload() {
@@ -185,16 +186,18 @@ class _MySubscriptionsScreenState extends State<MySubscriptionsScreen>
             )
           : Column(
               children: [
+                // 6/25 筛选: FilterChip 分 全部/内容/名言
+                _buildFilterChips(scale, isEn),
                 _buildFollowSummary(scale, isEn),
                 Expanded(
                   child: _items.isEmpty
                       ? _buildEmpty(scale, isEn)
                       : ListView.separated(
                           padding: EdgeInsets.all(16 * scale),
-                          itemCount: _items.length,
+                          itemCount: _filteredItems().length,
                           separatorBuilder: (_, __) => SizedBox(height: 12 * scale),
                           itemBuilder: (context, index) {
-                            final item = _items[index];
+                            final item = _filteredItems()[index];
                             return _SubscribedCard(
                               item: item,
                               scale: scale,
@@ -220,6 +223,56 @@ class _MySubscriptionsScreenState extends State<MySubscriptionsScreen>
             ),
       ),
     );
+  }
+
+  // 6/25 筛选: 顶部 3 个 FilterChip (全部/内容/名言)
+  Widget _buildFilterChips(double scale, bool isEn) {
+    final counts = _filterCounts();
+    final labels = isEn
+        ? ['All', 'Articles', 'Quotes']
+        : ['全部', '内容', '名言'];
+    return Padding(
+      padding: EdgeInsets.fromLTRB(16 * scale, 12 * scale, 16 * scale, 0),
+      child: Row(
+        children: List.generate(3, (i) {
+          final selected = _filterIndex == i;
+          return Padding(
+            padding: EdgeInsets.only(right: 8 * scale),
+            child: FilterChip(
+              label: Text('${labels[i]} ${counts[i]}'),
+              selected: selected,
+              onSelected: (_) => setState(() => _filterIndex = i),
+              selectedColor: AppTheme.primary.withOpacity(0.2),
+              checkmarkColor: AppTheme.primary,
+              labelStyle: TextStyle(
+                color: selected ? AppTheme.primary : AppTheme.textDark,
+                fontSize: 13 * scale,
+                fontWeight: selected ? FontWeight.w600 : FontWeight.w400,
+              ),
+              padding: EdgeInsets.symmetric(horizontal: 8 * scale, vertical: 0),
+            ),
+          );
+        }),
+      ),
+    );
+  }
+
+  // 6/25 筛选 helper: 返回按 _filterIndex 过滤后的列表
+  // 0=全部 1=内容 (非 encourage_) 2=名言 (encourage_)
+  List<ContentItem> _filteredItems() {
+    if (_filterIndex == 0) return _items;
+    if (_filterIndex == 1) {
+      return _items.where((it) => !it.id.startsWith('encourage_')).toList();
+    }
+    return _items.where((it) => it.id.startsWith('encourage_')).toList();
+  }
+
+  // 6/25 筛选 helper: 返回各分类计数 [全部, 内容, 名言]
+  List<int> _filterCounts() {
+    final all = _items.length;
+    final content = _items.where((it) => !it.id.startsWith('encourage_')).length;
+    final quotes = all - content;
+    return [all, content, quotes];
   }
 
   Widget _buildFollowSummary(double scale, bool isEn) {
