@@ -1125,7 +1125,8 @@ class _Tab0Switcher extends StatelessWidget {
       );
     }
     return SceneScreen(
-      key: const ValueKey('scene_screen'),
+      // 6/25 修 bug: key 加 userType 联动，改角色后 SceneScreen 重建 (否则推荐不变)
+      key: ValueKey('scene_screen_${selectedUserType!.name}'),
       userType: selectedUserType!,
       isInternational: isInternational,
       isElderlyMode: isElderlyMode,

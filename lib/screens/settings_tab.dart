@@ -321,10 +321,11 @@ class SettingsTab extends StatelessWidget {
                 ),
                 // 6/10 加: 我的 handle（学习小组 / 加入退出用）
                 Divider(height: 1),
-                FutureBuilder<String>(
-                  future: HandleService().get(),
-                  builder: (ctx, snap) {
-                    final h = snap.data ?? HandleService.defaultHandle;
+                // 6/25 修 bug: 用 ValueListenableBuilder 替代 FutureBuilder
+                // (之前 set 后 UI 不会 rebuild, 昵称看起来 '没保存')
+                ValueListenableBuilder<String>(
+                  valueListenable: HandleService.notifier,
+                  builder: (ctx, h, _) {
                     return ListTile(
                       leading: Icon(Icons.alternate_email, size: 24 * scale),
                       title: Text(isEn ? 'My Handle' : '我的昵称', style: TextStyle(fontSize: 16 * scale)),
