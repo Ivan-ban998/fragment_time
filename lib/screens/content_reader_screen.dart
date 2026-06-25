@@ -15,6 +15,7 @@ import '../services/share_service.dart';
 import '../services/study_group_service.dart';
 import '../services/handle_service.dart';
 import '../services/llm_service.dart';
+import '../services/news_service.dart';
 import '../widgets/inline_read_view.dart';
 
 class ContentReaderScreen extends StatefulWidget {
@@ -84,10 +85,11 @@ class _ContentReaderScreenState extends State<ContentReaderScreen> {
       _checkShortArticle();
     });
     // 6/25: AI 摘要自动生成 (取代手动点击按钮)
-    // 1.5b 模型已实测 4s 冷启/1.2s 热启, 可以默认调用
+    // 6/26 Brien 00:44: 1.5b 仍输出'5 个教育误解' 等学生内容
+    // → 改成从 NewsService 24 桶加载 (不调 LLM, 角色匹配)
     WidgetsBinding.instance.addPostFrameCallback((_) {
       if (!mounted) return;
-      _generateAiSummary();
+      _loadSummaryFromBucket();
     });
   }
 
@@ -163,6 +165,67 @@ class _ContentReaderScreenState extends State<ContentReaderScreen> {
         _aiSummaryFailed = true;
       });
     }
+  }
+
+  // 6/26 Brien 00:44 修: 1.5b 仍输出学生内容 — 摘要从 NewsService 24 桶加载 (不调 LLM)
+  // 注: ContentReaderScreen 只接 item, 不知道 userType/scene
+  // → 用 item 标题前缀 'student_learn_1' 等解析出 userType + scene
+  Future<void> _loadSummaryFromBucket() async {
+    try {
+      // 简单实现: 24 桶全部加载, 排除当前 article
+      // TODO: 优化 — ContentScreen 跳转时传 userType+scene 进 widget
+      final allBuckets = <String>[];
+      for (final ut in UserType.values) {
+        for (final s in Scene.values) {
+          allBuckets.add('${ut.bucketKey}_${s.bucketKey}');
+        }
+      }
+      List<ContentItem> candidates = [];
+      for (final key in allBuckets) {
+        // 直接调 NewsService 内部 _allContent, 但没暴露 — 改用 6x4 = 24 次
+        final results = await NewsService().getRecommendations(_inferType(), _inferScene());
+        candidates.addAll(
+            results.where((it) => it.id != widget.item.id).toList());
+        if (candidates.isNotEmpty) break; // 拿到 1 桶就够
+      }
+      if (!mounted || candidates.isEmpty) return;
+      final next = candidates.first;
+      final summary = '${next.title}\n\n${next.description ?? "".trim()}';
+      if (!mounted) return;
+      setState(() {
+        _aiSummary = summary;
+        _aiSummaryLoading = false;
+        _aiSummaryFailed = false;
+      });
+    } catch (e) {
+      if (!mounted) return;
+      setState(() {
+        _aiSummaryLoading = false;
+        _aiSummaryFailed = true;
+      });
+    }
+  }
+
+  // 6/26: 简单推 userType (item.id 前缀或 sourceType)
+  UserType _inferType() {
+    // id 格式: 'student_learn_1' / 'officeWorker_relax_2' / 'encourage_2024-01-01'
+    final id = widget.item.id;
+    if (id.startsWith('student')) return UserType.student;
+    if (id.startsWith('officeWorker')) return UserType.officeWorker;
+    if (id.startsWith('entrepreneur')) return UserType.entrepreneur;
+    if (id.startsWith('parent')) return UserType.parent;
+    if (id.startsWith('senior')) return UserType.senior;
+    if (id.startsWith('child')) return UserType.child;
+    return UserType.student; // fallback
+  }
+
+  Scene _inferScene() {
+    final id = widget.item.id;
+    if (id.contains('_learn')) return Scene.learn;
+    if (id.contains('_listen')) return Scene.listen;
+    if (id.contains('_relax')) return Scene.relax;
+    if (id.contains('_workout')) return Scene.workout;
+    return Scene.learn;
   }
 
   // 6/14 scroll 到底 -> 写 progress=100 + 弹成就 banner 3s
