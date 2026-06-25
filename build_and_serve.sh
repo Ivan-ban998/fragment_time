@@ -28,6 +28,15 @@ fi
 # 2) 清 canvaskit/skwasm（HTML renderer 用不到）
 rm -rf build/web/canvaskit build/web/skwasm
 
+# 2.5) 复制干净 SW 到 build/web (6/25 PWA: HTTPS 下生效, HTTP 下 index.html 跳过注册)
+cp -f /volume1/AI_Jarvis/OpenClaw/workspace/projects/fragment_time_good/web/service-worker.js \
+      /volume1/AI_Jarvis/OpenClaw/workspace/projects/fragment_time_good/build/web/service-worker.js 2>/dev/null
+if [ -f /volume1/AI_Jarvis/OpenClaw/workspace/projects/fragment_time_good/build/web/service-worker.js ]; then
+  echo "  service-worker.js copied to build/web"
+else
+  echo "  WARNING: service-worker.js copy failed"
+fi
+
 # 3) patch service worker (HTTP-only context: SW registration fails)
 python3 - <<'PYEOF'
 import re

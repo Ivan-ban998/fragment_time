@@ -18,19 +18,31 @@
 
   <meta charset="UTF-8">
   <meta content="IE=Edge" http-equiv="X-UA-Compatible">
-  <meta name="description" content="A new Flutter project.">
+  <meta name="description" content="碎片时间 - 综合类碎片时间利用工具">
 
   <!-- iOS meta tags & icons -->
   <meta name="apple-mobile-web-app-capable" content="yes">
   <meta name="apple-mobile-web-app-status-bar-style" content="black">
-  <meta name="apple-mobile-web-app-title" content="fragment_time">
+  <meta name="apple-mobile-web-app-title" content="碎片时间">
   <link rel="apple-touch-icon" href="icons/Icon-192.png">
 
   <!-- Favicon -->
   <link rel="icon" type="image/png" href="favicon.png"/>
 
-  <title>fragment_time</title>
+  <title>碎片时间</title>
   <link rel="manifest" href="manifest.json">
+  <meta name="theme-color" content="#6750A4">
+
+  <!-- 6/25 PWA: 只在 HTTPS 注册 SW (HTTP 下浏览器拒绝, build_and_serve.sh 也会禁用) -->
+  <script>
+    if (location.protocol === 'https:' && 'serviceWorker' in navigator) {
+      window.addEventListener('load', () => {
+        navigator.serviceWorker.register('/service-worker.js').catch((e) => {
+          console.warn('[SW] register failed:', e);
+        });
+      });
+    }
+  </script>
 </head>
 <body>
   <script src="flutter_bootstrap.js" async></script>
