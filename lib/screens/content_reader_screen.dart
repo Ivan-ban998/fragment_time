@@ -880,8 +880,9 @@ class _ContentReaderScreenState extends State<ContentReaderScreen> {
         child: _buildAchievementBanner(),
       ),
     // 6/25 v17: HUD 计时 — 从 AppBar 移到右下角浮窗
+    // 6/25 修: 跟底部 '读完了' / 成就 banner 重叠 → 移到顶部右上 AppBar 下
     Positioned(
-      bottom: 80,
+      top: 70,
       right: 16,
       child: Container(
         padding: EdgeInsets.symmetric(horizontal: 10 * scale, vertical: 4 * scale),
