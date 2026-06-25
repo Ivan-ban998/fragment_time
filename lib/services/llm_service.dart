@@ -227,7 +227,10 @@ class LlmService {
   static String _buildUserPrompt(UserType userType, Scene scene, String languageCode, bool isInternational) {
     final isEn = languageCode == 'en';
     if (isEn) return _enPrompt(userType, scene);
-    return _zhPrompt(userType, scene, isInternational);
+    // 6/25 锁角色匹配: 在所有 prompt 末尾加负面约束
+    final basePrompt = _zhPrompt(userType, scene, isInternational);
+    final forbid = _forbiddenForUserType(userType);
+    return '$basePrompt\n\n【禁忌】$forbid';
   }
 
   static String _zhPrompt(UserType u, Scene s, bool intl) {
@@ -235,6 +238,8 @@ class LlmService {
     final userDesc = _userTypeDescZh(u);
     final region = intl ? '国际视角' : '国内视角';
     final key = '${u.name}_${s.name}';
+    // 6/25 锁角色匹配: 负面约束 — 按当前 userType 加禁词列表
+    final forbid = _forbiddenForUserType(u);
     // 6/7 宪法 §4：儿童提示语开头加"适龄 6-12 岁"
     final childHint = u == UserType.child ? '【适龄 6-12 岁】' : '';
     switch (key) {
@@ -323,6 +328,28 @@ class LlmService {
       case UserType.senior: return '退休人群';
       case UserType.child: return '儿童';
     }
+  }
+
+  // 6/25 锁角色匹配: 按当前 userType 返回禁词列表
+  // 例: 上班族 → 禁止输出学生内容关键词
+  static String _forbiddenForUserType(UserType u) {
+    final parts = <String>[];
+    if (u != UserType.student && u != UserType.child) {
+      parts.add('禁止出现：高考、中考、考试、作业、课本、老师、学生党、K12、学校、学习规划、学习策略、高效学习、考试技巧、学生、考试');
+    }
+    if (u != UserType.child) {
+      parts.add('禁止出现：小朋友、幼儿园、儿童');
+    }
+    if (u == UserType.officeWorker) {
+      parts.add('只写职场内容 (行业/方法论/通勤要闻/正念/工位运动)。禁止 K12/学生/育儿/养生内容');
+    }
+    if (u == UserType.senior) {
+      parts.add('只写养生/健康/兴趣内容。禁止 K12/学生/职场术语');
+    }
+    if (u == UserType.entrepreneur) {
+      parts.add('只写商业/管理/行业动态。禁止 K12/学生/育儿/养生');
+    }
+    return parts.join(' ');
   }
 
   static String _sceneZh(Scene s) {
