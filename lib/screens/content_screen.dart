@@ -36,6 +36,7 @@ import '../widgets/quiz_panel.dart';
 import 'content_reader_screen.dart';
 import '../services/study_group_service.dart';
 import '../services/weekly_recap_service.dart';
+import '../services/analytics_service.dart';
 import '../services/handle_service.dart';
 
 class ContentScreen extends StatefulWidget {
@@ -59,6 +60,7 @@ class ContentScreen extends StatefulWidget {
 }
 
 class _ContentScreenState extends State<ContentScreen> {
+  String _handle = '@你'; // 6/25 AppBar title 联动昵称
   String _buf = '';
   bool get _hasContent => _buf.isNotEmpty;
   bool _loading = true;
@@ -94,6 +96,8 @@ class _ContentScreenState extends State<ContentScreen> {
   @override
   void initState() {
     super.initState();
+    // 6/25 AppBar title 联动昵称: 加载 handle (代替角色名显示)
+    _loadHandle();
     // 6/16 Brien 反馈: 有 prefillItem 时立刻显示 description, 不再空白 30s 等 AI
     if (widget.prefillItem != null && widget.prefillItem!.description.isNotEmpty) {
       _aiContentItem = widget.prefillItem;
@@ -272,6 +276,15 @@ class _ContentScreenState extends State<ContentScreen> {
     } catch (_) {}
   }
 
+  // 6/25 AppBar title 联动昵称: 加载 handle
+  Future<void> _loadHandle() async {
+    try {
+      final h = await HandleService().get();
+      if (!mounted) return;
+      setState(() => _handle = h);
+    } catch (_) {}
+  }
+
   // 今日完成计数 (从 UserPreference getDailyDone)
   Future<void> _loadTodayCount() async {
     try {
@@ -373,8 +386,8 @@ class _ContentScreenState extends State<ContentScreen> {
   Widget build(BuildContext context) {
     final isDark = Theme.of(context).brightness == Brightness.dark;
     final isWarm = EyeProtectionScope.of(context);
-    final userName = isEn ? widget.userType.name : widget.userType.title;
-    final title = '$userName · ${_sceneName()}';
+    // 6/25 AppBar title 联动昵称 (代替角色名): '@你 · 学习' 而不是 '上班族 · 学习'
+    final title = '$_handle · ${_sceneName()}';
 
     return Scaffold(
       extendBodyBehindAppBar: true,
