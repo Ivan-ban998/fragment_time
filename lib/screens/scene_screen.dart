@@ -319,7 +319,7 @@ class _TimeRecommendBanner extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final rec = TimeAwareRecommender.current;
+    final rec = TimeAwareRecommender.recommendAt(DateTime.now(), currentUserType: userType);
     final color = _sceneColor(rec.scene);
     return GestureDetector(
       onTap: () {
