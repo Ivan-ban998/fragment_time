@@ -83,6 +83,12 @@ class _ContentReaderScreenState extends State<ContentReaderScreen> {
     WidgetsBinding.instance.addPostFrameCallback((_) {
       _checkShortArticle();
     });
+    // 6/25: AI 摘要自动生成 (取代手动点击按钮)
+    // 1.5b 模型已实测 4s 冷启/1.2s 热启, 可以默认调用
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (!mounted) return;
+      _generateAiSummary();
+    });
   }
 
   // 6/24 v7: 格式化时长 (mm:ss 或 hh:mm:ss)
