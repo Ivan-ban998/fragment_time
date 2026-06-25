@@ -193,12 +193,9 @@ class _MySubscriptionsScreenState extends State<MySubscriptionsScreen>
                   child: _items.isEmpty
                       ? _buildEmpty(scale, isEn)
                       : (_filterIndex == 0
-                          // 6/25: 全部 = 按 [名言, 内容] 分组显示
-                          ? ListView(
-                              padding: EdgeInsets.symmetric(horizontal: 16 * scale),
-                              children: [
-                                _buildGroupedList(scale, isEn),
-                              ],
+                          // 6/25: 全部 = 按 [名言, 内容] 分组显示 (CustomScrollView + SliverList)
+                          ? CustomScrollView(
+                              slivers: [_buildGroupedList(scale, isEn)],
                             )
                           : // 内容 / 名言 过滤后不需要分组, 原 ListView 即可
                           ListView.separated(
@@ -298,8 +295,11 @@ class _MySubscriptionsScreenState extends State<MySubscriptionsScreen>
       ));
       slivers.addAll(content.map((it) => _buildCard(it, scale, isEn)));
     }
-    return SliverList(
-      delegate: SliverChildListDelegate(slivers),
+    return SliverPadding(
+      padding: EdgeInsets.symmetric(horizontal: 16 * scale),
+      sliver: SliverList(
+        delegate: SliverChildListDelegate(slivers),
+      ),
     );
   }
 
