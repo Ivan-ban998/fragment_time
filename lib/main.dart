@@ -18,6 +18,7 @@ import 'services/eye_protection_scope.dart';
 import 'services/handle_service.dart';
 import 'screens/user_type_screen.dart';
 import 'screens/onboarding_screen.dart';
+import 'screens/welcome_screen.dart';
 import 'screens/scene_screen.dart';
 import 'screens/content_screen.dart';
 import 'screens/content_reader_screen.dart';
@@ -199,7 +200,14 @@ class _MainHomeScreenState extends State<MainHomeScreen> {
   @override
   void dispose() {
     _eyeCheckTimer?.cancel();
+    WelcomeCompleteSignal.instance.removeListener(_onWelcomeComplete);
     super.dispose();
+  }
+
+  // 6/25 WelcomeScreen 完成回调
+  void _onWelcomeComplete() {
+    if (!mounted) return;
+    setState(() => _showWelcome = false);
   }
 
   final LocalSubscriptionService _subService = LocalSubscriptionService.instance;
@@ -220,6 +228,8 @@ class _MainHomeScreenState extends State<MainHomeScreen> {
   // 6/12 加: 首次启动引导
   bool _showOnboarding = false;
   bool _checkedOnboarding = false;
+  bool _showWelcome = true; // 6/25 Brien 反馈: 首启欢迎屏 (取昵称/跳过)
+  bool _checkedWelcome = false;
 
   @override
   void initState() {
@@ -227,6 +237,9 @@ class _MainHomeScreenState extends State<MainHomeScreen> {
     _loadSettings();
     _recordOpen();
     _checkOnboarding();
+    _checkWelcome(); // 6/25 首启欢迎屏
+    // 6/25 WelcomeScreen 完成信号监听
+    WelcomeCompleteSignal.instance.addListener(_onWelcomeComplete);
     _startEyeTimer();
     // 6/24 AI 私教: 启动时检查是否要生成周回顾 (周日 20:00 之后)
     _checkWeeklyRecap();
@@ -344,6 +357,17 @@ class _MainHomeScreenState extends State<MainHomeScreen> {
         _checkedOnboarding = true;
       });
     }
+  }
+
+  // 6/25 Brien 反馈: 首启欢迎屏 (取昵称/跳过)
+  Future<void> _checkWelcome() async {
+    final prefs = await SharedPreferences.getInstance();
+    final done = prefs.getBool('first_run_done_v1') ?? false;
+    if (!mounted) return;
+    setState(() {
+      _showWelcome = !done;
+      _checkedWelcome = true;
+    });
   }
 
   int _prevStreak = 0;
@@ -618,6 +642,12 @@ class _MainHomeScreenState extends State<MainHomeScreen> {
               selectedUserType: _selectedUserType,
               onUserTypeSelected: _onUserTypeSelected,
               onSkip: () => setState(() => _showOnboarding = false),
+            ),
+          // 6/25 加: 首启欢迎屏 (取昵称/跳过) — 在 Onboarding 之上, 不冲突
+          if (_checkedWelcome && _showWelcome)
+            WelcomeScreen(
+              key: const ValueKey('welcome_screen'),
+              isEn: isEn,
             ),
           // 6/24 AI 私教 亮点: 顶部鼓励 + 名言 banner, 只在 Tab 0 显
           if (_selectedIndex == 0 && (_dailyEncouragement != null || _dailyQuote != null))
