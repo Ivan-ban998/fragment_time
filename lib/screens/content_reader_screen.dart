@@ -14,6 +14,8 @@ import '../widgets/quiz_panel.dart';
 import '../services/share_service.dart';
 import '../services/study_group_service.dart';
 import '../services/handle_service.dart';
+import '../services/llm_service.dart';
+import '../widgets/inline_read_view.dart';
 
 class ContentReaderScreen extends StatefulWidget {
   final ContentItem item;
@@ -49,6 +51,15 @@ class _ContentReaderScreenState extends State<ContentReaderScreen> {
   late DateTime _openTime;
   Timer? _hudTimer;
   String _hudText = '0:00';
+
+  // 6/25 C: AI 摘要折叠区（手动按钮调 Ollama, 30s 兌底）
+  String? _aiSummary;
+  bool _aiSummaryLoading = false;
+  bool _aiSummaryFailed = false;
+
+  // 6/25 A: 站内直接读全文 (展开状态 + 兑底 iframe 加载状态)
+  bool _showInlineRead = false;
+  bool _inlineReadTimeout = false;
 
   @override
   void initState() {
@@ -116,6 +127,38 @@ class _ContentReaderScreenState extends State<ContentReaderScreen> {
     super.dispose();
   }
 
+  // 6/25 C: AI 摘要 (Ollama, 30s 兌底, 失败可重试)
+  // 6/25 注: child HARD RULE 由 LlmService.generateRaw 后续接入 (现为 stub, 留 TODO)
+  Future<void> _generateAiSummary() async {
+    if (_aiSummaryLoading) return;
+    setState(() {
+      _aiSummaryLoading = true;
+      _aiSummaryFailed = false;
+    });
+    final langHint = widget.isEn ? 'Respond in English.' : '中文回答.';
+    final prompt = '请为以下文章生成 3-5 句中文摘要, 不超过 150 字, 不要重复标题.\n'
+        '$langHint\n'
+        '标题: ${widget.item.title}\n'
+        '描述: ${widget.item.description}\n'
+        '延伸: ${_getExtendedContent()}\n\n'
+        '摘要:';
+    try {
+      final result = await LlmService.generateRaw(prompt, isEn: widget.isEn)
+          .timeout(const Duration(seconds: 30));
+      if (!mounted) return;
+      setState(() {
+        _aiSummary = result.trim();
+        _aiSummaryLoading = false;
+      });
+    } catch (e) {
+      if (!mounted) return;
+      setState(() {
+        _aiSummaryLoading = false;
+        _aiSummaryFailed = true;
+      });
+    }
+  }
+
   // 6/14 scroll 到底 -> 写 progress=100 + 弹成就 banner 3s
   // 6/24 修: try-catch + Timer 防卡死
   void _onScroll() {
@@ -139,11 +182,8 @@ class _ContentReaderScreenState extends State<ContentReaderScreen> {
       await LocalSubscriptionService.instance.updateProgress(widget.item, 100);
       if (!mounted) return;
       setState(() => _showAchievementBanner = true);
-      // 3 秒后淡出
+      // 6/25 v17: 不 3s 淺出, 常驻底部, 用户手动 X 关
       _markCompleteTimer?.cancel();
-      _markCompleteTimer = Timer(const Duration(seconds: 3), () {
-        if (mounted) setState(() => _showAchievementBanner = false);
-      });
     } catch (e) {
       debugPrint('详情页 mark complete 失败: $e');
     }
@@ -409,34 +449,7 @@ class _ContentReaderScreenState extends State<ContentReaderScreen> {
           ],
         ),
         actions: [
-          // 6/24 v7: HUD 计时 — 顶角显示阅读时长 (m:ss 或 h:mm:ss)
-          Padding(
-            padding: EdgeInsets.symmetric(horizontal: 8 * scale, vertical: 12 * scale),
-            child: Container(
-              padding: EdgeInsets.symmetric(horizontal: 10 * scale, vertical: 4 * scale),
-              decoration: BoxDecoration(
-                color: AppTheme.primary.withOpacity(0.12),
-                borderRadius: BorderRadius.circular(12),
-                border: Border.all(color: AppTheme.primary.withOpacity(0.3)),
-              ),
-              child: Row(
-                mainAxisSize: MainAxisSize.min,
-                children: [
-                  Icon(Icons.timer_outlined, size: 14 * scale, color: AppTheme.primary),
-                  SizedBox(width: 4 * scale),
-                  Text(
-                    _hudText,
-                    style: TextStyle(
-                      fontSize: 12 * scale,
-                      color: AppTheme.primary,
-                      fontWeight: FontWeight.w600,
-                      fontFeatures: const [FontFeature.tabularFigures()],
-                    ),
-                  ),
-                ],
-              ),
-            ),
-          ),
+          // 6/25 v17: HUD 计时 移到右下角浮窗 (避免 AppBar 重叠), AppBar 只保留其他 action
           // 6/8 加：分享按钮
           IconButton(
             icon: Icon(Icons.share, size: 24 * scale),
@@ -657,16 +670,55 @@ class _ContentReaderScreenState extends State<ContentReaderScreen> {
                 color: AppTheme.textDark,
               ),
             ),
+            SizedBox(height: 16 * scale),
+            // 6/25 A: 站内直接读全文按钮 (web 端 iframe, mobile 不支持)
+            if (item.externalUrl != null)
+              _buildInlineReadButton(),
+            SizedBox(height: 16 * scale),
+            // 6/25 A: 展开后的 inline read 区域 (点击后才加载, 避免一进页就调外网)
+            if (_showInlineRead && item.externalUrl != null)
+              _buildInlineReadSection(),
             SizedBox(height: 24 * scale),
-            // Extended content simulation
-            Text(
-              _getExtendedContent(),
-              style: TextStyle(
-                fontSize: 15 * scale,
-                height: 1.8,
-                color: AppTheme.textDark,
+            // 6/25 B: 延伸阅读分区（之前跟 description 混一起无区分）
+            Container(
+              padding: EdgeInsets.all(14 * scale),
+              decoration: BoxDecoration(
+                color: AppTheme.primary.withOpacity(0.04),
+                borderRadius: BorderRadius.circular(12),
+                border: Border.all(color: AppTheme.primary.withOpacity(0.15)),
+              ),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Row(
+                    children: [
+                      Icon(Icons.menu_book_outlined, size: 16 * scale, color: AppTheme.primary),
+                      SizedBox(width: 6 * scale),
+                      Text(
+                        isEn ? 'Extended preview' : '延伸阅读',
+                        style: TextStyle(
+                          fontSize: 13 * scale,
+                          fontWeight: FontWeight.w600,
+                          color: AppTheme.primary,
+                        ),
+                      ),
+                    ],
+                  ),
+                  SizedBox(height: 10 * scale),
+                  Text(
+                    _getExtendedContent(),
+                    style: TextStyle(
+                      fontSize: 15 * scale,
+                      height: 1.8,
+                      color: AppTheme.textDark,
+                    ),
+                  ),
+                ],
               ),
             ),
+            SizedBox(height: 16 * scale),
+            // 6/25 C: AI 摘要折叠区 (手动点, 30s 兌底, 失败可重试)
+            _buildAiSummarySection(),
             SizedBox(height: 32 * scale),
             // TTS 播放栏（6/7 新加）
             if (_ttsAvailable)
@@ -810,24 +862,269 @@ class _ContentReaderScreenState extends State<ContentReaderScreen> {
           ],
         ),
       ),
-    // 6/14 详情页完成:轻成就 banner 浮在顶部
+    // 6/25 v17: banner 移到常驻底部 — 避开 AppBar (避 HUD 重叠) + 不 3s 淺出
+    // "读完了" 常驻底部
     if (_isCompleted && !_showAchievementBanner)
       Positioned(
-        top: 8,
+        bottom: 16,
         left: 16,
         right: 16,
         child: _buildAlreadyReadBanner(),
       ),
+    // 成就完成 banner 常驻底部 (不淺出, 用户手动点 X 关)
     if (_showAchievementBanner)
       Positioned(
-        top: 8,
+        bottom: 16,
         left: 16,
         right: 16,
         child: _buildAchievementBanner(),
       ),
+    // 6/25 v17: HUD 计时 — 从 AppBar 移到右下角浮窗
+    Positioned(
+      bottom: 80,
+      right: 16,
+      child: Container(
+        padding: EdgeInsets.symmetric(horizontal: 10 * scale, vertical: 4 * scale),
+        decoration: BoxDecoration(
+          color: AppTheme.primary.withOpacity(0.9),
+          borderRadius: BorderRadius.circular(12),
+          boxShadow: [
+            BoxShadow(
+              color: Colors.black.withOpacity(0.1),
+              blurRadius: 6,
+              offset: const Offset(0, 2),
+            ),
+          ],
+        ),
+        child: Row(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            const Icon(Icons.timer_outlined, color: Colors.white, size: 14),
+            const SizedBox(width: 4),
+            Text(
+              _hudText,
+              style: TextStyle(
+                color: Colors.white,
+                fontSize: 12 * scale,
+                fontWeight: FontWeight.w600,
+                fontFeatures: const [FontFeature.tabularFigures()],
+              ),
+            ),
+          ],
+        ),
+      ),
+    ),
   ],
     ),
   );
+  }
+
+  Widget _buildInlineReadButton() {
+    return SizedBox(
+      width: double.infinity,
+      child: OutlinedButton.icon(
+        onPressed: () async {
+          setState(() {
+            _showInlineRead = !_showInlineRead;
+            _inlineReadTimeout = false;
+          });
+          // 展开后启动 8s 兌底 timer (浏览器 iframe onError 不可靠)
+          if (_showInlineRead) {
+            Future.delayed(const Duration(seconds: 8), () {
+              if (!mounted) return;
+              // 8s 后仍在显示状态且未超时 → 不动 (默认 iframe ok)
+              // 要让用户主动跳走: 额外提供 "去原站" 按钮在 _buildInlineReadSection 里
+            });
+          }
+        },
+        style: OutlinedButton.styleFrom(
+          side: BorderSide(color: AppTheme.primary.withOpacity(0.5)),
+          padding: EdgeInsets.symmetric(vertical: 12 * scale),
+          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+        ),
+        icon: Icon(
+          _showInlineRead ? Icons.expand_less : Icons.article_outlined,
+          size: 18 * scale,
+          color: AppTheme.primary,
+        ),
+        label: Text(
+          _showInlineRead
+              ? (widget.isEn ? 'Hide full article' : '收起全文')
+              : (widget.isEn ? 'Read full article in-app' : '站内读全文'),
+          style: TextStyle(fontSize: 14 * scale, color: AppTheme.primary),
+        ),
+      ),
+    );
+  }
+
+  Widget _buildInlineReadSection() {
+    if (_inlineReadTimeout) {
+      return Container(
+        padding: EdgeInsets.all(16 * scale),
+        decoration: BoxDecoration(
+          color: Colors.orange.withOpacity(0.08),
+          borderRadius: BorderRadius.circular(12),
+          border: Border.all(color: Colors.orange.withOpacity(0.3)),
+        ),
+        child: Row(
+          children: [
+            const Icon(Icons.warning_amber, color: Colors.orange, size: 20),
+            SizedBox(width: 8 * scale),
+            Expanded(
+              child: Text(
+                widget.isEn
+                    ? 'Inline read unavailable. Click below to open in browser.'
+                    : '站内读不可用, 点下方按钮在浏览器打开。',
+                style: TextStyle(fontSize: 13 * scale),
+              ),
+            ),
+            TextButton(
+              onPressed: () => _openExternal(item.externalUrl!),
+              child: Text(widget.isEn ? 'Open' : '打开'),
+            ),
+          ],
+        ),
+      );
+    }
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        SizedBox(
+          height: 600,
+          child: InlineReadView(url: item.externalUrl!),
+        ),
+        SizedBox(height: 8 * scale),
+        // 兑底: "去原站读" 按钮 (iframe 加载不出或反爬时可点)
+        Row(
+          mainAxisAlignment: MainAxisAlignment.end,
+          children: [
+            TextButton.icon(
+              onPressed: () => _openExternal(item.externalUrl!),
+              icon: const Icon(Icons.open_in_new, size: 14),
+              label: Text(
+                widget.isEn ? 'Open in browser' : '在浏览器打开',
+                style: TextStyle(fontSize: 12 * scale),
+              ),
+            ),
+            SizedBox(width: 8 * scale),
+            TextButton.icon(
+              onPressed: () {
+                setState(() {
+                  _showInlineRead = false;
+                  _inlineReadTimeout = false;
+                });
+              },
+              icon: const Icon(Icons.close, size: 14),
+              label: Text(
+                widget.isEn ? 'Close' : '关闭',
+                style: TextStyle(fontSize: 12 * scale),
+              ),
+            ),
+          ],
+        ),
+      ],
+    );
+  }
+
+  void _openExternal(String url) async {
+    final uri = Uri.parse(url);
+    if (await canLaunchUrl(uri)) {
+      await launchUrl(uri, mode: kIsWeb ? LaunchMode.platformDefault : LaunchMode.externalApplication);
+    }
+  }
+
+  Widget _buildAiSummarySection() {
+    return Container(
+      padding: EdgeInsets.all(14 * scale),
+      decoration: BoxDecoration(
+        color: AppTheme.primary.withOpacity(0.04),
+        borderRadius: BorderRadius.circular(12),
+        border: Border.all(color: AppTheme.primary.withOpacity(0.15)),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            children: [
+              Icon(Icons.auto_awesome, size: 16 * scale, color: AppTheme.primary),
+              SizedBox(width: 6 * scale),
+              Text(
+                widget.isEn ? 'AI Summary' : 'AI 摘要',
+                style: TextStyle(
+                  fontSize: 13 * scale,
+                  fontWeight: FontWeight.w600,
+                  color: AppTheme.primary,
+                ),
+              ),
+            ],
+          ),
+          SizedBox(height: 10 * scale),
+          if (_aiSummaryLoading)
+            Row(
+              children: [
+                SizedBox(
+                  width: 14 * scale,
+                  height: 14 * scale,
+                  child: const CircularProgressIndicator(strokeWidth: 2),
+                ),
+                SizedBox(width: 10 * scale),
+                Text(
+                  widget.isEn ? 'Generating...' : '生成中...',
+                  style: TextStyle(fontSize: 13 * scale, color: AppTheme.textLight),
+                ),
+              ],
+            )
+          else if (_aiSummaryFailed)
+            Row(
+              children: [
+                Icon(Icons.error_outline, size: 16 * scale, color: Colors.orange),
+                SizedBox(width: 6 * scale),
+                Text(
+                  widget.isEn ? 'Summary unavailable' : '摘要暂不可用',
+                  style: TextStyle(fontSize: 13 * scale, color: AppTheme.textLight),
+                ),
+                SizedBox(width: 8 * scale),
+                TextButton(
+                  onPressed: _generateAiSummary,
+                  style: TextButton.styleFrom(
+                    padding: EdgeInsets.symmetric(horizontal: 8 * scale, vertical: 2 * scale),
+                    minimumSize: Size.zero,
+                    tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+                  ),
+                  child: Text(
+                    widget.isEn ? 'Retry' : '重试',
+                    style: TextStyle(fontSize: 13 * scale, color: AppTheme.primary),
+                  ),
+                ),
+              ],
+            )
+          else if (_aiSummary != null)
+            Text(
+              _aiSummary!,
+              style: TextStyle(
+                fontSize: 14 * scale,
+                height: 1.7,
+                color: AppTheme.textDark,
+              ),
+            )
+          else
+            OutlinedButton.icon(
+              onPressed: _generateAiSummary,
+              style: OutlinedButton.styleFrom(
+                side: BorderSide(color: AppTheme.primary.withOpacity(0.4)),
+                padding: EdgeInsets.symmetric(horizontal: 12 * scale, vertical: 6 * scale),
+                minimumSize: Size.zero,
+                tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+              ),
+              icon: Icon(Icons.auto_awesome, size: 14 * scale, color: AppTheme.primary),
+              label: Text(
+                widget.isEn ? 'Generate AI Summary' : '生成 AI 摘要',
+                style: TextStyle(fontSize: 13 * scale, color: AppTheme.primary),
+              ),
+            ),
+        ],
+      ),
+    );
   }
 
   Widget _buildVideoPlayer() {
@@ -931,6 +1228,11 @@ class _ContentReaderScreenState extends State<ContentReaderScreen> {
                   isEn ? '🎉 Marked as read · 100%' : '🎉 已标记为读完 · 100%',
                   style: TextStyle(fontSize: 12 * scale, fontWeight: FontWeight.w700, color: AppTheme.textDark),
                 ),
+              ),
+              // 6/25 v17: 手动 X 关 banner
+              GestureDetector(
+                onTap: () => setState(() => _showAchievementBanner = false),
+                child: Icon(Icons.close, size: 18 * scale, color: AppTheme.textLight),
               ),
             ],
           ),

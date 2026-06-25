@@ -236,8 +236,8 @@ class _MySubscriptionsScreenState extends State<MySubscriptionsScreen>
                 children: [
                   Text(
                     isEn
-                        ? 'Following ${_followingPlatforms} platforms · ${_followingCategories} categories'
-                        : '已关注 ${_followingPlatforms} 个平台 · ${_followingCategories} 个类目',
+                        ? 'Following ${_followingPlatforms} platforms · ${_followingCategories} categories · ${_items.length} saved'
+                        : '已关注 ${_followingPlatforms} 个平台 · ${_followingCategories} 个类目 · ${_items.length} 篇收藏',
                     style: TextStyle(
                       fontSize: 13 * scale,
                       fontWeight: FontWeight.w600,
