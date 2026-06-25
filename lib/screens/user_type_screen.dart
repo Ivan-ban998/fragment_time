@@ -239,27 +239,11 @@ class _UserTypeScreenState extends State<UserTypeScreen> {
                 );
               }),
               SizedBox(height: 12 * scale),
-              // 6/9 A：今日推荐 hero 按钮 — 0 步选角色，直接给 1 条内容
-              _TodayPickCard(
+              // 6/26 Brien 00:11 修: 未选角色时 TodayPickCard 推 student LLM 占满界面
+              // 改成 _ChooseRoleHint — 只提示 '先选角色', 不推 LLM
+              _ChooseRoleHint(
                 scale: scale,
                 isEn: isEn,
-                onTap: () {
-                  final type = widget.selectedUserType ?? UserType.student;
-                  AnalyticsService.instance.track(AnalyticsService.EVT_USER_TYPE_SELECT,
-                      props: {'userType': type.name, 'source': 'today_pick'});
-                  widget.onUserTypeSelected(type);
-                  Navigator.pushReplacement(
-                    context,
-                    MaterialPageRoute(
-                      builder: (_) => SceneScreen(
-                        userType: type,
-                        isInternational: widget.isInternational,
-                        isElderlyMode: widget.isElderlyMode,
-                        languageCode: widget.languageCode,
-                      ),
-                    ),
-                  );
-                },
               ),
               SizedBox(height: 12 * scale),
               // 6/9 Sofa 启发：上次看到一半 — 进度未完
@@ -449,6 +433,44 @@ class _UserTypeCard extends StatelessWidget {
 }
 
 // 6/15 重写: 6/9 A 路线 hero 按钮 — 0 步选角色, 走默认 student + learn
+// 6/26 Brien 00:11 修: 未选角色时 TodayPickCard 推 student LLM 占满界面
+// 改成 _ChooseRoleHint — 只提示 '先选角色', 不推 LLM
+class _ChooseRoleHint extends StatelessWidget {
+  final double scale;
+  final bool isEn;
+  const _ChooseRoleHint({required this.scale, required this.isEn});
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      padding: EdgeInsets.symmetric(horizontal: 16 * scale, vertical: 14 * scale),
+      decoration: BoxDecoration(
+        color: AppTheme.primary.withOpacity(0.08),
+        borderRadius: BorderRadius.circular(20),
+        border: Border.all(color: AppTheme.primary.withOpacity(0.2)),
+      ),
+      child: Row(
+        children: [
+          Icon(Icons.touch_app_outlined, color: AppTheme.primary, size: 22 * scale),
+          SizedBox(width: 12 * scale),
+          Expanded(
+            child: Text(
+              isEn
+                  ? '↓ Pick a role below to start'
+                  : '↓ 下面 6 个角色选 1 个开始',
+              style: TextStyle(
+                color: AppTheme.primary,
+                fontSize: 14 * scale,
+                fontWeight: FontWeight.w600,
+              ),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
 class _TodayPickCard extends StatelessWidget {
   final double scale;
   final bool isEn;
