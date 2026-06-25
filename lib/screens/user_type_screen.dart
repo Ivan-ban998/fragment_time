@@ -208,9 +208,10 @@ class _UserTypeScreenState extends State<UserTypeScreen> {
                 style: TextStyle(fontSize: 14 * scale, color: AppTheme.textLight),
               ),
               SizedBox(height: 12 * scale),
-              // 6/23: 按时段推荐 banner — 从精简版学来
+              // 6/25 修 bug: 未选角色时不该显示时段推荐 banner
+              // (之前 '根据现在的时间,推荐你: 学生党...' 是错的, 用户还没选角色)
+              // 改为引导选角色提示
               Builder(builder: (_) {
-                final rec = TimeAwareRecommender.current;
                 return Container(
                   margin: EdgeInsets.only(bottom: 12 * scale),
                   padding: EdgeInsets.symmetric(horizontal: 14 * scale, vertical: 10 * scale),
@@ -220,49 +221,17 @@ class _UserTypeScreenState extends State<UserTypeScreen> {
                     border: Border.all(color: AppTheme.primary.withOpacity(0.2)),
                   ),
                   child: Row(children: [
-                    Icon(Icons.auto_awesome, size: 14 * scale, color: AppTheme.primary),
+                    Icon(Icons.touch_app, size: 14 * scale, color: AppTheme.primary),
                     SizedBox(width: 6),
                     Expanded(
                       child: Text(
                         isEn
-                            ? 'Right now, we recommend: ${rec.label}'
-                            : '根据现在的时间,推荐你: ${rec.label}',
+                            ? 'Pick your role below ↓ to get personalized recommendations'
+                            : '先选个角色, 下面 6 个选 1 个就能看到为你准备的内容 ↓',
                         style: TextStyle(
                           fontSize: 12 * scale,
                           color: AppTheme.primary,
                           fontWeight: FontWeight.w500,
-                        ),
-                      ),
-                    ),
-                    GestureDetector(
-                      onTap: () {
-                        AnalyticsService.instance.track(
-                          AnalyticsService.EVT_USER_TYPE_SELECT,
-                          props: {'userType': rec.userType.name, 'source': 'time_recommend_banner'},
-                        );
-                        widget.onUserTypeSelected(rec.userType);
-                        // 6/23 fix: 跟 _TodayPickCard 一致，跳到 SceneScreen — 之前没跳所以点不开
-                        Navigator.push(
-                          context,
-                          MaterialPageRoute(
-                            builder: (_) => SceneScreen(
-                              userType: rec.userType,
-                              isInternational: widget.isInternational,
-                              isElderlyMode: widget.isElderlyMode,
-                              languageCode: widget.languageCode,
-                            ),
-                          ),
-                        );
-                      },
-                      child: Container(
-                        padding: EdgeInsets.symmetric(horizontal: 10 * scale, vertical: 4 * scale),
-                        decoration: BoxDecoration(
-                          color: AppTheme.primary,
-                          borderRadius: BorderRadius.circular(20),
-                        ),
-                        child: Text(
-                          isEn ? 'Go' : '去逛逛',
-                          style: TextStyle(color: Colors.white, fontSize: 11 * scale, fontWeight: FontWeight.bold),
                         ),
                       ),
                     ),
