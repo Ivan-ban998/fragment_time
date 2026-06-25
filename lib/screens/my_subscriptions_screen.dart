@@ -224,7 +224,7 @@ class _MySubscriptionsScreenState extends State<MySubscriptionsScreen>
       );
     }
     if (filtered.isEmpty) {
-      return _buildEmpty(scale, isEn, contentOnly: contentOnly, quotesOnly: quotesOnly);
+      return _buildEmpty(context, scale, isEn, contentOnly: contentOnly, quotesOnly: quotesOnly);
     }
     return ListView.separated(
       padding: EdgeInsets.all(16 * scale),
@@ -254,105 +254,182 @@ class _MySubscriptionsScreenState extends State<MySubscriptionsScreen>
     );
   }
 
-  // 6/25 A: 关注 Tab (跳 SubscriptionScreen 复用现有功能)
+  // 6/25 A: 关注 Tab (显示完整关注列表 + 管理按钮)
   Widget _buildFollowingTab(double scale, bool isEn) {
-    return SingleChildScrollView(
-      child: Column(
-        children: [
-          _buildFollowSummary(scale, isEn),
-          const SizedBox(height: 24),
-          // 说明卡
-          Padding(
-            padding: EdgeInsets.symmetric(horizontal: 16 * scale),
-            child: Container(
-              padding: EdgeInsets.all(14 * scale),
-              decoration: BoxDecoration(
-                color: AppTheme.primary.withOpacity(0.04),
-                borderRadius: BorderRadius.circular(12),
-                border: Border.all(color: AppTheme.primary.withOpacity(0.15)),
-              ),
-              child: Row(
-                children: [
-                  Icon(Icons.info_outline, size: 18 * scale, color: AppTheme.primary),
-                  SizedBox(width: 10 * scale),
-                  Expanded(
-                    child: Text(
-                      isEn
-                          ? 'Click "Manage Following" above to add or remove platforms / categories.'
-                          : '点击上方"管理关注"按钮可添加或删除平台 / 类目。',
-                      style: TextStyle(fontSize: 13 * scale, color: AppTheme.textDark),
-                    ),
-                  ),
-                ],
-              ),
-            ),
-          ),
-        ],
-      ),
-    );
-  }
-
-// 6/25 A: 分组/卡片 helper 删了 (TabBar 子视图取代, 简化)
-
-  // 6/25 筛选 helper 删了 (用 TabBar 替代, 不需要计数)
-
-  Widget _buildFollowSummary(double scale, bool isEn) {
-    return InkWell(
-      onTap: () {
-        Navigator.push(
-          context,
-          MaterialPageRoute(
-            builder: (_) => SubscriptionScreen(isEn: isEn),
-          ),
-        );
-      },
-      child: Container(
-        margin: EdgeInsets.fromLTRB(16 * scale, 12 * scale, 16 * scale, 0),
-        padding: EdgeInsets.all(14 * scale),
-        decoration: BoxDecoration(
-          color: AppTheme.primary.withOpacity(0.08),
-          borderRadius: BorderRadius.circular(12),
-          border: Border.all(color: AppTheme.primary.withOpacity(0.2)),
-        ),
-        child: Row(
-          children: [
-            Icon(Icons.subscriptions, color: AppTheme.primary, size: 20 * scale),
-            SizedBox(width: 10 * scale),
-            Expanded(
+    return FutureBuilder<List<dynamic>>(
+      future: () async {
+        final sources = await SubscriptionService.instance.getSubscribedSources();
+        final categories = await SubscriptionService.instance.getSubscribedCategories();
+        return [sources, categories];
+      }(),
+          builder: (context, snap) {
+            if (!snap.hasData) {
+              return const Center(child: CircularProgressIndicator());
+            }
+            final sources = (snap.data![0] as Set).cast<dynamic>().toList();
+            final categories = (snap.data![1] as Set).cast<String>().toList();
+            if (sources.isEmpty && categories.isEmpty) {
+              return _buildFollowingEmpty(context, scale, isEn);
+            }
+            return SingleChildScrollView(
+              padding: EdgeInsets.all(16 * scale),
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  Text(
-                    isEn
-                        ? '${_handle}·s collection · Following ${_followingPlatforms} platforms · ${_followingCategories} categories · ${_items.length} saved'
-                        : '${_handle}的收藏 · 已关注 ${_followingPlatforms} 个平台 · ${_followingCategories} 个类目 · ${_items.length} 篇',
-                    style: TextStyle(
-                      fontSize: 13 * scale,
-                      fontWeight: FontWeight.w600,
-                      color: AppTheme.textDark,
-                    ),
+                  // 顶部管理按钮
+                  Row(
+                    children: [
+                      Expanded(
+                        child: OutlinedButton.icon(
+                          onPressed: () {
+                            Navigator.push(
+                              context,
+                              MaterialPageRoute(builder: (_) => const SubscriptionScreen()),
+                            );
+                          },
+                          style: OutlinedButton.styleFrom(
+                            side: BorderSide(color: AppTheme.primary.withOpacity(0.5)),
+                            padding: EdgeInsets.symmetric(vertical: 10 * scale),
+                          ),
+                          icon: Icon(Icons.edit, size: 16 * scale, color: AppTheme.primary),
+                          label: Text(
+                            isEn ? 'Manage Following' : '管理关注',
+                            style: TextStyle(fontSize: 14 * scale, color: AppTheme.primary),
+                          ),
+                        ),
+                      ),
+                    ],
                   ),
-                  SizedBox(height: 2 * scale),
-                  Text(
-                    isEn
-                        ? 'Tap to manage what you follow →'
-                        : '点击管理你关注的内容 →',
-                    style: TextStyle(
-                      fontSize: 11 * scale,
-                      color: AppTheme.textLight,
+                  SizedBox(height: 20 * scale),
+                  // 平台
+                  if (sources.isNotEmpty) ...[
+                    _buildFollowingSectionHeader(
+                      isEn ? 'PLATFORMS (${sources.length})' : '关注平台 (${sources.length})',
+                      Icons.subscriptions,
+                      scale,
                     ),
-                  ),
+                    SizedBox(height: 12 * scale),
+                    Wrap(
+                      spacing: 8 * scale,
+                      runSpacing: 8 * scale,
+                      children: sources.map<Widget>((s) {
+                        final name = isEn
+                            ? (s.name ?? s.toString())
+                            : _sourceNameZh(s);
+                        return Chip(
+                          label: Text(name),
+                          backgroundColor: AppTheme.primary.withOpacity(0.1),
+                          side: BorderSide(color: AppTheme.primary.withOpacity(0.3)),
+                          labelStyle: TextStyle(fontSize: 13 * scale, color: AppTheme.primary),
+                        );
+                      }).toList(),
+                    ),
+                    SizedBox(height: 24 * scale),
+                  ],
+                  // 类目
+                  if (categories.isNotEmpty) ...[
+                    _buildFollowingSectionHeader(
+                      isEn ? 'CATEGORIES (${categories.length})' : '关注类目 (${categories.length})',
+                      Icons.category_outlined,
+                      scale,
+                    ),
+                    SizedBox(height: 12 * scale),
+                    Wrap(
+                      spacing: 8 * scale,
+                      runSpacing: 8 * scale,
+                      children: categories.map<Widget>((c) => Chip(
+                        label: Text(c),
+                        backgroundColor: AppTheme.primary.withOpacity(0.1),
+                        side: BorderSide(color: AppTheme.primary.withOpacity(0.3)),
+                        labelStyle: TextStyle(fontSize: 13 * scale, color: AppTheme.primary),
+                      )).toList(),
+                    ),
+                  ],
                 ],
               ),
+            );
+          },
+        );
+  }
+
+  // 6/25 A: 关注 Tab 空态 (没有关注任何)
+  Widget _buildFollowingEmpty(BuildContext context, double scale, bool isEn) {
+    return Center(
+      child: Padding(
+        padding: EdgeInsets.all(32 * scale),
+        child: Column(
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: [
+            Icon(Icons.subscriptions_outlined, size: 80 * scale, color: AppTheme.textLight.withOpacity(0.4)),
+            SizedBox(height: 24 * scale),
+            Text(
+              isEn ? 'No platforms or categories followed yet' : '还没有关注任何平台 / 类目',
+              textAlign: TextAlign.center,
+              style: TextStyle(fontSize: 16 * scale, color: AppTheme.textLight),
             ),
-            Icon(Icons.chevron_right, color: AppTheme.primary, size: 20 * scale),
+            SizedBox(height: 24 * scale),
+            ElevatedButton.icon(
+              onPressed: () {
+                Navigator.push(
+                  context,
+                  MaterialPageRoute(builder: (_) => const SubscriptionScreen()),
+                );
+              },
+              style: ElevatedButton.styleFrom(
+                backgroundColor: AppTheme.primary,
+                padding: EdgeInsets.symmetric(horizontal: 24 * scale, vertical: 12 * scale),
+              ),
+              icon: const Icon(Icons.add, color: Colors.white, size: 18),
+              label: Text(
+                isEn ? 'Start Following' : '开始关注',
+                style: TextStyle(fontSize: 15 * scale, color: Colors.white, fontWeight: FontWeight.w600),
+              ),
+            ),
           ],
         ),
       ),
     );
   }
 
-  Widget _buildEmpty(double scale, bool isEn, {bool contentOnly = false, bool quotesOnly = false}) {
+  // 6/25 A: 关注 Tab section header (类似 70fa9a7 风格)
+  Widget _buildFollowingSectionHeader(String label, IconData icon, double scale) {
+    return Row(
+      children: [
+        Icon(icon, size: 14 * scale, color: AppTheme.primary),
+        SizedBox(width: 6 * scale),
+        Text(
+          label,
+          style: TextStyle(
+            fontSize: 12 * scale,
+            fontWeight: FontWeight.w700,
+            color: AppTheme.primary,
+            letterSpacing: 0.5,
+          ),
+        ),
+      ],
+    );
+  }
+
+  // 6/25 A: ContentSource enum 转中文
+  String _sourceNameZh(ContentSource s) {
+    switch (s) {
+      case ContentSource.ximalaya: return '喜马拉雅';
+      case ContentSource.news36kr: return '36氪';
+      case ContentSource.bilibili: return 'B站';
+      case ContentSource.youtube: return 'YouTube';
+      case ContentSource.rss: return 'RSS';
+      case ContentSource.applePodcasts: return 'Apple Podcasts';
+      case ContentSource.lizhiFM: return '荔枝FM';
+      case ContentSource.zhihu: return '知乎';
+      case ContentSource.spotify: return 'Spotify';
+    }
+  }
+
+// 6/25 A: 分组/卡片 helper 删了 (TabBar 子视图取代, 简化)
+
+  // 6/25 筛选 helper 删了 (用 TabBar 替代, 不需要计数)
+
+  Widget _buildEmpty(BuildContext context, double scale, bool isEn, {bool contentOnly = false, bool quotesOnly = false}) {
     final msg = quotesOnly
         ? (isEn ? 'No quotes saved' : '还没有名言收藏')
         : contentOnly
