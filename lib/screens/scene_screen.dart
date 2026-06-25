@@ -124,7 +124,8 @@ class _SceneScreenState extends State<SceneScreen> {
                     MaterialPageRoute(
                       builder: (_) => ContentScreen(
                         userType: userType,
-                        scene: TimeAwareRecommender.current.scene,
+                        // 6/25 修 bug: 用 userType 推荐的场景 (不传 userType 默认 student)
+                        scene: TimeAwareRecommender.recommendAt(DateTime.now(), currentUserType: userType).scene,
                         isInternational: isInternational,
                         isElderlyMode: isElderlyMode,
                         languageCode: languageCode,
