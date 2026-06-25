@@ -120,9 +120,10 @@ class _ContentScreenState extends State<ContentScreen> {
     _loadInProgress();
     _loadTodayCount();
     _loadTlDr();
-    // 6/23: prefillItem != null 跳过 LLM,避免重生成跟描述冲突
+    // 6/26 Brien 00:22 '要真实数据': 不调 LLM, 直接拉 NewsService 24 桶
+    // 保留 _startLlm() 备用 (未来云端 API 启用)
     if (widget.prefillItem == null) {
-      _startLlm();
+      _loadFromBucket(); // 6/26 从 NewsService 24 桶加载第 1 条
     }
     _recordOpen();
     _startProgressTimer();
@@ -199,6 +200,23 @@ class _ContentScreenState extends State<ContentScreen> {
           : '⚠️ 在线 AI 暂不可用\n\n为你推荐预制内容。 (原因: $reason)';
       _loading = false;
     });
+  }
+
+  // 6/26 Brien 00:22 '要真实数据': 从 NewsService 24 桶加载第 1 条作为 aiContentItem
+  Future<void> _loadFromBucket() async {
+    try {
+      final items = await NewsService().getRecommendations(widget.userType, widget.scene);
+      if (!mounted || items.isEmpty) return;
+      final first = items.first;
+      setState(() {
+        _aiContentItem = first;
+        _buf = '${first.title}\n\n${first.description ?? "".trim()}';
+        _llmGotFirstChunk = true;
+        _loading = false;
+      });
+    } catch (e) {
+      debugPrint('_loadFromBucket error: $e');
+    }
   }
 
   // 6/25 锁死角色匹配: 检测 LLM 生成内容是否跟当前 userType 匹配
