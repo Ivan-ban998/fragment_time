@@ -864,7 +864,8 @@ class _ContentReaderScreenState extends State<ContentReaderScreen> {
                   ),
                 ),
               ),
-            SizedBox(height: 40 * scale),
+            // 6/25 Brien 反馈 手机上 '读完了' 跟下面内容重叠 → 加底部 padding (banner 60px + 40px 安全距离)
+            SizedBox(height: 100 * scale),
           ],
         ),
       ),
