@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 import '../theme/glass_decoration.dart';
 import '../models/models.dart';
 import '../theme/app_theme.dart';
@@ -77,6 +78,15 @@ class _MySubscriptionsScreenState extends State<MySubscriptionsScreen>
 
   Future<void> _unsubscribe(ContentItem item) async {
     await _subService.unsubscribe(item);
+    // 6/25 修 bug: 取消订阅鼓励/名言后，同步清 SharedPreferences 的 'encourage_saved_*' key
+    // 否则 banner ❤️ 还是会显实心 (prefs true, 但 list 里没了)
+    if (item.id.startsWith('encourage_')) {
+      try {
+        final prefs = await SharedPreferences.getInstance();
+        // 鼓励 id 格式: 'encourage_${year}-${month}-${day}' → prefs key 是同样的
+        await prefs.remove('encourage_saved_${item.id.replaceFirst('encourage_', '')}');
+      } catch (_) {}
+    }
     await _load();
     if (mounted) {
       ScaffoldMessenger.of(context).showSnackBar(

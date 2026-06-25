@@ -897,13 +897,24 @@ class _DailyEncouragementBannerState extends State<_DailyEncouragementBanner> {
   }
 
   // 6/24 v9: 从 SharedPreferences 读今日是否已收藏 (重启后保持 ❤️)
+  // 6/25 修 bug: 同时查订阅 list 验证 (双重保险, prefs true 但 list 已删 → 重置 prefs)
   Future<void> _loadSaved() async {
     try {
       final prefs = await SharedPreferences.getInstance();
       final now = DateTime.now();
       final key = 'encourage_saved_${now.year}-${now.month}-${now.day}';
-      if (prefs.getBool(key) ?? false) {
-        if (mounted) setState(() => _saved = true);
+      final prefSaved = prefs.getBool(key) ?? false;
+      if (prefSaved) {
+        // 验证 list 里还有这条鼓励 (防止 prefs true 但 list 已删)
+        final id = 'encourage_${now.year}-${now.month}-${now.day}';
+        final items = await LocalSubscriptionService.instance.getSubscribedItems();
+        final exists = items.any((it) => it.id == id);
+        if (exists) {
+          if (mounted) setState(() => _saved = true);
+        } else {
+          // list 里没了, 重置 prefs (修正数据不一致)
+          await prefs.setBool(key, false);
+        }
       }
       _loaded = true;
     } catch (_) {
