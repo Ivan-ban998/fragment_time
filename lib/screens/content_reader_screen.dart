@@ -144,7 +144,7 @@ class _ContentReaderScreenState extends State<ContentReaderScreen> {
         '摘要:';
     try {
       final result = await LlmService.generateRaw(prompt, isEn: widget.isEn)
-          .timeout(const Duration(seconds: 30));
+                    .timeout(const Duration(seconds: 120));
       if (!mounted) return;
       setState(() {
         _aiSummary = result.trim();
@@ -1068,9 +1068,13 @@ class _ContentReaderScreenState extends State<ContentReaderScreen> {
                   child: const CircularProgressIndicator(strokeWidth: 2),
                 ),
                 SizedBox(width: 10 * scale),
-                Text(
-                  widget.isEn ? 'Generating...' : '生成中...',
-                  style: TextStyle(fontSize: 13 * scale, color: AppTheme.textLight),
+                Expanded(
+                  child: Text(
+                    widget.isEn
+                        ? 'Generating... (first run may take 30-60s)'
+                        : '生成中... (首次启动需 30-60 秒)',
+                    style: TextStyle(fontSize: 13 * scale, color: AppTheme.textLight),
+                  ),
                 ),
               ],
             )

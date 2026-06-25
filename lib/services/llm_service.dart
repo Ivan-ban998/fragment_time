@@ -28,7 +28,8 @@ class LlmService {
   static String get _ollamaEndpoint {
     return 'http://$_ollamaHost:11434/api/chat';
   }
-  static const String _model = 'qwen2.5:7b';
+  // 6/25 E: 7b CPU 推理太慢 (首 token 30-60s), 切 1.5b (CPU 上 5-10x 快, 老人模式总结质量仍可)
+  static const String _model = 'qwen2.5:1.5b';
 
   static Stream<String> generateStream({
     required UserType userType,
@@ -71,6 +72,8 @@ class LlmService {
           'temperature': 0.8,
           'num_predict': 500,
         },
+        // 6/25 E: keep_alive 10 分钟 — 模型常驻内存, 避免每次冷启动 30-60s
+        'keep_alive': '10m',
       };
     }
 
@@ -162,6 +165,8 @@ class LlmService {
               {'role': 'user', 'content': prompt},
             ],
             'options': {'temperature': 0.7, 'num_predict': 200},
+            // 6/25 E: keep_alive 10 分钟
+            'keep_alive': '10m',
           };
 
     if (useRemote) headers['Authorization'] = 'Bearer $_apiKey';
