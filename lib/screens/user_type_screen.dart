@@ -357,15 +357,16 @@ class _UserTypeScreenState extends State<UserTypeScreen> {
                                       props: {'userType': ut.type.name});
                                   widget.onUserTypeSelected(ut.type);
                                   // 6/24 v15: 角色选完 → 话题 onboarding (可跳过) → SceneScreen
+                                  // 6/25 修 bug: onComplete 用外部 BuildContext 在 push 后失效
+                                  // → 改用 Builder 包 context (动态 context, Navigator 能找到)
                                   Navigator.push(
                                     context,
                                     MaterialPageRoute(
-                                      builder: (_) => TopicOnboardingScreen(
+                                      builder: (topCtx) => TopicOnboardingScreen(
                                         isEn: isEn,
                                         isElderlyMode: widget.isElderlyMode,
                                         onComplete: () {
-                                          Navigator.pushReplacement(
-                                            context,
+                                          Navigator.of(topCtx).pushReplacement(
                                             MaterialPageRoute(
                                               builder: (_) => SceneScreen(
                                                 userType: ut.type,
