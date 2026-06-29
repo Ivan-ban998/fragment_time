@@ -29,7 +29,7 @@ class LlmService {
     return 'http://$_ollamaHost:11434/api/chat';
   }
   // 6/25 E: 7b CPU 推理太慢 (首 token 30-60s), 切 1.5b (CPU 上 5-10x 快, 老人模式总结质量仍可)
-  static const String _model = 'qwen2.5:1.5b';
+  static const String _model = 'qwen2.5:7b'; // 6/26 Brien 拍: 切 7b 改善角色匹配质量
 
   static Stream<String> generateStream({
     required UserType userType,
@@ -228,10 +228,8 @@ class LlmService {
   static String _buildUserPrompt(UserType userType, Scene scene, String languageCode, bool isInternational) {
     final isEn = languageCode == 'en';
     if (isEn) return _enPrompt(userType, scene);
-    // 6/25 锁角色匹配: 在所有 prompt 末尾加负面约束
-    final basePrompt = _zhPrompt(userType, scene, isInternational);
-    final forbid = _forbiddenForUserType(userType);
-    return '$basePrompt\n\n【禁忌】$forbid';
+    // 6/26 Brien 反馈: LLM 1.5b 把 "【禁忌】禁止出现:高考/学生" 当成要输出的内容漏到 UI → 删 user prompt 末尾的禁词
+    return _zhPrompt(userType, scene, isInternational);
   }
 
   static String _zhPrompt(UserType u, Scene s, bool intl) {
@@ -239,8 +237,6 @@ class LlmService {
     final userDesc = _userTypeDescZh(u);
     final region = intl ? '国际视角' : '国内视角';
     final key = '${u.name}_${s.name}';
-    // 6/25 锁角色匹配: 负面约束 — 按当前 userType 加禁词列表
-    final forbid = _forbiddenForUserType(u);
     // 6/7 宪法 §4：儿童提示语开头加"适龄 6-12 岁"
     final childHint = u == UserType.child ? '【适龄 6-12 岁】' : '';
     switch (key) {

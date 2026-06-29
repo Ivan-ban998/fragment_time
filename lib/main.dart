@@ -1,12 +1,15 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/foundation.dart';
 import 'package:shared_preferences/shared_preferences.dart';
+// ignore: avoid_web_libraries_in_flutter
+import 'dart:js' as js;
 import 'dart:async';
 import 'dart:ui';
 import 'models/models.dart';
 import 'theme/app_theme.dart';
 import 'theme/glass_decoration.dart';
 import 'services/local_subscription_service.dart';
+import 'services/subscription_service.dart';
 import 'services/history_service.dart';
 import 'services/locale_service.dart';
 import 'services/motivation_service.dart';
@@ -19,6 +22,7 @@ import 'services/handle_service.dart';
 import 'screens/user_type_screen.dart';
 import 'screens/onboarding_screen.dart';
 import 'screens/welcome_screen.dart';
+import 'screens/loading_screen.dart';
 import 'screens/scene_screen.dart';
 import 'screens/content_screen.dart';
 import 'screens/content_reader_screen.dart';
@@ -33,9 +37,62 @@ import 'package:shared_preferences/shared_preferences.dart';
 
 /// 6/14 v4 公开跨屏导航入口:content_screen "去搜索" 按钣直接调
 void navigateToMainTab(int index) {
-  final state = _MainHomeScreenState.globalKey.currentState;
-  if (state != null) {
-    (state as dynamic).setTab(index);
+  final state = _MainHomeScreenState.globalKey;
+  if (state.currentState != null) {
+    (state.currentState as dynamic).setTab(index);
+  }
+}
+
+// 6/28 公开 globalKey accessor (跨文件使用, 不暴露私有类 _MainHomeScreenState)
+// 直接暴露 GlobalKey 让调用方调 currentState, 避免跨 getter 调用
+GlobalKey<State<MainHomeScreen>> get globalMainKey => _MainHomeScreenState.globalKey;
+
+// 6/28 公开跨屏入口: LoadingScreen '开始' 按钮调用
+// 真凶猜测: popUntil(isFirst) 在 Flutter web 上可能有 Navigator 事件没正常路由
+//              → 改用 GlobalKey 直接调 _MainHomeScreenState 跳转 + popUntil
+void completeLoadingAndGoHome() {
+  final state = _MainHomeScreenState.globalKey;
+  if (state.currentState != null) {
+    // 强制跳到 Tab 0 (SceneScreen), 关闭 WelcomeScreen / Onboarding
+    (state.currentState as dynamic).setTab(0);
+    (state.currentState as dynamic).finishLoading();
+  }
+}
+
+// 6/28 公开入口: WelcomeScreen '继续' 按钮调用
+// 真凶: WelcomeCompleteSignal ValueNotifier 在 Flutter web 上 listener 偶发不触发
+// 修: 直接用 GlobalKey 调 _MainHomeScreenState.hideWelcomeScreen()
+void hideWelcomeScreenFromOutside() {
+  final state = _MainHomeScreenState.globalKey;
+  if (state.currentState != null) {
+    (state.currentState as dynamic).hideWelcomeScreen();
+  }
+}
+
+// 6/28 16:11 Brien 反馈: '点开始不能强刷' (3 次反馈, 终于懂了)
+// 修: LoadingScreen '开始' 按了直接调 webReloadPage() 真强刷整个页面
+// 真强刷必须用 window.location.reload(true), 不带 true 浏览器会可能用 cache
+// 实现: dart:js 调 js.context.callMethod('reload', [true])
+void webReloadPage() {
+  try {
+    js.context.callMethod('reload', [true]);
+  } catch (e) {
+    debugPrint('webReloadPage 失败: $e');
+    // 兑底: 不带 true 再试
+    try {
+      js.context.callMethod('reload');
+    } catch (_) {}
+  }
+}
+
+// 6/28: 点击事件里跳转 = 浏览器原生 reload (chrome 拒绝被动 reload)
+void webForceReload() {
+  try {
+    js.context['location']['href'] = '/?refreshed=1';
+  } catch (e) {
+    debugPrint('webForceReload 失败: $e');
+    // 兑底用 reload
+    webReloadPage();
   }
 }
 
@@ -55,7 +112,7 @@ class FragmentTimeApp extends StatefulWidget {
 }
 
 class _FragmentTimeAppState extends State<FragmentTimeApp> {
-  ThemeMode _mode = ThemeMode.system;
+  ThemeMode _mode = ThemeMode.light; // 6/28 Brien 反馈: 手机 dark system 让 app 变 dark → 强制 light default
   bool _eyeProtectionOn = false;
 
   @override
@@ -84,6 +141,10 @@ class _FragmentTimeAppState extends State<FragmentTimeApp> {
       debugShowCheckedModeBanner: false,
       theme: AppTheme.lightTheme,
       darkTheme: AppTheme.dark(),
+      // 6/28 Brien 反馈: '手机加载页面总是黑黑的, 深色模式, 永远' (手机 system dark → app dark → 老人/上班族看着累)
+      // 真凶: themeMode = system 跟随手机 system, 手机 dark → app dark → SceneScreen / LoadingScreen 全 dark
+      // 修: 强制 themeMode = light, 老人/上班族看着累别选 dark。
+      //     用户在设置 Tab 手动点 dark 会调 setMode → _mode → setState (ThemeMode.dark) 仍然生效
       themeMode: _mode,
       // 6/13 护眼 InheritedWidget 包装（让所有屏可读）
       builder: (context, child) {
@@ -159,6 +220,44 @@ class _MainHomeScreenState extends State<MainHomeScreen> {
     // 6/24 v14: IndexedStack 一直挂载, reload 路径不可靠
     // 改为: LocalSubscriptionService 用 ChangeNotifier, MySubscriptionsScreen watch 自动 rebuild
   }
+
+  /// 6/28 LoadingScreen '开始' 回调: 关闭 WelcomeScreen / Onboarding, 跳 Tab 0
+  void finishLoading() {
+    if (!mounted) return;
+    setState(() {
+      _showWelcome = false;
+      _showOnboarding = false;
+      _checkedWelcome = true;
+      _checkedOnboarding = true;
+      _selectedIndex = 0;
+    });
+  }
+
+  /// 6/28 LoadingScreen 作为覆盖层使用 (不走 Navigator push/pop, 避免 Flutter web Navigator 事件不触发)
+  /// MainHomeScreen Stack 多加一个 LoadingScreen 覆盖层, 用 _showLoading 控制显示
+  bool _showLoading = false;
+  bool get showLoading => _showLoading;
+
+  void showLoadingScreen() {
+    if (!mounted) return;
+    setState(() {
+      _showLoading = true;
+    });
+  }
+
+  void hideLoadingScreen() {
+    if (!mounted) return;
+    // 6/28 Brien 反馈: 'LoadingScreen 消失后一片白'
+    // 真凶: prefs 'first_run_done_v1' 没写成功 (fire-and-forget 丢) → _showWelcome=true 一直显示 WelcomeScreen
+    // 修: hideLoadingScreen 同时强制关掉 WelcomeScreen / Onboarding, 不依赖 prefs
+    setState(() {
+      _showLoading = false;
+      _showWelcome = false;
+      _showOnboarding = false;
+      _checkedWelcome = true;
+      _checkedOnboarding = true;
+    });
+  }
   Future<void> _cycleThemeMode() async {
     final next = widget.themeMode == ThemeMode.system
         ? ThemeMode.light
@@ -201,6 +300,7 @@ class _MainHomeScreenState extends State<MainHomeScreen> {
   void dispose() {
     _eyeCheckTimer?.cancel();
     WelcomeCompleteSignal.instance.removeListener(_onWelcomeComplete);
+    ForceReloadSignal.instance.removeListener(_onForceReload);
     super.dispose();
   }
 
@@ -208,6 +308,43 @@ class _MainHomeScreenState extends State<MainHomeScreen> {
   void _onWelcomeComplete() {
     if (!mounted) return;
     setState(() => _showWelcome = false);
+  }
+
+  /// 6/28 公开方法: WelcomeScreen '继续' 按了直接调 (不走 ValueNotifier)
+  /// 真凶: WelcomeCompleteSignal ValueNotifier 在 Flutter web 上 listener 偶发不触发
+  void hideWelcomeScreen() {
+    if (!mounted) return;
+    setState(() => _showWelcome = false);
+  }
+
+  /// 6/28 加: hideOnboarding / hideLoadingScreen 公开方法, 让 LoadingScreen '开始' 一键关所有
+  void hideOnboarding() {
+    if (!mounted) return;
+    setState(() => _showOnboarding = false);
+  }
+
+  // 6/28 LoadingScreen '强制刷新' 回调 (Brien 反馈: 保留为强行加载入口)
+  // 接收到信号后: 重新拉 _subscribedItems + 让 ContentScreen rebuild
+  void _onForceReload() {
+    _reloadAll();
+  }
+
+  Future<void> _reloadAll() async {
+    if (!mounted) return;
+    try {
+      // 1. 重新拉关注列表 (LocalSubscriptionService)
+      final items = await _subService.getSubscribedItems();
+      if (!mounted) return;
+      setState(() {
+        _subscribedItems = items;
+        _subscriptionCount = items.length;
+      });
+      // 2. 重新拉每日名言 (DailyMessage)
+      await _loadDailyQuote();
+      // 3. ContentScreen 通过 _subscribedItems 变化自动 rebuild (Consumer/Provider 风格)
+    } catch (e) {
+      debugPrint('[force-reload] 失败: $e');
+    }
   }
 
   final LocalSubscriptionService _subService = LocalSubscriptionService.instance;
@@ -240,14 +377,30 @@ class _MainHomeScreenState extends State<MainHomeScreen> {
     _checkWelcome(); // 6/25 首启欢迎屏
     // 6/25 WelcomeScreen 完成信号监听
     WelcomeCompleteSignal.instance.addListener(_onWelcomeComplete);
+    // 6/28 LoadingScreen '强制刷新' 信号监听 (Brien 反馈: 保留为强行加载入口)
+    ForceReloadSignal.instance.addListener(_onForceReload);
     _startEyeTimer();
     // 6/24 AI 私教: 启动时检查是否要生成周回顾 (周日 20:00 之后)
     _checkWeeklyRecap();
     // 6/24 AI 私教 亮点: 启动时生成 1 句鼓励, 首页顶部 banner
-    _loadDailyEncouragement();
+    _loadDailyQuote();
     // 6/25 昵称扩展: 启动时加载 handle
     _loadHandle();
+    // 6/26 迁移: 删老 id 'encourage_*' 的 item (banner 改名言后老 item 装的是完整 LLM 推的鼓励新闻)
+    _migrateOldEncourageItems();
     AnalyticsService.instance.track(AnalyticsService.EVT_APP_OPEN);
+  }
+
+  // 6/26 迁移: 删老 id 'encourage_*' 的 item, banner 现在只存名言
+  Future<void> _migrateOldEncourageItems() async {
+    try {
+      final items = await LocalSubscriptionService.instance.getSubscribedItems();
+      final old = items.where((it) => it.id.startsWith('encourage_')).toList();
+      for (final it in old) {
+        await LocalSubscriptionService.instance.unsubscribe(it);
+      }
+      if (old.isNotEmpty) debugPrint('[migrate] 删了 ${old.length} 个老 encourage_ item');
+    } catch (_) {}
   }
 
   // 6/25 昵称扩展: 加载 handle (banner / 收藏 tab / 分享卡都用)
@@ -257,39 +410,49 @@ class _MainHomeScreenState extends State<MainHomeScreen> {
     setState(() => _handle = h);
   }
 
-  // 6/24 AI 私教 亮点: 1 句鼓励 banner
-  String? _dailyEncouragement;
-  String? _dailyQuote; // 6/24 v3 亮点: 每日名言
+  // 6/26 Brien 反馈: 名言对各角色通用, 删掉鼓励字段
+  String? _dailyQuote; // 每日名言 — banner 唯一内容
   String _handle = HandleService.defaultHandle; // 6/25 昵称扩展: 从 HandleService 加载
 
-  Future<void> _loadDailyEncouragement() async {
+  Future<void> _loadDailyQuote() async {
     try {
-      // adapter: 把 LlmService.generateStream 收成 Future<String>
+      // 6/26 重构: 只调名言, 删鼓励 (名言对各角色通用)
       Future<String> llmCall(String prompt) async {
         final buffer = StringBuffer();
         await for (final chunk in LlmService.generateStream(
-          userType: _selectedUserType ?? UserType.student,
+          userType: UserType.officeWorker, // 名言不跟 userType 绑, 随便传个
           scene: Scene.learn,
           languageCode: _languageCode,
           isInternational: _isInternational,
-        )) {
+        ).timeout(const Duration(seconds: 5), onTimeout: (sink) {
+          // 6/28 Brien 反馈: '顶上的名言呢' — LLM 冷启动 12-20s 不 throw 也不返回
+          // 这里 5s 强行 timeout, 避免 _dailyQuote 永远 null
+          sink.close();
+        })) {
           buffer.write(chunk);
         }
         return buffer.toString();
       }
 
-      // 并行调两个 LLM
-      final results = await Future.wait([
-        _streakService.getDailyEncouragement(isEn: isEn, llmCall: llmCall),
-        _streakService.getDailyQuote(isEn: isEn, llmCall: llmCall),
-      ]);
+      final quote = await _streakService.getDailyQuote(isEn: isEn, llmCall: llmCall);
+      // 6/26 Brien 反馈: LLM 1.5b 推 250 字新闻, 不是 25 字名言 → 硬截断 50 字
+      final trimmed = quote.length > 50 ? '${quote.substring(0, 50)}…' : quote;
       if (!mounted) return;
       setState(() {
-        _dailyEncouragement = results[0];
-        _dailyQuote = results[1];
+        _dailyQuote = trimmed;
       });
     } catch (e) {
-      debugPrint('AI 私教 加载失败: $e');
+      // 6/28 Brien 反馈: '顶上的名言呢' = _dailyQuote 一直是 null, banner 不显示
+      // 真凶: 这里 catch 之后 _dailyQuote 永不被设值, main.dart 的 banner condition 永远失败
+      // 修: 兑底给一句硬编码名言 + 仍 setState
+      debugPrint('名言 加载失败 (兑底): $e');
+      final fallback = isEn
+          ? 'The impediment to action advances action. — Marcus Aurelius'
+          : '竹杖芒鞋轻胜马, 谁怕? 一蓑烟雨任平生。';
+      if (!mounted) return;
+      setState(() {
+        _dailyQuote = fallback;
+      });
     }
   }
 
@@ -467,6 +630,38 @@ class _MainHomeScreenState extends State<MainHomeScreen> {
   Future<void> _onUserTypeSelected(UserType type) async {
     setState(() => _selectedUserType = type);
     await _localeService.setSelectedUserType(type);
+    // 6/28 Brien 反馈: '选完兴趣点后系统自动会加载'
+    // 设计: 选完角色后不弹 TopicOnboarding (6/18 已确认 30s 引导累赘),
+    //       直接调 SubscriptionService.subscribeCategory × defaultCategories
+    //       让首页推荐池一打开就有内容, 跟用户预期一致
+    // 用 fire-and-forget, 不阻塞角色选择
+    _autoSubscribeDefaultCategories();
+  }
+
+  // 6/28: 自动关注默认 8 个类目 (用户没显式选过的话)
+  // 防御: 检查 SharedPreferences 'subscribed_categories' 是否为空, 避免重复
+  Future<void> _autoSubscribeDefaultCategories() async {
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      final existing = prefs.getStringList('subscribed_categories') ?? [];
+      if (existing.isNotEmpty) return; // 已有手动选过, 不重复
+      for (final cat in SubscriptionService.defaultCategories) {
+        await SubscriptionService.instance.subscribeCategory(cat);
+      }
+      // 刷新 _subscribedItems 让 banner / Tab 1 推荐池更新
+      if (mounted) {
+        try {
+          final items = await _subService.getSubscribedItems();
+          if (!mounted) return;
+          setState(() {
+            _subscribedItems = items;
+            _subscriptionCount = items.length;
+          });
+        } catch (_) {}
+      }
+    } catch (e) {
+      debugPrint('auto-subscribe 失败: $e');
+    }
   }
 
   // 6/24 v12: 设置 Tab "我的身份" — 弹出 6 角色选择
@@ -507,7 +702,7 @@ class _MainHomeScreenState extends State<MainHomeScreen> {
       builder: (ctx) => _QuoteDetailSheet(
         recent: recent,
         isEn: isEn,
-        encouragement: _dailyEncouragement ?? '',
+        // 6/26: 删鼓励字段, 只传 quote
         quote: _dailyQuote,
         llmKeywords: llmKeywords, // 6/24 v16
       ),
@@ -647,28 +842,67 @@ class _MainHomeScreenState extends State<MainHomeScreen> {
           if (_checkedWelcome && _showWelcome)
             WelcomeScreen(
               key: const ValueKey('welcome_screen'),
-              isEn: isEn,
+              onComplete: () {
+                // 6/28 19:54 Brien 反馈: '所有浏览器都不行, 你自己想办法'
+                // 真凶: globalKey.currentState = null (Flutter web canvas render detach)
+                // 修法: 不用 globalKey, 让 MainHomeScreen 自己用 setState 关闭 _showWelcome
+                //   WelcomeScreen 是 Stack child, 不依赖 Navigator, 直接 setState 即可
+                if (mounted) {
+                  setState(() {
+                    _showWelcome = false;
+                    _checkedWelcome = true;
+                  });
+                }
+              },
             ),
-          // 6/24 AI 私教 亮点: 顶部鼓励 + 名言 banner, 只在 Tab 0 显
-          if (_selectedIndex == 0 && (_dailyEncouragement != null || _dailyQuote != null))
+          // 6/28 LoadingScreen 作为覆盖层 (不走 Navigator)
+          // 真凶: LoadingScreen push 出来 + Navigator pop 在 Flutter web 上不触发
+          // 修: MainHomeScreen Stack 多加一个 LoadingScreen, _showLoading 控制显示
+          if (_showLoading)
+            LoadingScreen(
+              key: const ValueKey('loading_screen'),
+              userTypeName: _selectedUserType == null ? '' : (_isInternational ? _selectedUserType!.name : _selectedUserType!.title),
+              isInternational: _isInternational,
+              isElderlyMode: _isElderlyMode,
+              languageCode: _languageCode,
+              onComplete: () {
+                // 6/28: '开始' callback 关 LoadingScreen + Welcome + Onboarding, 切到 Tab 0
+                if (mounted) {
+                  setState(() {
+                    _showLoading = false;
+                    _showWelcome = false;
+                    _showOnboarding = false;
+                    _checkedWelcome = true;
+                    _checkedOnboarding = true;
+                    _selectedIndex = 0;
+                  });
+                }
+              },
+            ),
+          // 6/28 Brien 反馈: 'LoadingScreen 消失后一片白' = LoadingScreen widget 报错 (e.g. _scale getter 未定义) 中断了 main build
+          // 修: 加 ErrorWidget 兑底 (出 bug 时显红色块而不是白屏, 便于诊断)
+          // 6/26 Brien 反馈: 恢复 banner, 只显示 1 句名言
+          if (_selectedIndex == 0 && _dailyQuote != null && !_showWelcome && !_showOnboarding && _selectedUserType != null)
             Positioned(
               top: 0,
               left: 0,
               right: 0,
               child: SafeArea(
                 child: _DailyEncouragementBanner(
-                  text: _dailyEncouragement ?? '',
+                  text: '',
                   quote: _dailyQuote,
                   isEn: isEn,
                   isElderlyMode: _isElderlyMode,
-                  handle: _handle, // 6/25 昵称扩展
-                  onTapDetail: _showQuoteDetailSheet, // 6/24 v13
+                  handle: _handle,
+                  onTapDetail: _showQuoteDetailSheet,
                 ),
               ),
             ),
         ],
       ),
-      bottomNavigationBar: Padding(
+      bottomNavigationBar: (_showWelcome || _showOnboarding || _selectedUserType == null)
+          ? null
+          : Padding(
         // 6/14 visionOS 胶囊导航:全宽胶囊 + 高亮胶囊 + 顶亮高光
         padding: const EdgeInsets.fromLTRB(16, 4, 16, 16),
         child: ClipRRect(
@@ -928,15 +1162,16 @@ class _DailyEncouragementBannerState extends State<_DailyEncouragementBanner> {
 
   // 6/24 v9: 从 SharedPreferences 读今日是否已收藏 (重启后保持 ❤️)
   // 6/25 修 bug: 同时查订阅 list 验证 (双重保险, prefs true 但 list 已删 → 重置 prefs)
+  // 6/26: id 从 encourage_ 改 quote_ (banner 现在是名言不是鼓励)
   Future<void> _loadSaved() async {
     try {
       final prefs = await SharedPreferences.getInstance();
       final now = DateTime.now();
-      final key = 'encourage_saved_${now.year}-${now.month}-${now.day}';
+      final key = 'quote_saved_${now.year}_${now.month}_${now.day}';
       final prefSaved = prefs.getBool(key) ?? false;
       if (prefSaved) {
-        // 验证 list 里还有这条鼓励 (防止 prefs true 但 list 已删)
-        final id = 'encourage_${now.year}-${now.month}-${now.day}';
+        // 验证 list 里还有这条名言 (防止 prefs true 但 list 已删)
+        final id = 'quote_${now.year}_${now.month}_${now.day}';
         final items = await LocalSubscriptionService.instance.getSubscribedItems();
         final exists = items.any((it) => it.id == id);
         if (exists) {
@@ -956,13 +1191,12 @@ class _DailyEncouragementBannerState extends State<_DailyEncouragementBanner> {
   Future<void> _onSave() async {
     if (_saved) return;
     final now = DateTime.now();
-    final id = 'encourage_${now.year}-${now.month}-${now.day}';
+    // 6/26 Brien 反馈: 收藏里显示"AI 6月26日鼓励"但 Tab 是名言 → 改 id/title 描述一致
+    final id = 'quote_${now.year}_${now.month}_${now.day}';
     final title = widget.isEn
-        ? 'AI ${now.month}/${now.day} encouragement'
-        : 'AI ${now.month}月${now.day}日鼓励';
-    final desc = widget.quote != null
-        ? '${widget.text}\n\n“${widget.quote}”'
-        : widget.text;
+        ? 'AI ${now.month}/${now.day} quote'
+        : 'AI ${now.month}月${now.day}日名言';
+    final desc = widget.quote ?? widget.text; // 6/26: 只存名言本身, 不拼鼓励+引号
     final item = ContentItem(
       id: id,
       title: title,
@@ -977,9 +1211,10 @@ class _DailyEncouragementBannerState extends State<_DailyEncouragementBanner> {
       await LocalSubscriptionService.instance.subscribe(item);
       if (!mounted) return;
       // 6/24 v9: 持久化已收藏标记 (重启后保持 ❤️)
+      // 6/26: key 从 encourage_saved_ 改 quote_saved_ (banner 改名言)
       try {
         final prefs = await SharedPreferences.getInstance();
-        final key = 'encourage_saved_${now.year}-${now.month}-${now.day}';
+        final key = 'quote_saved_${now.year}_${now.month}_${now.day}';
         await prefs.setBool(key, true);
       } catch (_) {}
       if (!mounted) return;
@@ -1015,7 +1250,8 @@ class _DailyEncouragementBannerState extends State<_DailyEncouragementBanner> {
       // 6/24 v13: 点 banner → 弹相关推荐 sheet
       onTap: widget.onTapDetail,
       child: Container(
-        margin: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+        // 9:53 Brien 反馈: 刷新按钮被 banner 压住 — 修法: right 多 48dp 给 AppBar actions 让位
+        margin: const EdgeInsets.fromLTRB(16, 8, 64, 8),
         padding: EdgeInsets.symmetric(horizontal: 14 * scale, vertical: 10 * scale),
         decoration: BoxDecoration(
           gradient: const LinearGradient(
@@ -1035,17 +1271,18 @@ class _DailyEncouragementBannerState extends State<_DailyEncouragementBanner> {
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            // 鼓励
+            // 6/26 Brien 反馈: banner 只放名言, 不显示鼓励 / 推荐内容
             Row(
               children: [
-                const Icon(Icons.auto_awesome, color: Colors.white, size: 18),
+                const Icon(Icons.format_quote, color: Colors.white, size: 18),
                 const SizedBox(width: 8),
                 Expanded(
                   child: Text(
-                    // 6/25 昵称扩展: 鼓励文本前加 '@你,' 让用户感觉 AI 在叫自己
-                    '${widget.handle}${widget.isEn ? ', ' : ','} ${widget.text}',
+                    widget.quote ?? widget.text, // 6/26: 优先 quote, 没 quote 时兑底用鼓励
+                    maxLines: 1, // 6/26 Brien 反馈: LLM 1.5b 推 250 字 → 强制 1 行省略
+                    overflow: TextOverflow.ellipsis,
                     style: TextStyle(
-                      color: Colors.white,
+                      color: Colors.white.withOpacity(0.95),
                       fontSize: 13 * scale,
                       fontWeight: FontWeight.w500,
                       fontStyle: FontStyle.italic,
@@ -1054,7 +1291,7 @@ class _DailyEncouragementBannerState extends State<_DailyEncouragementBanner> {
                 ),
                 // 6/24 v6: ❤️ 收藏按钮
                 GestureDetector(
-                  onTap: _onSave, // 独立 onTap, 不触发 _showDetailSheet
+                  onTap: _onSave,
                   child: AnimatedSwitcher(
                     duration: const Duration(milliseconds: 200),
                     child: _saved
@@ -1088,21 +1325,6 @@ class _DailyEncouragementBannerState extends State<_DailyEncouragementBanner> {
                 ),
               ],
             ),
-          // 名言 (6/24 v3)
-          if (widget.quote != null) ...[
-            SizedBox(height: 6 * scale),
-            Padding(
-              padding: const EdgeInsets.only(left: 26),
-              child: Text(
-                '“${widget.quote}”',
-                style: TextStyle(
-                  color: Colors.white.withOpacity(0.85),
-                  fontSize: 11 * scale,
-                  fontWeight: FontWeight.w400,
-                ),
-              ),
-            ),
-          ],
           ],
       ),
       ),
@@ -1189,16 +1411,15 @@ String _userTypeNameEn(UserType t) {
 }
 
 // 6/24 v13: 名言点开弹底部 Sheet — 显示近 7 天相关推荐
+// 6/26: 删鼓励字段, 只显示 quote
 class _QuoteDetailSheet extends StatelessWidget {
   final List<HistoryItem> recent;
   final bool isEn;
-  final String encouragement;
   final String? quote;
-  final List<String>? llmKeywords; // 6/24 v16
+  final List<String>? llmKeywords;
   const _QuoteDetailSheet({
     required this.recent,
     required this.isEn,
-    required this.encouragement,
     required this.quote,
     this.llmKeywords,
   });
@@ -1238,18 +1459,7 @@ class _QuoteDetailSheet extends StatelessWidget {
               ),
             ]),
             const SizedBox(height: 8),
-            if (encouragement.isNotEmpty)
-              Padding(
-                padding: const EdgeInsets.only(bottom: 6),
-                child: Text(
-                  '“$encouragement”',
-                  style: TextStyle(
-                    fontSize: 13,
-                    fontStyle: FontStyle.italic,
-                    color: Colors.grey[700],
-                  ),
-                ),
-              ),
+            // 6/26: 删鼓励文本
             if (quote != null)
               Padding(
                 padding: const EdgeInsets.only(bottom: 16),

@@ -41,3 +41,4 @@ windows/
 firebase_options.dart  # 如果有
 google-services.json
 GoogleService-Info.plist
+.screenshots/

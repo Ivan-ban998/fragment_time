@@ -74,7 +74,8 @@ class _StudyGroupScreenState extends State<StudyGroupScreen> {
                     controller: handleCtrl,
                     decoration: InputDecoration(
                       labelText: isEn ? 'Your handle' : '你的 handle',
-                      hintText: '@你的名字',
+                      // 6/26 Brien 反馈: @ 符号让人误以为要保留, 删了
+                      hintText: isEn ? 'Your name' : '你的昵称',
                     ),
                   ),
                   const SizedBox(height: 16),

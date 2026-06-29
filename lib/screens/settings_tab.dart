@@ -48,8 +48,11 @@ class SettingsTab extends StatelessWidget {
   });
 
   // 6/10 加: 编辑 handle dialog
+  // 6/26 Brien 反馈: @ 符号让人误以为要保留, 删掉
   Future<void> _showHandleDialog(BuildContext context, String current, bool isEn) async {
-    final ctrl = TextEditingController(text: current);
+    // 6/26: 老默认值 @你 直接清空 (老用户已存 @小O 等不动)
+    final initial = (current == '@你' || current.isEmpty) ? '' : current;
+    final ctrl = TextEditingController(text: initial);
     final result = await showDialog<String>(
       context: context,
       builder: (ctx) => AlertDialog(
@@ -58,7 +61,7 @@ class SettingsTab extends StatelessWidget {
           controller: ctrl,
           decoration: InputDecoration(
             labelText: isEn ? 'handle' : 'handle',
-            hintText: '@你的名字',
+            hintText: isEn ? 'Your name' : '你的昵称',
           ),
           autofocus: true,
         ),

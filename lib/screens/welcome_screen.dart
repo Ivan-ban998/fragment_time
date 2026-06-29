@@ -6,6 +6,7 @@ import 'package:flutter/material.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import '../services/handle_service.dart';
 import '../theme/app_theme.dart';
+import '../main.dart' as app;
 import 'user_type_screen.dart';
 
 // 6/25 WelcomeScreen → MainHomeScreen 通信信号 (ValueNotifier)
@@ -18,7 +19,8 @@ class WelcomeCompleteSignal {
 
 class WelcomeScreen extends StatefulWidget {
   final bool isEn;
-  const WelcomeScreen({super.key, this.isEn = false});
+  final VoidCallback? onComplete; // 6/28 19:54: 让 MainHomeScreen 传 callback, 不靠 globalKey
+  const WelcomeScreen({super.key, this.isEn = false, this.onComplete});
 
   @override
   State<WelcomeScreen> createState() => _WelcomeScreenState();
@@ -31,7 +33,8 @@ class _WelcomeScreenState extends State<WelcomeScreen> {
   @override
   void initState() {
     super.initState();
-    _ctrl = TextEditingController(text: _currentHandle);
+    // 6/26 Brien 反馈: 默认值 '@你' 让人以为要保留 @, 改成空 (让用户直接输入)
+    _ctrl = TextEditingController(text: _currentHandle == '@你' ? '' : _currentHandle);
   }
 
   @override
@@ -40,20 +43,31 @@ class _WelcomeScreenState extends State<WelcomeScreen> {
     super.dispose();
   }
 
-  Future<void> _complete({bool save = true}) async {
-    if (save && _ctrl.text.trim().isNotEmpty) {
-      await HandleService().set(_ctrl.text.trim());
+  // 6/28 Brien 反馈: WelcomeScreen 按钮无反应
+  // 真凶: async 链中 `await HandleService().set()` 可能因为 web SharedPreferences 跨 isolate 卡住,
+  //   后续 prefs.setBool + notifyComplete 都没跑。改成 fire-and-forget + 同步 prefs + 立即 notify
+  void _complete({bool save = true}) {
+    final text = _ctrl.text.trim();
+    if (save && text.isNotEmpty) {
+      // 不 await, fire-and-forget
+      HandleService().set(text).catchError((_) {});
     }
-    // 标记首次完成 + 设 first_run_done_v1 = true
-    final prefs = await SharedPreferences.getInstance();
-    await prefs.setBool('first_run_done_v1', true);
+    // prefs 也 fire-and-forget, 不阻塞 UI
+    SharedPreferences.getInstance().then((prefs) {
+      prefs.setBool('first_run_done_v1', true);
+    }).catchError((_) {});
+    // 6/28: WelcomeCompleteSignal ValueNotifier + GlobalKey 双保险, onComplete 优先
     if (!mounted) return;
-    // 6/25: 欢迎屏不是单独路由, 是 main Stack 覆盖层
-    // 通过 Navigator 拿到上层 MainHomeScreenState 调 _showWelcome = false
-    // 这里用 Navigator.popUntil(rootNavigator) 不可行 (不在 Route 栈)
-    // 最简: 直接通过 rootNavigator 返回, 但其实覆盖层没用 MaterialPageRoute, 需要其他方式
-    // 改用全局 ValueNotifier 通知 MainHomeScreenState 关掉
     WelcomeCompleteSignal.notifyComplete();
+    if (widget.onComplete != null) {
+      widget.onComplete!();
+    } else {
+      try {
+        app.hideWelcomeScreenFromOutside();
+      } catch (e) {
+        debugPrint('[welcome] hideWelcomeScreenFromOutside 失败: $e');
+      }
+    }
   }
 
   @override
@@ -79,7 +93,6 @@ class _WelcomeScreenState extends State<WelcomeScreen> {
                   color: AppTheme.primary,
                 ),
               ),
-              const SizedBox(height: 12),
               Text(
                 isEn
                     ? "Let's set up your fragment time."
@@ -104,7 +117,7 @@ class _WelcomeScreenState extends State<WelcomeScreen> {
                 controller: _ctrl,
                 decoration: InputDecoration(
                   hintText: isEn ? 'Your name' : '你的昵称',
-                  prefixIcon: Icon(Icons.alternate_email, color: AppTheme.primary),
+                  // 6/26 Brien 反馈: 输入框 @ 前缀图标让人误会要保留 @, 删了
                   border: OutlineInputBorder(
                     borderRadius: BorderRadius.circular(12),
                   ),
