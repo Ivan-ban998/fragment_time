@@ -91,6 +91,11 @@ class _AiAssistantScreenState extends State<AiAssistantScreen> {
           ));
         }
       });
+      // 6/29 20:36: 加载历史后滚到底, 看最新消息
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        if (!_scrollController.hasClients) return;
+        _scrollController.jumpTo(_scrollController.position.maxScrollExtent);
+      });
     } catch (_) {
       _addWelcome();
     }
