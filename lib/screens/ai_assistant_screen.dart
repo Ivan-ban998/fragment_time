@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/foundation.dart';
 import 'dart:async';
 import 'dart:convert';
 import '../theme/glass_decoration.dart';
@@ -7,6 +8,7 @@ import '../services/news_service.dart';
 import '../services/audio_play_service.dart';
 import '../models/models.dart';
 import 'content_reader_screen.dart';
+import 'package:url_launcher/url_launcher.dart';
 
 /// 6/29 v2: AI 助手聊天 sheet (静态版, 不接 LLM)
 /// - 半屏弹起 (isScrollControlled: true)
@@ -80,9 +82,10 @@ class _AiAssistantScreenState extends State<AiAssistantScreen> {
         ? '''You are a warm, concise AI reading assistant.
 
 RULES:
-- If the user asks for a recommendation, return a JSON array (no extra text):
-  [{"title":"...","type":"article|audio|video|short","source":"...","duration":"...","url":"..."}]
-  Use 1-3 items. No commentary.
+- If the user asks for a recommendation, return a JSON array (no extra text, no commentary):
+  [{"title":"...","type":"article|audio|video|short"}]
+  Use 1-3 items. Do NOT include url/source/duration fields — those come from our database.
+- Title must match a real topic in our database (5-minute English, meditation, business, parenting, news, etc.).
 - Otherwise return plain text (under 80 words).
 - Use the user\'s quote context if provided.
 
@@ -91,8 +94,9 @@ Start your reply with "[" if returning JSON, otherwise plain text.'''
 
 规则:
 - 如果用户要推荐内容, 返回 JSON 数组 (不要额外文字):
-  [{"title":"...","type":"article|audio|video|short","source":"...","duration":"...","url":"..."}]
-  1-3 条, 不评论。
+  [{"title":"...","type":"article|audio|video|short"}]
+  1-3 条, 不评论。**不要** 填 url/source/duration 字段 — 这些走数据库拿。
+- title 必须是数据库里实际存在的主题 (5 分钟英语、冥想、商业、育儿、新闻 等)。
 - 其他情况返回普通文字 (80 字以内)。
 - 如果用户传了名言上下文, 可以引用。
 
@@ -601,27 +605,21 @@ class _CardTile extends StatelessWidget {
           borderRadius: BorderRadius.circular(12),
           onTap: () {
             // 6/29 段 6: 优先用 NewsService.search 找的真 ContentItem
-            final ContentItem item;
-            if (card.realItem != null) {
-              item = card.realItem!;
-            } else {
-              // 兑底 mock ContentItem (没找到真内容)
-              item = ContentItem(
-                id: 'ai_${DateTime.now().millisecondsSinceEpoch}',
-                title: card.title,
-                description: card.url.isNotEmpty ? card.url : card.source,
-                duration: card.duration.isNotEmpty ? card.duration : '5 min',
-                source: card.source.isNotEmpty ? card.source : 'AI',
-                sourceType: ContentSource.rss,
-                contentType: card.type == 'audio' ? ContentType.audio
-                    : card.type == 'video' ? ContentType.video
-                    : card.type == 'short' ? ContentType.short
-                    : ContentType.article,
-                externalUrl: card.url.isNotEmpty ? card.url : null,
-                audioUrl: card.audioUrl,
+            // 6/29 12:30 Brien 反馈: 兑底 mock 给出 AI 编的 URL (蜻蜓 FM 错的 URL), 错位内容
+            // 修: 找不到真内容 → SnackBar 提示, 不跳 reader 避免 AI 编 URL 进去
+            if (card.realItem == null) {
+              ScaffoldMessenger.of(context).showSnackBar(
+                SnackBar(
+                  content: Text(
+                    '库里没有 "${card.title}" 的匹配内容, 换个关键词试试。',
+                  ),
+                  duration: const Duration(seconds: 3),
+                ),
               );
+              return;
             }
-            // 6/29 段 6: audio 类型且有 audioUrl → 直接 AudioPlayService 播
+            final item = card.realItem!;
+            // 6/29 12:36: audio 优先真播 (audioUrl 不空), 没有就跳原文 (喜马拉雅搜索页)
             if (card.type == 'audio' && (card.audioUrl?.isNotEmpty ?? false)) {
               AudioPlayService().play(item);
               ScaffoldMessenger.of(context).showSnackBar(
@@ -631,6 +629,18 @@ class _CardTile extends StatelessWidget {
                         ? card.title.substring(0, 30) + '…'
                         : card.title),
                   ),
+                  duration: const Duration(seconds: 2),
+                ),
+              );
+              return;
+            }
+            if (card.type == 'audio' && (item.externalUrl?.isNotEmpty ?? false)) {
+              // 跳原文 (喜马拉雅/B 站等)
+              final uri = Uri.parse(item.externalUrl!);
+              launchUrl(uri, mode: kIsWeb ? LaunchMode.platformDefault : LaunchMode.externalApplication);
+              ScaffoldMessenger.of(context).showSnackBar(
+                SnackBar(
+                  content: Text('♫ ' + (item.source.isNotEmpty ? item.source : '打开原文')),
                   duration: const Duration(seconds: 2),
                 ),
               );
