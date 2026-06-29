@@ -674,10 +674,10 @@ class _ContentReaderScreenState extends State<ContentReaderScreen> {
             _buildVideoPlayer(),
             Divider(height: 1 * scale),
             SizedBox(height: 20 * scale),
-            // 6/11 B2: 测一测（仅 article / video / audio 有意义）
+            // 6/11 B2: 测一测（仅 article / video 有意义）
+            // 6/29 15:55: audio 跳过 — QuizPanel 基于 description AI 出题, 跟音频内容无关会错位
             if (item.contentType == ContentType.article ||
-                item.contentType == ContentType.video ||
-                item.contentType == ContentType.audio)
+                item.contentType == ContentType.video)
               Padding(
                 padding: EdgeInsets.only(bottom: 20 * scale),
                 child: QuizPanel(
@@ -686,7 +686,8 @@ class _ContentReaderScreenState extends State<ContentReaderScreen> {
                   languageCode: isEn ? 'en' : 'zh',
                 ),
               ),
-            // AI Summary
+            // 6/29 15:55: AI 摘要 + Main content + 延伸阅读 — audio 不显示 (description 太短会错位)
+            if (item.contentType != ContentType.audio) ...[
             Container(
               padding: EdgeInsets.all(16 * scale),
               decoration: BoxDecoration(
@@ -788,6 +789,7 @@ class _ContentReaderScreenState extends State<ContentReaderScreen> {
             SizedBox(height: 16 * scale),
             // 6/25 C: AI 摘要折叠区 (手动点, 30s 兌底, 失败可重试)
             _buildAiSummarySection(),
+            ],
             SizedBox(height: 32 * scale),
             // TTS 播放栏（6/7 新加）
             if (_ttsAvailable)
