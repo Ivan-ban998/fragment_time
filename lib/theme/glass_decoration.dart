@@ -186,6 +186,22 @@ class GlassStyle {
     return isDark ? onGlassSecondaryDark : onGlassSecondary;
   }
 
+  // 6/29: 聊天 sheet 背景 (顶部弹起, 半透明玻璃)
+  static Color sheetBg(BuildContext c) {
+    final isDark = Theme.of(c).brightness == Brightness.dark;
+    return isDark
+        ? const Color(0xFF1F1F2E).withOpacity(0.96)
+        : Colors.white.withOpacity(0.96);
+  }
+
+  // 6/29: 聊天 sheet 输入区背景
+  static Color sheetInputBg(BuildContext c) {
+    final isDark = Theme.of(c).brightness == Brightness.dark;
+    return isDark
+        ? const Color(0xFF16161F)
+        : const Color(0xFFFAFAFA);
+  }
+
   // ========== 强调色（操作按钮 / 链接） ==========
   static const Color accent = Color(0xFF4A6CF7);
   static const Color danger = Color(0xFFFF3B30);
