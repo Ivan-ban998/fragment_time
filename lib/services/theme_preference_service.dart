@@ -14,11 +14,11 @@ class ThemePreferenceService {
 
   Future<ThemeMode> getMode() async {
     final prefs = await SharedPreferences.getInstance();
-    final s = prefs.getString(_key) ?? 'system';
+    final s = prefs.getString(_key) ?? 'light'; // 6/28 Brien 反馈: '手机总是黑黑' → default 改 light (不跟随 system)
     switch (s) {
       case 'light': return ThemeMode.light;
       case 'dark': return ThemeMode.dark;
-      default: return ThemeMode.system;
+      default: return ThemeMode.light;
     }
   }
 

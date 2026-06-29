@@ -11,6 +11,22 @@ class NewsService {
     return _allContent[key] ?? _fallback(userType, scene);
   }
 
+  // 6/28 加: 预热 24 桶 + 国际版备用桶 (LoadingScreen 调用)
+  // 同步预热: 只需触达 Map, Dart 会在首次访问时初始化
+  // 加 200ms delay 让用户看到进度条走 1/4 (仪式感)
+  Future<void> preheatAll() async {
+    await Future<void>.delayed(const Duration(milliseconds: 200));
+    final userTypes = UserType.values;
+    final scenes = Scene.values;
+    int hit = 0;
+    for (final u in userTypes) {
+      for (final s in scenes) {
+        final key = '${u.bucketKey}_${s.bucketKey}';
+        if (_allContent.containsKey(key)) hit++;
+      }
+    }
+  }
+
   Future<List<ContentItem>> search(String query) async {
     if (query.trim().isEmpty) return [];
     final q = query.toLowerCase();

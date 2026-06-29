@@ -8,6 +8,8 @@ import '../services/time_aware_recommender.dart';
 import 'scene_screen.dart';
 import 'content_screen.dart';
 import 'topic_onboarding_screen.dart';
+import 'loading_screen.dart';
+import '../main.dart' as appMain;
 
 class UserTypeScreen extends StatefulWidget {
   final dynamic config;
@@ -309,26 +311,27 @@ class _UserTypeScreenState extends State<UserTypeScreen> {
                                   AnalyticsService.instance.track(AnalyticsService.EVT_USER_TYPE_SELECT,
                                       props: {'userType': ut.type.name});
                                   widget.onUserTypeSelected(ut.type);
-                                  // 6/24 v15: 角色选完 → 话题 onboarding (可跳过) → SceneScreen
-                                  // 6/25 修 bug: onComplete 用外部 BuildContext 在 push 后失效
-                                  // → 改用 Builder 包 context (动态 context, Navigator 能找到)
+                                  // 6/28 15:06 Brien 反馈: '角色选择之后, 兴趣选择怎么没有了? 兴趣选择之后才是这个页面'
+                                  // 真凶: 6/18 一刀切关掉 TopicOnboarding, 但 Brien 记得有 (6/24 v15 设计)
+                                  // 修: 角色选完 → TopicOnboarding (选 12 类目 / 跳过) → LoadingScreen → SceneScreen
                                   Navigator.push(
                                     context,
                                     MaterialPageRoute(
                                       builder: (topCtx) => TopicOnboardingScreen(
-                                        isEn: isEn,
+                                        isEn: widget.isInternational,
                                         isElderlyMode: widget.isElderlyMode,
                                         onComplete: () {
-                                          Navigator.of(topCtx).pushReplacement(
-                                            MaterialPageRoute(
-                                              builder: (_) => SceneScreen(
-                                                userType: ut.type,
-                                                isInternational: widget.isInternational,
-                                                isElderlyMode: widget.isElderlyMode,
-                                                languageCode: widget.languageCode,
-                                              ),
-                                            ),
-                                          );
+                                          Navigator.of(topCtx).pop();
+                                          // TopicOnboarding 选完/跳过 → 加载 LoadingScreen
+                                          try {
+                                            final state = appMain.globalMainKey.currentState;
+                                            if (state != null) {
+                                              (state as dynamic).showLoadingScreen();
+                                            } else {
+                                            }
+                                          } catch (e) {
+                                            debugPrint('[user_type] showLoadingScreen 失败: $e');
+                                          }
                                         },
                                       ),
                                     ),

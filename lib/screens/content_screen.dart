@@ -75,6 +75,7 @@ class _ContentScreenState extends State<ContentScreen> {
   List<ContentItem> _recItems = [];
   bool _recLoading = false;
   bool _showCompletionBanner = false;
+  bool _hasScrolled = false; // 6/26: 滚到过文章中部才显"读完啦"按钮
   bool _ttsPlaying = false;
   bool _showAllDoneDialog = false; // 6 张全看完弹 dialog
   List<ContentItem> _inProgressItems = []; // 续读
@@ -180,7 +181,6 @@ class _ContentScreenState extends State<ContentScreen> {
           // 1.5b 质量不够时可能输出学生内容给上班族, 检测后 fallback
           if (_buf.length > 30 && !_isRoleMatch(_buf, widget.userType)) {
             // 内容错位: 重置 buf 并调假数据桶
-            debugPrint('[LLM] 内容错位 fallback: userType=${widget.userType.name}');
             _loadFakeContent();
           }
         },
@@ -299,6 +299,10 @@ class _ContentScreenState extends State<ContentScreen> {
   void _onBodyScroll() {
     if (!_bodyScroll.hasClients) return;
     final pos = _bodyScroll.position;
+    // 6/26: 用户滚到 1/4 处就标记 hasScrolled, "读完啦"按钮才显
+    if (!_hasScrolled && pos.pixels > pos.maxScrollExtent * 0.25) {
+      setState(() => _hasScrolled = true);
+    }
     if (pos.pixels >= pos.maxScrollExtent - 80 && _progress < 100) {
       _writeProgress(100);
       _showCompletionBanner = true;
@@ -580,7 +584,8 @@ class _ContentScreenState extends State<ContentScreen> {
           ),
         ),
       ),
-      floatingActionButton: _hasContent ? _buildCompleteFab(context) : null,
+      // 6/26 Brien 反馈: "还没读就读完了" 误导 → 滚过 1/4 才显"读完啦"按钮
+      floatingActionButton: (_hasContent && _hasScrolled && _progress < 100) ? _buildCompleteFab(context) : null,
     );
   }
 

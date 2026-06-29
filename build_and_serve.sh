@@ -1,6 +1,9 @@
 #!/bin/bash
 # FragmentTime - build + serve script
-# 1) flutter build web (HTML renderer, release)
+# 1) flutter build web (canvaskit renderer, release)
+# 6/28 17:08 Brien 反馈: '点开始不动, 白屏' = Flutter web HTML renderer 在你 chrome/firefox 跑不起来
+# 真凶: HTML renderer 点击事件失效, widget 不响应
+# 修法: 改用 canvaskit renderer (Flutter 3+ 默认), 使用 CanvasKit 代替 DOM
 # 2) 清理 build 残留的 canvaskit/skwasm 目录
 # 3) patch 掉 service worker（HTTP 下注册会失败）
 # 4) 重启 python http server 在 9090
@@ -14,7 +17,7 @@ LOG="/tmp/ft_http.log"
 cd "$PROJECT_DIR"
 
 # 1) build
-echo "=== flutter build web --release --web-renderer html ==="
+echo "=== flutter build web --release (canvaskit default) ==="
 # 默认走本地 Ollama（无需 key）；如需外部 LLM，set LLM_API_KEY + LLM_ENDPOINT 环境变量
 DART_DEFINES="--dart-define=BUILD_MODE=domestic"
 # 6/10 加: 每次 build 注入 BUILD_VERSION = 时间戳短码（让你看 Settings → 版本信息验证拿到最新 build）
@@ -23,10 +26,9 @@ DART_DEFINES="$DART_DEFINES --dart-define=BUILD_VERSION=$BUILD_TS"
 if [ -n "$LLM_API_KEY" ] && [ -n "$LLM_ENDPOINT" ]; then
   DART_DEFINES="$DART_DEFINES --dart-define=LLM_API_KEY=$LLM_API_KEY --dart-define=LLM_ENDPOINT=$LLM_ENDPOINT"
 fi
-"$FLUTTER" build web --release --web-renderer html $DART_DEFINES
+"$FLUTTER" build web --release $DART_DEFINES
 
-# 2) 清 canvaskit/skwasm（HTML renderer 用不到）
-rm -rf build/web/canvaskit build/web/skwasm
+# 2) canvaskit renderer 需要 canvaskit 目录, 不清除
 
 # 2.5) 复制干净 SW 到 build/web (6/25 PWA: HTTPS 下生效, HTTP 下 index.html 跳过注册)
 cp -f /volume1/AI_Jarvis/OpenClaw/workspace/projects/fragment_time_good/web/service-worker.js \
@@ -141,12 +143,58 @@ else:
     print(f"  main.dart.js version already at ?v={VER} or no match")
 PYEOF
 
-# 4) 重启 server
-echo "=== restart http server on 9090 ==="
-ps aux | grep "http.server 9090" | grep -v grep | awk '{print $2}' | xargs -r kill 2>/dev/null
+# 3.4) patch index.html: 加 ?v=<时间戳> 到 flutter_bootstrap.js 引用
+# 真凶: 浏览器 cache 老 flutter_bootstrap.js → 老 ?v= 引用 → 老 main.dart.js
+# 修: index.html 也加 ?v= 强制重新 fetch flutter_bootstrap.js
+echo "=== patch index.html flutter_bootstrap.js ?v= ==="
+VER=$(date +%s)
+sed -i "s|flutter_bootstrap.js\" async|flutter_bootstrap.js?v=$VER\" async|" \
+    /volume1/AI_Jarvis/OpenClaw/workspace/projects/fragment_time_good/build/web/index.html
+echo "  patched index.html flutter_bootstrap.js?v=$VER"
+
+# 3.5) patch flutter_bootstrap.js: 加错误捕获 + onEntrypointLoaded 日志
+# 真凶: Flutter web 在某些 chrome 环境下 init 失败, 但默认静默, 用户看白屏
+# 修: 加 onEntrypointLoaded 回调, 任何 step 失败都显红色块
+echo "=== patch flutter_bootstrap.js with error handler ==="
+node -e "
+const fs = require('fs');
+const path = '/volume1/AI_Jarvis/OpenClaw/workspace/projects/fragment_time_good/build/web/flutter_bootstrap.js';
+let s = fs.readFileSync(path, 'utf-8');
+const marker = '_flutter.loader.load({});';
+if (s.includes(marker) && !s.includes('[bootstrap]')) {
+  const inject = \`
+try {
+  _flutter.loader.load({
+    onEntrypointLoaded: async function(engineInitializer) {
+      console.log('[bootstrap] entrypoint loaded');
+      try {
+        const appRunner = await engineInitializer.initializeEngine();
+        console.log('[bootstrap] engine initialized');
+        await appRunner.runApp();
+        console.log('[bootstrap] app started');
+      } catch (e) {
+        console.error('[bootstrap] init error:', e.message);
+        document.body.innerHTML = '<div style=\"background:red;color:white;padding:30px;font-size:24px;\">Flutter init failed: ' + e.message + '</div>';
+      }
+    },
+  });
+} catch (e) {
+  console.error('[bootstrap] load failed:', e.message);
+  document.body.innerHTML = '<div style=\"background:red;color:white;padding:30px;font-size:24px;\">Flutter load failed: ' + e.message + '</div>';
+}
+\`;
+  s = s.replace(marker, inject);
+  fs.writeFileSync(path, s);
+  console.log('  patched');
+}
+"
+
+# 4) 重启 server (no-cache headers, 绝对路径避免 cwd 依赖)
+echo "=== restart http server on 9090 (no-cache) ==="
+ps aux | grep "http.server 9090\|no_cache_server" | grep -v grep | awk '{print $2}' | xargs -r kill 2>/dev/null
 sleep 1
-cd build/web
-nohup python3 -m http.server 9090 --bind 0.0.0.0 > "$LOG" 2>&1 &
+nohup python3 /volume1/AI_Jarvis/OpenClaw/workspace/projects/fragment_time_good/build/no_cache_server.py 9090 \
+    > "$LOG" 2>&1 &
 disown
 sleep 2
 

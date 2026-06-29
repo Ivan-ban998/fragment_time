@@ -131,59 +131,14 @@ class StreakService {
     return out;
   }
 
-  // 6/24 AI 私教: 启动时生成 1 句鼓励 (今天读的内容 + 时段)
-  // 跟周回顾不同: 不限周日, 每天首次启动都有; 防重 key = today_yyyy-m-d
-  // 失败兜底: 返回一句硬编码的鼓励 (不调 LLM, 不影响性能)
+  // 6/26 Brien 反馈: 删鼓励 (LLM 1.5b 推鼓励也输出完整新闻, 名言已够用, 各角色通用)
+  // 只保留 getDailyQuote
   Future<String> getDailyEncouragement({
     required bool isEn,
     required Future<String> Function(String prompt) llmCall,
   }) async {
-    final prefs = await SharedPreferences.getInstance();
-    final now = DateTime.now();
-    final dayKey = 'encourage_${now.year}-${now.month}-${now.day}';
-    // 防重: 今天的已经生成过, 直接用
-    final cached = prefs.getString(dayKey);
-    if (cached != null && cached.isNotEmpty) return cached;
-
-    // 没生成过: 读今天的历史, 调 LLM
-    final all = await HistoryService.instance.getAll();
-    final today = all.where((h) {
-      final t = DateTime.fromMillisecondsSinceEpoch(h.readAt);
-      return t.year == now.year && t.month == now.month && t.day == now.day;
-    }).toList();
-
-    String prompt;
-    if (today.isEmpty) {
-      // 今天没读: 给开篇鼓励
-      final hour = now.hour;
-      final timeLabel = hour < 12 ? (isEn ? 'morning' : '上午') : hour < 18 ? (isEn ? 'afternoon' : '下午') : (isEn ? 'evening' : '晚上');
-      prompt = isEn
-          ? 'It is $timeLabel. The user just opened the app, no reading today yet. Give ONE short encouraging sentence (max 25 words) in warm tone. Do not say hello, do not use emoji, just the encouragement.'
-          : '现在是$timeLabel，用户刚打开 app，今天还没读。给一句 25 字以内的温暖鼓励，不要问好，不要用 emoji。';
-    } else {
-      // 今天读了: 基于读的标题给鼓励
-      final titles = today.take(3).map((h) => h.title).join(' / ');
-      prompt = isEn
-          ? 'User read these today: $titles. Give ONE short sentence (max 25 words) connecting what they read to action or insight. Warm tone, no emoji.'
-          : '用户今天读了: $titles。给一句 25 字以内的鼓励, 把读的跟行动或洞察连起来, 温暖, 不用 emoji。';
-    }
-
-    String out;
-    try {
-      out = await llmCall(prompt);
-      if (out.isEmpty) throw 'empty';
-    } catch (_) {
-      // 兜底: 硬编码鼓励
-      out = isEn
-          ? (today.isEmpty
-              ? 'A new day, a fresh start. Five minutes is all it takes.'
-              : 'You are building a habit, one small step at a time.')
-          : (today.isEmpty
-              ? '新的一天, 新的开始。5 分钟就够。'
-              : '你正在一点点养成习惯, 已经很棒了。');
-    }
-    await prefs.setString(dayKey, out);
-    return out;
+    // 6/26: fallback — 返回 quote 代替鼓励
+    return getDailyQuote(isEn: isEn, llmCall: llmCall);
   }
 
   // 6/24 v3 亮点: 每日 1 句名言 (按小时选作者, 跟场景色配)
@@ -195,7 +150,7 @@ class StreakService {
   }) async {
     final prefs = await SharedPreferences.getInstance();
     final now = DateTime.now();
-    final dayKey = 'quote_${now.year}-${now.month}-${now.day}';
+    final dayKey = 'quote_v2_${now.year}-${now.month}-${now.day}'; // 6/26: v2 cache 避免老 quote 缓存
     final cached = prefs.getString(dayKey);
     if (cached != null && cached.isNotEmpty) return cached;
 
@@ -213,8 +168,12 @@ class StreakService {
     try {
       out = await llmCall(prompt);
       if (out.isEmpty) throw 'empty';
+      // 6/26 Brien 反馈: LLM 1.5b 推 250 字新闻, 不是 25 字名言 → 超 50 字兑底
+      if (out.length > 50) {
+        throw 'too_long';
+      }
     } catch (_) {
-      // 兑底: 硬编码名訁 (按时段 + 语种)
+      // 兑底: 硬编码名言 (按时段 + 语种)
       final quotes = isEn
           ? ['The impediment to action advances action.', 'We suffer more in imagination than in reality.', 'No man is free who is not master of himself.']
           : ['竹杖芒鞋轻胜马, 谁怕? 一蓑烟雨任平生。', '长风破浪会有时, 直挂云帆济沧海。', '采菊东篱下, 悠然见南山。'];

@@ -6,6 +6,7 @@ import '../services/analytics_service.dart';
 import '../services/time_aware_recommender.dart';
 import '../services/handle_service.dart';
 import 'content_screen.dart';
+import 'loading_screen.dart';
 
 class SceneScreen extends StatefulWidget {
   final UserType userType;
@@ -69,25 +70,43 @@ class _SceneScreenState extends State<SceneScreen> {
     // 6/25 联动昵称: userTypeName 删了 (AppBar + 欢迎语都改用 _handle)
     return Scaffold(
       appBar: AppBar(
+        // 6/27 修: SceneScreen 在首页 Tab 内, 不是独立页 → 不要返回箭头 (6/26 Brien 反馈 12:02)
+        automaticallyImplyLeading: false,
         backgroundColor: GlassStyle.glassAppBarBg,
         foregroundColor: GlassStyle.glassAppBarFg,
         elevation: GlassStyle.glassAppBarElevation,
         title: Text(
           // 6/19 修: 删 userType.icon (IconData 不能跟 String 直接拼接, 6/19 00:16 Brien 反馈 'IconData(U+0E6F2)' bug)
           // 6/25 联动昵称: 用 handle 而不是 userTypeName
-          _handle,
+          // 6/27 修: AppBar 改回 userTypeName (SceneScreen 是选场景页, 该显角色名, 不是只昵称)
+          _getUserTypeName(widget.userType),
           style: TextStyle(fontSize: 18 * _scale),
         ),
-        leading: Material(
-          color: Colors.white.withOpacity(0.6),
-          shape: const CircleBorder(),
-          child: IconButton(
-            icon: Icon(Icons.arrow_back, size: 24 * _scale, color: AppTheme.primary),
-            padding: EdgeInsets.all(12 * _scale),
-            constraints: BoxConstraints.tightFor(width: 48 * _scale, height: 48 * _scale),
-            onPressed: () => Navigator.pop(context),
+        // 6/28 加: 👁 按钮 → LoadingScreen (Brien 6/27 提议"选完兴趣点 → LoadingScreen → SceneScreen")
+        // 6/28 Brien 反馈: 保留为 '强行加载刷新' 入口
+        //   点 LoadingScreen 开始 → 推回 SceneScreen, SceneScreen 调 ContentAggregator 重新拉推荐池
+        actions: [
+          IconButton(
+            tooltip: isEn ? 'Force reload recommendations' : '强制刷新推荐',
+            icon: const Icon(Icons.refresh_outlined),
+            onPressed: () {
+
+              // 6/28 Brien 反馈: 保留 LoadingScreen 作为 '强行刷新' 入口
+              // LoadingScreen 内部 按 '开始' → ForceReloadSignal.notifyReload() + pop
+              // MainHomeScreen._onForceReload 监听到信号后重新拉推荐池
+              Navigator.of(context).push(
+                MaterialPageRoute(
+                  builder: (_) => LoadingScreen(
+                    userTypeName: _getUserTypeName(widget.userType),
+                    isInternational: widget.isInternational,
+                    isElderlyMode: widget.isElderlyMode,
+                    languageCode: widget.languageCode,
+                  ),
+                ),
+              );
+            },
           ),
-        ),
+        ],
       ),
       // 6/14 v5.4: 选场景页背景加白叠
       body: Container(
@@ -308,6 +327,9 @@ class _TimeRecommendBanner extends StatelessWidget {
       case Scene.workout: return isEn ? 'Workout' : '动一动';
     }
   }
+
+  // 6/27 加: AppBar 标题用 (独立于 main.dart 的 _userTypeNameEn/Zh, 避免循环 import)
+  // 6/27 删: SceneScreen 已有 _getUserTypeName, 复用就行
 
   Color _sceneColor(Scene s) {
     switch (s) {

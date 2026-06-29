@@ -8,6 +8,7 @@ import '../theme/app_theme.dart';
 import '../services/analytics_service.dart';
 import '../services/motivation_service.dart';
 import '../services/llm_service.dart';
+import '../services/weekly_recap_service.dart';
 
 class AnalyticsDashboardScreen extends StatefulWidget {
   const AnalyticsDashboardScreen({super.key});
@@ -237,6 +238,7 @@ class _AnalyticsDashboardScreenState extends State<AnalyticsDashboardScreen> {
   }
 
   // 6/10 加: 本周回顾 (看 / 听 / 收藏 / 活跃分钟)
+  // 6/26 Brien 反馈: Sofa 启发, 加 "本周最常看类目" 1 行
   Widget _buildWeeklyRecap() {
     return FutureBuilder<({int watchedArticles, int listenedAudio, int savedCount, int minutesActive})>(
       future: StreakService().getWeeklyRecap(),
@@ -250,6 +252,17 @@ class _AnalyticsDashboardScreenState extends State<AnalyticsDashboardScreen> {
             _stat('听音频', '${r.listenedAudio}'),
             _stat('收藏', '${r.savedCount}'),
             _stat('活跃分钟', '${r.minutesActive}'),
+            // 6/26: Sofa 启发 1 行 — 复用 WeeklyRecapService 拿本周最常看 source
+            FutureBuilder<WeeklyRecap>(
+              future: WeeklyRecapService.instance.generate(useLLM: false),
+              builder: (ctx2, snap2) {
+                if (!snap2.hasData || snap2.data!.perSource.isEmpty) return const SizedBox.shrink();
+                final entries = snap2.data!.perSource.entries.toList()
+                  ..sort((a, b) => b.value.compareTo(a.value));
+                final top = entries.first;
+                return _stat('本周最常看', '${top.key} ×${top.value}');
+              },
+            ),
           ],
         );
       },

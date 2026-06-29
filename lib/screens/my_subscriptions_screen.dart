@@ -40,7 +40,6 @@ class _MySubscriptionsScreenState extends State<MySubscriptionsScreen>
 
   // 6/24 v8: 公开方法, main.dart 切 tab 时调用
   void reload() {
-    debugPrint('[MySubs] reload() called, _items.length=${_items.length}');
     _load();
   }
 
@@ -124,10 +123,10 @@ class _MySubscriptionsScreenState extends State<MySubscriptionsScreen>
           style: TextStyle(fontSize: 18 * scale),
         ),
         actions: [
-          if (_items.isNotEmpty)
-            IconButton(
-              icon: const Icon(Icons.refresh),
-              tooltip: isEn ? 'Refresh' : '刷新',
+          // 6/25 Brien 反馈: 刷新按钮常驻 (之前 _items.isNotEmpty 才显示, 偶发有数量但内容没来时刷不了)
+          IconButton(
+            icon: const Icon(Icons.refresh),
+            tooltip: isEn ? 'Refresh' : '刷新',
               onPressed: _load,
             ),
           // 6/12 加: 收藏包导入/导出
@@ -208,9 +207,9 @@ class _MySubscriptionsScreenState extends State<MySubscriptionsScreen>
   // 6/25 A: 收藏 Tab (内容 / 名言)
   Widget _buildSavedTab(double scale, bool isEn, {bool contentOnly = false, bool quotesOnly = false}) {
     final filtered = contentOnly
-        ? _items.where((it) => !it.id.startsWith('encourage_')).toList()
+        ? _items.where((it) => !it.id.startsWith('quote_')).toList()
         : quotesOnly
-            ? _items.where((it) => it.id.startsWith('encourage_')).toList()
+            ? _items.where((it) => it.id.startsWith('quote_')).toList()
             : _items;
 
     if (_loading) {

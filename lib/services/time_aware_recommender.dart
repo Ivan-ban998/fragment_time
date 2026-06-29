@@ -13,32 +13,59 @@ class TimeRecommendation {
 class TimeAwareRecommender {
   /// 根据当前时间 + 当前用户角色返回推荐
   /// 6/25 修 bug: 之前只硬编码 6 种 userType 不看当前选择, 用户选上班族也会推荐学生党
+  /// 6/26 Brien 反馈: scene 跟 userType 不联动, 上班族上午推 "学点东西" 违和 → 按 userType 选场景
   static TimeRecommendation recommendAt(DateTime now, {UserType? currentUserType}) {
     final h = now.hour;
     final ut = currentUserType ?? UserType.student;
     final name = _userTypeNameZh(ut);
 
-    // 根据时间推荐场景 (不强制 userType, 用当前选的角色名拼接)
+    // 6/26: 按 userType 选时段场景
+    // - 学生/小朋友/宝爸宝妈 → learn (学习场景)
+    // - 上班族/创业者 → listen (资讯/通勤)
+    // - 退休人群 → relax (慢节奏)
+    bool preferLearn() => ut == UserType.student || ut == UserType.child || ut == UserType.parent;
+    bool preferListen() => ut == UserType.officeWorker || ut == UserType.entrepreneur;
+    bool preferRelax() => ut == UserType.senior;
+
+    // 根据时间推荐场景
     Scene scene;
     String label;
     if (h >= 7 && h < 9) {
-      scene = Scene.listen; // 早间通勤听
-      label = '$name - 听一听';
+      // 早间: 通勤
+      if (preferRelax()) {
+        scene = Scene.relax; label = '$name - 放松一下';
+      } else {
+        scene = Scene.listen; label = '$name - 听一听';
+      }
     } else if (h >= 9 && h < 12) {
-      scene = Scene.learn; // 上午学习
-      label = '$name - 学点东西';
+      // 上午
+      if (preferListen()) {
+        scene = Scene.listen; label = '$name - 听一听';
+      } else if (preferRelax()) {
+        scene = Scene.relax; label = '$name - 放松一下';
+      } else {
+        scene = Scene.learn; label = '$name - 学点东西';
+      }
     } else if (h >= 12 && h < 14) {
-      scene = Scene.relax; // 午休放松
-      label = '$name - 放松一下';
+      scene = Scene.relax; label = '$name - 放松一下';
     } else if (h >= 14 && h < 18) {
-      scene = Scene.learn; // 下午继续学
-      label = '$name - 学点东西';
+      // 下午
+      if (preferListen()) {
+        scene = Scene.listen; label = '$name - 听一听';
+      } else if (preferRelax()) {
+        scene = Scene.relax; label = '$name - 放松一下';
+      } else {
+        scene = Scene.learn; label = '$name - 学点东西';
+      }
     } else if (h >= 18 && h < 21) {
-      scene = Scene.listen; // 下班通勤听
-      label = '$name - 听一听';
+      // 下班通勤
+      if (preferRelax()) {
+        scene = Scene.relax; label = '$name - 放松一下';
+      } else {
+        scene = Scene.listen; label = '$name - 听一听';
+      }
     } else {
-      scene = Scene.relax; // 夜深放松
-      label = '$name - 放松一下';
+      scene = Scene.relax; label = '$name - 放松一下';
     }
     return TimeRecommendation(ut, scene, label);
   }
