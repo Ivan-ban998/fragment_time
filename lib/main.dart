@@ -38,6 +38,7 @@ import 'services/news_service.dart';
 import 'services/llm_service.dart';
 import 'screens/content_reader_screen.dart';
 import 'screens/ai_assistant_screen.dart';
+import 'screens/ai_tab_screen.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
 /// 6/14 v4 公开跨屏导航入口:content_screen "去搜索" 按钣直接调
@@ -792,7 +793,9 @@ class _MainHomeScreenState extends State<MainHomeScreen> {
           IndexedStack(
             index: _selectedIndex,
             children: [
-              // 6/24 v12: Tab 0 — 已选角色 → SceneScreen (顶推荐 + 4 场景), 未选 → UserTypeScreen
+              // 6/30 00:15: Tab 0 — AI 助手 (头像+按钮+chip 行, 点按钮弹 chat sheet)
+              const AiTabScreen(),
+              // 6/24 v12: Tab 1 — 原 Tab 0, SceneScreen / UserTypeScreen
               _Tab0Switcher(
                 selectedUserType: _selectedUserType,
                 config: config,
@@ -955,16 +958,17 @@ class _MainHomeScreenState extends State<MainHomeScreen> {
               decoration: GlassStyle.glassCapsule(),
               child: Row(
                 children: [
-                  _buildNavItem(0, Icons.home_outlined, Icons.home, isEn ? 'Home' : '首页'),
-                  _buildNavItem(1, Icons.search_outlined, Icons.search, isEn ? 'Search' : '搜索'),
+                  _buildNavItem(0, Icons.support_agent_outlined, Icons.support_agent, isEn ? 'AI' : 'AI'),
+                  _buildNavItem(1, Icons.home_outlined, Icons.home, isEn ? 'Home' : '场景'),
+                  _buildNavItem(2, Icons.search_outlined, Icons.search, isEn ? 'Search' : '搜索'),
                   _buildNavItem(
-                    2,
+                    3,
                     Icons.bookmark_outline,
                     Icons.bookmark,
                     isEn ? 'Saved' : '收藏',
                     badge: _subscriptionCount,
                   ),
-                  _buildNavItem(3, Icons.settings_outlined, Icons.settings, isEn ? 'Settings' : '设置'),
+                  _buildNavItem(4, Icons.settings_outlined, Icons.settings, isEn ? 'Settings' : '设置'),
                 ],
               ),
             ),

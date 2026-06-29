@@ -8,7 +8,6 @@ import '../services/handle_service.dart';
 import 'content_screen.dart';
 import 'loading_screen.dart';
 import 'ai_assistant_screen.dart';
-import '../widgets/ai_floating_button.dart';
 
 class SceneScreen extends StatefulWidget {
   final UserType userType;
@@ -112,24 +111,7 @@ class _SceneScreenState extends State<SceneScreen> {
         ],
       ),
       // 6/29 段 1: AI 助手悬浮气泡
-      // 段 2: onTap 接 chat sheet (静态版)
-      floatingActionButton: AiFloatingButton(
-        isElderlyMode: widget.isElderlyMode,
-        onTap: () {
-          showModalBottomSheet(
-            context: context,
-            isScrollControlled: true,
-            backgroundColor: Colors.transparent,
-            // 6/29 10:42 Brien 反馈: sheet 跳起来后主屏 25% 露出来, banner 重叠 — 加 barrierColor 调暗主屏
-            barrierColor: Colors.black54,
-            builder: (_) => AiAssistantScreen(
-              isEn: widget.isInternational,
-              isElderlyMode: widget.isElderlyMode,
-              userTypeName: _getUserTypeName(widget.userType),
-            ),
-          );
-        },
-      ),
+      // 6/30 00:15: AI 助手挪到 Tab 0 (AiTabScreen), SceneScreen 不再需要 floatingActionButton
       // 6/14 v5.4: 选场景页背景加白叠
       body: Container(
         decoration: BoxDecoration(

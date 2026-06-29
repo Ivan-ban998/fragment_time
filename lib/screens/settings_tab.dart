@@ -6,6 +6,7 @@ import '../models/models.dart';
 import '../theme/app_theme.dart';
 import '../services/motivation_service.dart';
 import '../services/handle_service.dart';
+import '../services/robot_name_service.dart';
 import '../services/theme_preference_service.dart';
 import '../services/weekly_recap_service.dart';
 import '../services/pack_io_helpers.dart';
@@ -79,6 +80,41 @@ class SettingsTab extends StatelessWidget {
       if (context.mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(content: Text(isEn ? 'Handle saved' : 'handle 已保存')),
+        );
+      }
+    }
+  }
+
+  // 6/30 00:20: 编辑 AI 机器人昵称 dialog
+  Future<void> _showRobotNameDialog(BuildContext context, String current, bool isEn) async {
+    final initial = (current == RobotNameService.defaultRobotName || current.isEmpty) ? '' : current;
+    final ctrl = TextEditingController(text: initial);
+    final result = await showDialog<String>(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        title: Text(isEn ? 'AI Robot Name' : 'AI 机器人昵称'),
+        content: TextField(
+          controller: ctrl,
+          decoration: InputDecoration(
+            labelText: isEn ? 'name' : '昵称',
+            hintText: isEn ? 'Your AI assistant name' : '你的 AI 助手叫什么',
+          ),
+          autofocus: true,
+        ),
+        actions: [
+          TextButton(onPressed: () => Navigator.pop(ctx), child: Text(isEn ? 'Cancel' : '取消')),
+          FilledButton(
+            onPressed: () => Navigator.pop(ctx, ctrl.text.trim()),
+            child: Text(isEn ? 'Save' : '保存'),
+          ),
+        ],
+      ),
+    );
+    if (result != null) {
+      await RobotNameService().set(result);
+      if (context.mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text(isEn ? 'AI name saved' : 'AI 昵称已保存')),
         );
       }
     }
@@ -335,6 +371,20 @@ class SettingsTab extends StatelessWidget {
                       subtitle: Text(h, style: TextStyle(fontSize: 13 * scale, color: AppTheme.primary)),
                       trailing: Icon(Icons.edit, size: 18 * scale),
                       onTap: () => _showHandleDialog(context, h, isEn),
+                    );
+                  },
+                ),
+                // 6/30 00:20: AI 机器人昵称 (Tab 0 显示用)
+                Divider(height: 1),
+                ValueListenableBuilder<String>(
+                  valueListenable: RobotNameService.notifier,
+                  builder: (ctx, name, _) {
+                    return ListTile(
+                      leading: Icon(Icons.smart_toy_outlined, size: 24 * scale),
+                      title: Text(isEn ? 'AI Robot Name' : 'AI 机器人昵称', style: TextStyle(fontSize: 16 * scale)),
+                      subtitle: Text(name, style: TextStyle(fontSize: 13 * scale, color: AppTheme.primary)),
+                      trailing: Icon(Icons.edit, size: 18 * scale),
+                      onTap: () => _showRobotNameDialog(context, name, isEn),
                     );
                   },
                 ),
