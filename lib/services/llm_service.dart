@@ -187,6 +187,57 @@ class LlmService {
     }
   }
 
+  // 6/29: 通用聊天流式接口 — AI 助手用
+  // messages = [{'role': 'system'|'user'|'assistant', 'content': '...'}, ...]
+  static Stream<String> chatStream({
+    required List<Map<String, String>> messages,
+    int numPredict = 400,
+  }) async* {
+    final useRemote = _apiKey.isNotEmpty && _remoteEndpoint.isNotEmpty;
+    final endpoint = useRemote ? _remoteEndpoint : _ollamaEndpoint;
+    final model = useRemote ? 'MiniMax-M2.7' : _model;
+    final headers = {'Content-Type': 'application/json'};
+    if (useRemote) headers['Authorization'] = 'Bearer $_apiKey';
+
+    final body = useRemote
+        ? {
+            'model': model,
+            'stream': true,
+            'messages': messages,
+            'temperature': 0.7,
+            'max_tokens': numPredict,
+          }
+        : {
+            'model': model,
+            'stream': true,
+            'messages': messages,
+            'options': {'temperature': 0.7, 'num_predict': numPredict},
+            'keep_alive': '10m',
+          };
+
+    try {
+      final request = http.Request('POST', Uri.parse(endpoint));
+      request.headers.addAll(headers);
+      request.body = jsonEncode(body);
+      final response = await request.send().timeout(const Duration(seconds: 60));
+      if (response.statusCode != 200) {
+        yield '(LLM unavailable)';
+        return;
+      }
+      await for (final chunk in response.stream.transform(utf8.decoder).transform(const LineSplitter())) {
+        if (chunk.isEmpty) continue;
+        try {
+          final json = jsonDecode(chunk) as Map<String, dynamic>;
+          final msg = json['message'] as Map<String, dynamic>?;
+          final content = msg?['content'] as String?;
+          if (content != null && content.isNotEmpty) yield content;
+        } catch (_) {}
+      }
+    } catch (e) {
+      yield '(LLM error: $e)';
+    }
+  }
+
   static String _buildSystemPrompt(UserType userType, String languageCode, {String? prefSummary}) {
     final isEn = languageCode == 'en';
     // 6/13 偏好拼进 system prompt

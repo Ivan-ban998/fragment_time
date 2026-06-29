@@ -1,10 +1,14 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/foundation.dart';
 import 'package:shared_preferences/shared_preferences.dart';
-// ignore: avoid_web_libraries_in_flutter
-import 'dart:js' as js;
 import 'dart:async';
 import 'dart:ui';
+// 6/29: web-only dart:js 平台实现走条件 import
+import 'web_helpers_stub.dart'
+    if (dart.library.js) 'web_helpers_web.dart';
+// re-export 让 loading_screen.dart 用 appMain.webForceReload() 不用改
+export 'web_helpers_stub.dart'
+    if (dart.library.js) 'web_helpers_web.dart';
 import 'models/models.dart';
 import 'theme/app_theme.dart';
 import 'theme/glass_decoration.dart';
@@ -33,6 +37,7 @@ import 'screens/about_screen.dart';
 import 'services/news_service.dart';
 import 'services/llm_service.dart';
 import 'screens/content_reader_screen.dart';
+import 'screens/ai_assistant_screen.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
 /// 6/14 v4 公开跨屏导航入口:content_screen "去搜索" 按钣直接调
@@ -70,31 +75,8 @@ void hideWelcomeScreenFromOutside() {
 }
 
 // 6/28 16:11 Brien 反馈: '点开始不能强刷' (3 次反馈, 终于懂了)
-// 修: LoadingScreen '开始' 按了直接调 webReloadPage() 真强刷整个页面
-// 真强刷必须用 window.location.reload(true), 不带 true 浏览器会可能用 cache
-// 实现: dart:js 调 js.context.callMethod('reload', [true])
-void webReloadPage() {
-  try {
-    js.context.callMethod('reload', [true]);
-  } catch (e) {
-    debugPrint('webReloadPage 失败: $e');
-    // 兑底: 不带 true 再试
-    try {
-      js.context.callMethod('reload');
-    } catch (_) {}
-  }
-}
-
-// 6/28: 点击事件里跳转 = 浏览器原生 reload (chrome 拒绝被动 reload)
-void webForceReload() {
-  try {
-    js.context['location']['href'] = '/?refreshed=1';
-  } catch (e) {
-    debugPrint('webForceReload 失败: $e');
-    // 兑底用 reload
-    webReloadPage();
-  }
-}
+// webReloadPage / webForceReload 实现挪到 lib/web_helpers_web.dart (web-only),
+// 6/29 抽出来是为了 android APK build 也能编 (dart:js 是 web-only API)
 
 // 6/11 puppeteer E2E: 设 true 开启 dev=reader&userType=...&scene=...&autoQuiz=1 深链
 // 验证完设回 false 走正常 home
@@ -412,7 +394,8 @@ class _MainHomeScreenState extends State<MainHomeScreen> {
 
   // 6/26 Brien 反馈: 名言对各角色通用, 删掉鼓励字段
   String? _dailyQuote; // 每日名言 — banner 唯一内容
-  String _handle = HandleService.defaultHandle; // 6/25 昵称扩展: 从 HandleService 加载
+  String _handle = HandleService.defaultHandle; // 6/25 昵称扩展: 从 HandleService 传入
+  bool _quoteLoading = false; // 6/29: 防止点 "下一个" 按钮时双击
 
   Future<void> _loadDailyQuote() async {
     try {
@@ -454,6 +437,17 @@ class _MainHomeScreenState extends State<MainHomeScreen> {
         _dailyQuote = fallback;
       });
     }
+  }
+
+  // 6/29 10:59: 简化 — 不调 LLM, 走 hardcoded 池 (快)
+  void _loadNextQuote() {
+    if (_quoteLoading) return;
+    if (!mounted) return;
+    setState(() {
+      _quoteLoading = true;
+      _dailyQuote = _streakService.getRandomQuoteSync(isEn: isEn);
+      _quoteLoading = false;
+    });
   }
 
   // 6/24 AI 私教: 调用 LLM 生成本周总结 (周日 20:00 之后 + 本周未生成)
@@ -884,20 +878,61 @@ class _MainHomeScreenState extends State<MainHomeScreen> {
           // 6/26 Brien 反馈: 恢复 banner, 只显示 1 句名言
           if (_selectedIndex == 0 && _dailyQuote != null && !_showWelcome && !_showOnboarding && _selectedUserType != null)
             Positioned(
-              top: 0,
+              // 6/29 10:38 Brien 反馈: banner 跟 AppBar 挤了 — top 0 跟 AppBar 重叠
+              // 修: top = AppBar toolbarHeight + status bar (MediaQuery padding.top)
+              // 老人模式 AppBar 默认 56×1.3 ≈ 72
+              top: (_isElderlyMode ? 72 : 56) + MediaQuery.of(context).padding.top,
               left: 0,
               right: 0,
-              child: SafeArea(
-                child: _DailyEncouragementBanner(
-                  text: '',
-                  quote: _dailyQuote,
-                  isEn: isEn,
-                  isElderlyMode: _isElderlyMode,
-                  handle: _handle,
-                  onTapDetail: _showQuoteDetailSheet,
-                ),
+              child: _DailyEncouragementBanner(
+                text: '',
+                quote: _dailyQuote,
+                isEn: isEn,
+                isElderlyMode: _isElderlyMode,
+                handle: _handle,
+                onTapDetail: _showQuoteDetailSheet,
+                onNextQuote: _loadNextQuote, // 6/29: 点 "下一个" 按钮
               ),
             ),
+            // 6/29 10:54 Brien 反馈: ↻ 按钮从 banner 内挪到外, 放在 64dp 空白区
+            // top 对齐 banner 顶部 (80 老人 96), right 距屏边 8
+            if (_dailyQuote != null && !_showWelcome && !_showOnboarding && _selectedUserType != null && _selectedIndex == 0)
+              Positioned(
+                top: (_isElderlyMode ? 72 : 56) + MediaQuery.of(context).padding.top + 4,
+                right: 8,
+                child: Material(
+                  color: Colors.transparent,
+                  child: InkWell(
+                    onTap: _quoteLoading ? null : _loadNextQuote,
+                    borderRadius: BorderRadius.circular(20),
+                    child: Container(
+                      width: _isElderlyMode ? 44 : 36,
+                      height: _isElderlyMode ? 44 : 36,
+                      decoration: BoxDecoration(
+                        color: const Color(0xFF7C5CFC).withOpacity(0.12),
+                        shape: BoxShape.circle,
+                        border: Border.all(
+                          color: const Color(0xFF7C5CFC).withOpacity(0.4),
+                          width: 1,
+                        ),
+                      ),
+                      child: _quoteLoading
+                          ? const Padding(
+                              padding: EdgeInsets.all(8),
+                              child: CircularProgressIndicator(
+                                strokeWidth: 2,
+                                color: Color(0xFF7C5CFC),
+                              ),
+                            )
+                          : Icon(
+                              Icons.shuffle, // 6/29 10:57: 区别于 AppBar 绿色 ↻ (Icons.refresh_outlined)
+                              size: _isElderlyMode ? 22 : 18,
+                              color: const Color(0xFF7C5CFC),
+                            ),
+                    ),
+                  ),
+                ),
+              ),
         ],
       ),
       bottomNavigationBar: (_showWelcome || _showOnboarding || _selectedUserType == null)
@@ -1137,6 +1172,7 @@ class _DailyEncouragementBanner extends StatefulWidget {
   final bool isElderlyMode;
   final String handle; // 6/25: 昵称 (从 HandleService 传入)
   final VoidCallback onTapDetail; // 6/24 v13: 点 banner 弹相关推荐
+  final VoidCallback? onNextQuote; // 6/29: 点 "下一个" 按钮
   const _DailyEncouragementBanner({
     required this.text,
     this.quote,
@@ -1144,6 +1180,7 @@ class _DailyEncouragementBanner extends StatefulWidget {
     required this.isElderlyMode,
     required this.handle,
     required this.onTapDetail,
+    this.onNextQuote,
   });
 
   @override
@@ -1323,6 +1360,9 @@ class _DailyEncouragementBannerState extends State<_DailyEncouragementBanner> {
                           ),
                   ),
                 ),
+                // 6/29 10:49 改为: "下一个名言" 按钮挪到 banner 外, 放 64dp 空白处
+                // (banner 让给 AppBar actions 的 64dp 区域)
+                // 见 main.dart Stack 里的 _NextQuoteFab Positioned
               ],
             ),
           ],
@@ -1453,10 +1493,39 @@ class _QuoteDetailSheet extends StatelessWidget {
             Row(children: [
               const Icon(Icons.auto_awesome, color: Color(0xFF7C5CFC), size: 20),
               const SizedBox(width: 8),
-              Text(
-                isEn ? 'Related to today' : '今天的相关内容',
-                style: const TextStyle(fontSize: 18, fontWeight: FontWeight.w700),
+              Expanded(
+                child: Text(
+                  isEn ? 'Related to today' : '今天的相关内容',
+                  style: const TextStyle(fontSize: 18, fontWeight: FontWeight.w700),
+                ),
               ),
+              // 6/29 段 4: quote 联动 AI 助手 — 点 "问 AI" 关 sheet + 弹 AiAssistantScreen, 带 quote context
+              if (quote != null)
+                TextButton.icon(
+                  onPressed: () {
+                    Navigator.of(context).pop(); // 关 quote detail sheet
+                    showModalBottomSheet(
+                      context: context,
+                      isScrollControlled: true,
+                      backgroundColor: Colors.transparent,
+                      barrierColor: Colors.black54,
+                      builder: (_) => AiAssistantScreen(
+                        isEn: isEn,
+                        isElderlyMode: false, // quote sheet 拿不到 MainHomeScreen isElderlyMode, 兑底 false
+                        userTypeName: 'you', // 兑底
+                        contextQuote: quote,
+                      ),
+                    );
+                  },
+                  icon: const Icon(Icons.support_agent, color: Color(0xFF7C5CFC), size: 18),
+                  label: Text(
+                    isEn ? 'Ask AI' : '问 AI',
+                    style: const TextStyle(
+                      color: Color(0xFF7C5CFC),
+                      fontWeight: FontWeight.w600,
+                    ),
+                  ),
+                ),
             ]),
             const SizedBox(height: 8),
             // 6/26: 删鼓励文本

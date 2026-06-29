@@ -184,6 +184,43 @@ class StreakService {
     return out;
   }
 
+  // 6/29 10:59: 随机名言 — 8s LLM 慢, Brien 反馈 "一直转"
+  // 修: 不调 LLM, 直接走 hardcoded 池 (7b 冷启动 12-20s, 完 5 名言池够用)
+  // 未来 P2: 预热 LLM 后台写 cache, 按钮拿 cache
+  String getRandomQuoteSync({
+    required bool isEn,
+  }) {
+    final now = DateTime.now();
+    final pool = isEn
+        ? [
+            'The impediment to action advances action. — Marcus Aurelius',
+            'We suffer more in imagination than in reality. — Seneca',
+            'No man is free who is not master of himself. — Epictetus',
+            'What we do in life echoes in eternity. — Marcus Aurelius',
+            'Waste no more time arguing what a good man should be. Be one. — Marcus Aurelius',
+            'The only true wisdom is in knowing you know nothing. — Socrates',
+            'It is not death that a man should fear, but he should fear never beginning to live. — Marcus Aurelius',
+          ]
+        : [
+            '竹杖芒鞋轻胜马, 谁怕? 一蓑烟雨任平生。',
+            '长风破浪会有时, 直挂云帆济沧海。',
+            '采菊东篱下, 悠然见南山。',
+            '行到水穷处, 坐看云起时。',
+            '不畏浮云遮望眼, 自缘身在最高层。',
+            '会当凌绝顶, 一览众山小。',
+            '海纳百川, 有容乃大; 壁立千仞, 无欲则刚。',
+          ];
+    return pool[now.second % pool.length];
+  }
+
+  // 保留 async 接口兼容 (未来 LLM 接入点)
+  Future<String> getRandomQuote({
+    required bool isEn,
+    Future<String> Function(String prompt)? llmCall,
+  }) async {
+    return getRandomQuoteSync(isEn: isEn);
+  }
+
   // 给 streak +1 后的 milestone popup
   Future<({int streak, String? justUnlocked})> checkJustUnlocked(bool isEn, int prevStreak) async {
     final cur = await getStreakCount();

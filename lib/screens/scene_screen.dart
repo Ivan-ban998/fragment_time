@@ -7,6 +7,8 @@ import '../services/time_aware_recommender.dart';
 import '../services/handle_service.dart';
 import 'content_screen.dart';
 import 'loading_screen.dart';
+import 'ai_assistant_screen.dart';
+import '../widgets/ai_floating_button.dart';
 
 class SceneScreen extends StatefulWidget {
   final UserType userType;
@@ -88,7 +90,8 @@ class _SceneScreenState extends State<SceneScreen> {
         actions: [
           IconButton(
             tooltip: isEn ? 'Force reload recommendations' : '强制刷新推荐',
-            icon: const Icon(Icons.refresh_outlined),
+            // 6/29 11:15: 区别于 banner 旁边的紫色 shuffle 按钮 (换名言), 改图标避免跟 “刷”重
+            icon: const Icon(Icons.restart_alt),
             onPressed: () {
 
               // 6/28 Brien 反馈: 保留 LoadingScreen 作为 '强行刷新' 入口
@@ -108,6 +111,25 @@ class _SceneScreenState extends State<SceneScreen> {
           ),
         ],
       ),
+      // 6/29 段 1: AI 助手悬浮气泡
+      // 段 2: onTap 接 chat sheet (静态版)
+      floatingActionButton: AiFloatingButton(
+        isElderlyMode: widget.isElderlyMode,
+        onTap: () {
+          showModalBottomSheet(
+            context: context,
+            isScrollControlled: true,
+            backgroundColor: Colors.transparent,
+            // 6/29 10:42 Brien 反馈: sheet 跳起来后主屏 25% 露出来, banner 重叠 — 加 barrierColor 调暗主屏
+            barrierColor: Colors.black54,
+            builder: (_) => AiAssistantScreen(
+              isEn: widget.isInternational,
+              isElderlyMode: widget.isElderlyMode,
+              userTypeName: _getUserTypeName(widget.userType),
+            ),
+          );
+        },
+      ),
       // 6/14 v5.4: 选场景页背景加白叠
       body: Container(
         decoration: BoxDecoration(
@@ -115,7 +137,8 @@ class _SceneScreenState extends State<SceneScreen> {
         ),
         child: SafeArea(
         child: Padding(
-          padding: EdgeInsets.all(20 * _scale),
+          // 6/29 10:44 Brien 反馈: banner 跟 4 场景卡顶部重叠 — top 加 60 给 banner 让位
+          padding: EdgeInsets.fromLTRB(20 * _scale, 60, 20 * _scale, 20 * _scale),
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
