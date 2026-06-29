@@ -1,11 +1,13 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/foundation.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 import 'dart:async';
 import 'dart:convert';
 import '../theme/glass_decoration.dart';
 import '../services/llm_service.dart';
 import '../services/news_service.dart';
 import '../services/audio_play_service.dart';
+import '../services/tts_service.dart';
 import '../models/models.dart';
 import 'content_reader_screen.dart';
 import 'package:url_launcher/url_launcher.dart';
@@ -37,11 +39,64 @@ class _AiAssistantScreenState extends State<AiAssistantScreen> {
   final _controller = TextEditingController();
   final _scrollController = ScrollController();
   final List<_ChatMessage> _messages = [];
+  static const _historyKey = 'ai_chat_history_v1';
+  static const _maxHistory = 30; // 保留最近 30 条
 
   @override
   void initState() {
     super.initState();
-    // 段 4: 收到 contextQuote 时, 注入欢迎语
+    _loadHistory();
+  }
+
+  // 6/29 16:09 Brien 反馈: 关 sheet 重开, 聊天记录丢了
+  // 修: SharedPreferences 存最近 30 条消息 (JSON), initState 加载
+  Future<void> _loadHistory() async {
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      final raw = prefs.getString(_historyKey);
+      if (raw == null || raw.isEmpty) {
+        _addWelcome();
+        return;
+      }
+      final list = jsonDecode(raw) as List<dynamic>;
+      if (list.isEmpty) {
+        _addWelcome();
+        return;
+      }
+      setState(() {
+        _messages.clear();
+        for (final m in list) {
+          final entry = m as Map<String, dynamic>;
+          // 6/29 16:23: 复原 cards 字段
+          final cardsJson = entry['cards'] as List<dynamic>?;
+          List<_ContentCard>? cards;
+          if (cardsJson != null) {
+            cards = cardsJson.map((c) {
+              final cm = c as Map<String, dynamic>;
+              return _ContentCard(
+                title: cm['title'] as String? ?? '',
+                type: cm['type'] as String? ?? 'article',
+                source: cm['source'] as String? ?? '',
+                duration: cm['duration'] as String? ?? '',
+                url: cm['url'] as String? ?? '',
+                audioUrl: cm['audioUrl'] as String?,
+                realItem: null, // realItem 不存 (构造太重)
+              );
+            }).toList();
+          }
+          _messages.add(_ChatMessage(
+            text: entry['text'] as String? ?? '',
+            isUser: entry['isUser'] as bool? ?? false,
+            cards: cards,
+          ));
+        }
+      });
+    } catch (_) {
+      _addWelcome();
+    }
+  }
+
+  void _addWelcome() {
     if (widget.contextQuote != null) {
       _messages.add(_ChatMessage(
         text: widget.isEn
@@ -59,48 +114,187 @@ class _AiAssistantScreenState extends State<AiAssistantScreen> {
     }
   }
 
+  // 6/29 16:09: 保存聊天历史到 prefs (最近 30 条)
+  Timer? _saveDebounce;
+  void _scheduleSave() {
+    _saveDebounce?.cancel();
+    _saveDebounce = Timer(const Duration(seconds: 1), _saveHistory);
+  }
+
+  Future<void> _saveHistory() async {
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      final recent = _messages.length > _maxHistory
+          ? _messages.sublist(_messages.length - _maxHistory)
+          : _messages;
+      final list = recent.map((m) {
+        // 6/29 16:23: 存 cards (audioUrl + url + 标题等), realItem 不存
+        final cardsJson = m.cards?.map((c) => {
+          'title': c.title,
+          'type': c.type,
+          'source': c.source,
+          'duration': c.duration,
+          'url': c.url,
+          'audioUrl': c.audioUrl,
+        }).toList();
+        return {
+          'text': m.text,
+          'isUser': m.isUser,
+          if (cardsJson != null) 'cards': cardsJson,
+        };
+      }).toList();
+      await prefs.setString(_historyKey, jsonEncode(list));
+    } catch (_) {}
+  }
+
   @override
   void dispose() {
     _streamTimer?.cancel();
+    _saveDebounce?.cancel();
+    _saveHistory(); // 6/29 16:09: 保险存盘 (关 sheet)
     _controller.dispose();
     _scrollController.dispose();
     super.dispose();
   }
 
   Timer? _streamTimer;
+  bool _sending = false; // 6/29 17:05: 防双击
+
+  // 6/29 16:59: 快捷选项卡 — 6 个一键选项, 直接走硬编码真 title (不调 LLM, 免 30s+ 慢)
+  // 6/29 17:05: chip 跳过 LLM, 直接 add 真 card, 0 慢
+  // 6/29 20:28: 扩到 25 个 — 覆盖 24 桶 6 userType×4 scene 80% 场景, 0 LLM 0 钱 0 token
+  static const _quickPrompts = <_QuickPrompt>[
+    _QuickPrompt('🇬🇧', 'BBC 英语', 'BBC 6 Minute English', 'audio'),
+    _QuickPrompt('🎧', '新概念英语', '新概念英语：5 分钟一段', 'audio'),
+    _QuickPrompt('🧘', '5 分钟冥想', '5 分钟办公室冥想', 'audio'),
+    _QuickPrompt('🌿', '白噪音', '课间 5 分钟：白噪音 + 闭眼', 'audio'),
+    _QuickPrompt('📰', '今日新闻', '得到头条：5 分钟', 'audio'),
+    _QuickPrompt('💼', '哈佛商业', '哈佛商业评论：5 分钟', 'audio'),
+    _QuickPrompt('📚', '樊登读书', '樊登读书：5 分钟', 'audio'),
+    _QuickPrompt('🎓', '睡前英语', '睡前英语故事：5 分钟', 'audio'),
+    _QuickPrompt('🔬', '今日科普', '今日科普：3 个奇闻', 'audio'),
+    _QuickPrompt('🏛', '中学古诗', '中学必背古诗：5 首', 'audio'),
+    _QuickPrompt('📊', 'OKR 入门', '5 分钟读懂：OKR 和 KPI 的区别', 'card'),
+    _QuickPrompt('🧠', '深度工作', '深度工作法：5 分钟入门', 'article'),
+    _QuickPrompt('💰', '谈加薪', '怎么跟老板谈加薪？3 步走', 'article'),
+    _QuickPrompt('🏆', '精益创业', '5 分钟读懂：精益创业 MVP', 'card'),
+    _QuickPrompt('📈', '增长黑客', '5 分钟读懂：增长黑客', 'article'),
+    _QuickPrompt('👨‍👩‍👧', '正面管教', '5 分钟读懂：正面管教', 'article'),
+    _QuickPrompt('👨‍👦', '孩子磨蹭', '孩子写作业磨蹭？3 步搞定', 'article'),
+    _QuickPrompt('🏃', '跑步热身', '跑步前后：5 分钟热身', 'video'),
+    _QuickPrompt('💪', '眼保健操', '课间 5 分钟：眼保健操 + 拉伸', 'video'),
+    _QuickPrompt('😴', '考前放空', '考前 5 分钟放空练习', 'article'),
+    _QuickPrompt('🍅', '番茄钟', '番茄钟：学 25 休 5', 'card'),
+    _QuickPrompt('📐', '物理入门', '物理入门：牛顿 3 大定律', 'article'),
+    _QuickPrompt('🏛', '历史今天', '历史：今天发生了什么？', 'card'),
+    _QuickPrompt('🌙', '凌晨冥想', '凌晨 3 点 5 分钟：CEO 冥想', 'audio'),
+    _QuickPrompt('🌅', '会议拉伸', '会议室后 5 分钟：拉伸', 'video'),
+  ];
+
+  // 6/29 17:05: chip 渲染流程 — 加用户消息 + 调 NewsService.search 加 card (不走 LLM)
+  Future<void> _sendQuick(_QuickPrompt prompt) async {
+    if (_sending) return; // 6/29 17:05: 防双击
+    _sending = true;
+    setState(() {
+      _messages.add(_ChatMessage(text: prompt.label, isUser: true));
+    });
+    _scheduleSave();
+    // 6/29 17:05: 直接调 NewsService.search 拿真 ContentItem
+    ContentItem? realItem;
+    try {
+      final hits = await NewsService().search(prompt.realTitle);
+      if (hits.isNotEmpty) {
+        realItem = hits.firstWhere(
+          (it) => _matchType(it.contentType, prompt.type),
+          orElse: () => hits.first,
+        );
+      }
+    } catch (_) {}
+    if (!mounted) return;
+    _sending = false; // 6/29 20:16: chip 路径不调 LLM, await 完就释放
+    if (realItem == null) {
+      setState(() {
+        _messages.add(_ChatMessage(
+          text: widget.isEn
+              ? 'No library match for "${prompt.realTitle}".'
+              : '库里没有 "${prompt.realTitle}" 的匹配。',
+          isUser: false,
+        ));
+      });
+      _scheduleSave();
+      return;
+    }
+    setState(() {
+      _messages.add(_ChatMessage(
+        text: widget.isEn ? 'Here you go:' : '为你找到:',
+        isUser: false,
+        cards: [_ContentCard(
+          title: realItem!.title,
+          type: prompt.type,
+          source: realItem.source,
+          duration: realItem.duration,
+          url: realItem.externalUrl ?? '',
+          audioUrl: realItem.audioUrl,
+          realItem: realItem,
+        )],
+      ));
+    });
+    _scheduleSave();
+  }
 
   void _send() {
+    if (_sending) return; // 6/29 17:05: 防双击
     final text = _controller.text.trim();
     if (text.isEmpty) return;
+    _sending = true;
     setState(() {
       _messages.add(_ChatMessage(text: text, isUser: true));
       _controller.clear();
     });
+    _scheduleSave(); // 6/29 16:09: debounce save history
 
     // 6/29 段 5: JSON card 模式 — AI 推内容时返回结构化 JSON, sheet 解析渲染
     final systemPrompt = widget.isEn
-        ? '''You are a warm, concise AI reading assistant.
+        ? '''You are a warm AI reading assistant.
 
-RULES:
-- If the user asks for a recommendation, return a JSON array (no extra text, no commentary):
-  [{"title":"...","type":"article|audio|video|short"}]
-  Use 1-3 items. Do NOT include url/source/duration fields — those come from our database.
-- Title must match a real topic in our database (5-minute English, meditation, business, parenting, news, etc.).
-- Otherwise return plain text (under 80 words).
-- Use the user\'s quote context if provided.
+Library titles (use EXACTLY these for recommendations):
+- "BBC 6 Minute English" (audio)
+- "New Concept English 5 min" (audio)
+- "Today Headlines 5 min" (audio)
+- "Harvard Business Review 5 min" (audio)
+- "Office Meditation 5 min" (audio)
+- "Commute Podcast 5 min" (audio)
 
-Start your reply with "[" if returning JSON, otherwise plain text.'''
+Rules:
+- If user mentions time, topic, type, or asks "what is good" / "recommend" / "any" → reply ONLY a JSON array.
+  Examples: User: 5 min English → Reply: [{"title":"BBC 6 Minute English","type":"audio"}]
+  User: any meditation? → Reply: [{"title":"Office Meditation 5 min","type":"audio"}]
+  User: news today → Reply: [{"title":"Today Headlines 5 min","type":"audio"}]
+  No other text. 1-3 items. type: article / audio / video / short.
+- Otherwise plain text (under 60 words).'''
         : '''你是温紫、简洁的 AI 阅读助手。
 
-规则:
-- 如果用户要推荐内容, 返回 JSON 数组 (不要额外文字):
-  [{"title":"...","type":"article|audio|video|short"}]
-  1-3 条, 不评论。**不要** 填 url/source/duration 字段 — 这些走数据库拿。
-- title 必须是数据库里实际存在的主题 (5 分钟英语、冥想、商业、育儿、新闻 等)。
-- 其他情况返回普通文字 (80 字以内)。
-- 如果用户传了名言上下文, 可以引用。
+库里现有的真实标题（必须从下面选, 不能编造）:
+- 《BBC 6 Minute English》 (audio)
+- 《新概念英语：5 分钟一段》 (audio)
+- 《哈佛商业评论：5 分钟》 (audio)
+- 《得到头条：5 分钟》 (audio)
+- 《樊登读书：5 分钟》 (audio)
+- 《5 分钟办公室冥想》 (audio)
+- 《课间 5 分钟：白噪音 + 闭眼》 (audio)
+- 《通勤路上：白噪音 + 闭眼》 (audio)
+- 《今日科普：3 个奇闻》 (audio)
+- 《睡前英语故事：5 分钟》 (audio)
+- 《一级市场：5 分钟看融资》 (audio)
+- 《商业要闻 5 分钟》 (audio)
 
-如果返回 JSON, 以 "[" 开头; 否则普通文字。''';
+规则:
+- 用户提到时间 / 主题 / 类型 / "有什么" / "推荐" / "什么好" → 只返回 JSON 数组, 标题必须从上面选 (不要编造)。
+  例子 1: 用户: 5 分钟英语 → 回复: [{"title":"BBC 6 Minute English","type":"audio"}]
+  例子 2: 用户: 有什么冥想 → 回复: [{"title":"5 分钟办公室冥想","type":"audio"}]
+  例子 3: 用户: 今日新闻 → 回复: [{"title":"得到头条：5 分钟","type":"audio"}]
+  不要其他文字。1-3 条。type: article / audio / video / short。
+- 其他情况普通文字 (60 字以内)。''';
     final messages = <Map<String, String>>[
       {'role': 'system', 'content': systemPrompt},
     ];
@@ -160,6 +354,7 @@ Start your reply with "[" if returning JSON, otherwise plain text.'''
             isUser: false,
           );
         });
+        _scheduleSave(); // 6/29 16:09: chunk 收到, debounce save
         // 滚到底 (每 chunk 滚)
         if (_scrollController.hasClients) {
           _scrollController.animateTo(
@@ -171,17 +366,29 @@ Start your reply with "[" if returning JSON, otherwise plain text.'''
       },
       onError: (e) {
         if (!mounted) return;
+        _sending = false; // 6/29 17:05: 错误也释放防双击
         setState(() {
           _messages[aiIdx] = _ChatMessage(
             text: widget.isEn
-                ? '(LLM error: $e)'
-                : '（LLM 错误: $e）',
+                ? 'LLM is slow or unavailable. Send the same message again to retry.'
+                : 'LLM 慢或不可用, 重新发一遍即可重试。',
             isUser: false,
           );
         });
+        _scheduleSave(); // 6/29 16:17: 错误也存 prefs, 重开能看到
+        // 6/29 16:12: SnackBar 提示用户重试
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text(widget.isEn
+                ? 'Request timed out. Try again.'
+                : '请求超时, 重新发一遍即可。'),
+            duration: const Duration(seconds: 3),
+          ),
+        );
       },
       onDone: () async {
         if (!mounted) return;
+        _sending = false; // 6/29 17:05: LLM 完, 释放防双击
         final raw = _messages[aiIdx].text.trim();
         if (raw.isEmpty) {
           setState(() {
@@ -190,6 +397,7 @@ Start your reply with "[" if returning JSON, otherwise plain text.'''
               isUser: false,
             );
           });
+          _scheduleSave();
           return;
         }
         // 6/29 段 5: 尝试解析 JSON card (段 6 调 NewsService.search 找真内容)
@@ -204,6 +412,20 @@ Start your reply with "[" if returning JSON, otherwise plain text.'''
                 cards: cards,
               );
             });
+            _scheduleSave();
+            return;
+          }
+          // 6/29 16:35: AI 输出了 JSON 但 NewsService 全部找不到, 兑底提示用户
+          if (cards != null && cards.isEmpty) {
+            setState(() {
+              _messages[aiIdx] = _ChatMessage(
+                text: widget.isEn
+                    ? 'No library match for this. Try different keywords (e.g. "BBC", "冥想", "5 分钟").'
+                    : '库里没匹配这些标题, 换个关键词试试 (例如 "BBC", "冥想", "5 分钟")。',
+                isUser: false,
+              );
+            });
+            _scheduleSave();
             return;
           }
         }
@@ -232,11 +454,17 @@ Start your reply with "[" if returning JSON, otherwise plain text.'''
       final newsService = NewsService();
       final out = <_ContentCard>[];
       for (final e in list) {
-        final m = e as Map<String, dynamic>;
-        final title = (m['title'] ?? '').toString();
+        // 6/29 16:26: 1.5b 偶输出纯字符串数组 ["a","b"] — 兑底
+        String title = '';
+        String type = 'audio';
+        if (e is String) {
+          title = e;
+        } else if (e is Map<String, dynamic>) {
+          title = (e['title'] ?? '').toString();
+          type = (e['type'] ?? 'audio').toString(); // 6/29 默认 audio (推轻音乐场景)
+        }
         if (title.isEmpty) continue;
-        final type = (m['type'] ?? 'article').toString();
-        // 搜真内容 — 取首条匹配, 拿 ContentItem 全字段
+        // 搜真内容 — 6/29 16:35: 找不到就不渲染该 card (避免点开错位)
         ContentItem? realItem;
         try {
           final hits = await newsService.search(title);
@@ -248,12 +476,13 @@ Start your reply with "[" if returning JSON, otherwise plain text.'''
             );
           }
         } catch (_) {}
+        if (realItem == null) continue; // 6/29 16:35: 过滤掉找不到的 card
         out.add(_ContentCard(
           title: title,
           type: type,
-          source: realItem?.source ?? (m['source'] ?? '').toString(),
-          duration: realItem?.duration ?? (m['duration'] ?? '').toString(),
-          url: realItem?.externalUrl ?? (m['url'] ?? '').toString(),
+          source: realItem?.source ?? '',
+          duration: realItem?.duration ?? '',
+          url: realItem?.externalUrl ?? '',
           audioUrl: realItem?.audioUrl,
           realItem: realItem,
         ));
@@ -403,6 +632,34 @@ Start your reply with "[" if returning JSON, otherwise plain text.'''
                   ],
                 ),
               ),
+            // 6/29 16:59: 快捷选项卡 — 一键发送真库 prompt
+            Container(
+              padding: EdgeInsets.symmetric(horizontal: 12 * scale, vertical: 6 * scale),
+              decoration: BoxDecoration(
+                border: Border(
+                  top: BorderSide(color: Colors.grey.withOpacity(0.15)),
+                ),
+              ),
+              child: SingleChildScrollView(
+                scrollDirection: Axis.horizontal,
+                child: Row(
+                  children: _quickPrompts.map((p) {
+                    return Padding(
+                      padding: EdgeInsets.only(right: 8 * scale),
+                      child: ActionChip(
+                        avatar: Text(p.emoji, style: const TextStyle(fontSize: 14)),
+                        label: Text(p.label, style: TextStyle(fontSize: 13 * scale)),
+                        backgroundColor: const Color(0xFF7C5CFC).withOpacity(0.08),
+                        side: BorderSide(
+                          color: const Color(0xFF7C5CFC).withOpacity(0.3),
+                        ),
+                        onPressed: () => _sendQuick(p),
+                      ),
+                    );
+                  }).toList(),
+                ),
+              ),
+            ),
             // 输入框
             Container(
               padding: EdgeInsets.all(12 * scale),
@@ -474,6 +731,15 @@ class _ChatMessage {
   final bool isUser;
   final List<_ContentCard>? cards; // 6/29 段 5: AI 推的 card 列表
   _ChatMessage({required this.text, required this.isUser, this.cards});
+}
+
+// 6/29 17:05: chip 配置 — emoji + label + 真 title + type
+class _QuickPrompt {
+  final String emoji;
+  final String label;
+  final String realTitle;
+  final String type;
+  const _QuickPrompt(this.emoji, this.label, this.realTitle, this.type);
 }
 
 class _ContentCard {
@@ -619,7 +885,7 @@ class _CardTile extends StatelessWidget {
               return;
             }
             final item = card.realItem!;
-            // 6/29 12:36: audio 优先真播 (audioUrl 不空), 没有就跳原文 (喜马拉雅搜索页)
+            // 6/29 15:55: audio 三层 fallback — audioUrl 真播 → TTS 读 → externalUrl 跳原文
             if (card.type == 'audio' && (card.audioUrl?.isNotEmpty ?? false)) {
               AudioPlayService().play(item);
               ScaffoldMessenger.of(context).showSnackBar(
@@ -633,6 +899,34 @@ class _CardTile extends StatelessWidget {
                 ),
               );
               return;
+            }
+            // 没 audioUrl → 有 externalUrl 跳原文, 没 URL 才 TTS 读
+            if (card.type == 'audio' && (item.externalUrl?.isNotEmpty ?? false)) {
+              final uri = Uri.parse(item.externalUrl!);
+              launchUrl(uri, mode: kIsWeb ? LaunchMode.platformDefault : LaunchMode.externalApplication);
+              ScaffoldMessenger.of(context).showSnackBar(
+                SnackBar(
+                  content: Text('♫ 跳 ' + (item.source.isNotEmpty ? item.source : '原文')),
+                  duration: const Duration(seconds: 2),
+                ),
+              );
+              return;
+            }
+            if (card.type == 'audio') {
+              // 6/29 16:29: 兑底 — 没 audioUrl 没 externalUrl, TTS 读标题
+              final ttsText = item.title;
+              if (ttsText.isNotEmpty && kIsWeb) {
+                TtsService.instance.speak(ttsText);
+                ScaffoldMessenger.of(context).showSnackBar(
+                  SnackBar(
+                    content: Text('🔊 TTS 读: ' + (item.title.length > 24
+                        ? item.title.substring(0, 24) + '…'
+                        : item.title)),
+                    duration: const Duration(seconds: 2),
+                  ),
+                );
+                return;
+              }
             }
             if (card.type == 'audio' && (item.externalUrl?.isNotEmpty ?? false)) {
               // 跳原文 (喜马拉雅/B 站等)

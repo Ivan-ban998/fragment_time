@@ -29,7 +29,7 @@ class LlmService {
     return 'http://$_ollamaHost:11434/api/chat';
   }
   // 6/25 E: 7b CPU 推理太慢 (首 token 30-60s), 切 1.5b (CPU 上 5-10x 快, 老人模式总结质量仍可)
-  static const String _model = 'qwen2.5:7b'; // 6/26 Brien 拍: 切 7b 改善角色匹配质量
+  static const String _model = 'qwen2.5:7b'; // 6/29 16:55: 1.5b 不理解"音乐/英语/冥想"区别, 回到 7b
 
   static Stream<String> generateStream({
     required UserType userType,
@@ -218,19 +218,35 @@ class LlmService {
     try {
       final request = http.Request('POST', Uri.parse(endpoint));
       request.headers.addAll(headers);
+      if (useRemote) request.headers['Accept'] = 'text/event-stream'; // 6/29 20:25: 云端 SSE
       request.body = jsonEncode(body);
-      final response = await request.send().timeout(const Duration(seconds: 60));
+      final response = await request.send().timeout(const Duration(seconds: 120));
       if (response.statusCode != 200) {
         yield '(LLM unavailable)';
         return;
       }
+      // 6/29 20:25: 云端走 MiniMax /chat SSE 格式, 本地走 Ollama 格式
       await for (final chunk in response.stream.transform(utf8.decoder).transform(const LineSplitter())) {
         if (chunk.isEmpty) continue;
         try {
-          final json = jsonDecode(chunk) as Map<String, dynamic>;
-          final msg = json['message'] as Map<String, dynamic>?;
-          final content = msg?['content'] as String?;
-          if (content != null && content.isNotEmpty) yield content;
+          if (useRemote) {
+            // MiniMax SSE: "data: {...}\n\n", 末行 "data: [DONE]"
+            if (!chunk.startsWith('data:')) continue;
+            final data = chunk.substring(5).trim();
+            if (data == '[DONE]' || data.isEmpty) continue;
+            final json = jsonDecode(data) as Map<String, dynamic>;
+            final choices = json['choices'] as List<dynamic>?;
+            if (choices == null || choices.isEmpty) continue;
+            final delta = choices[0]['delta'] as Map<String, dynamic>?;
+            final content = delta?['content'] as String?;
+            if (content != null && content.isNotEmpty) yield content;
+          } else {
+            // Ollama: 每行一个 JSON {message: {content: "..."}}
+            final json = jsonDecode(chunk) as Map<String, dynamic>;
+            final msg = json['message'] as Map<String, dynamic>?;
+            final content = msg?['content'] as String?;
+            if (content != null && content.isNotEmpty) yield content;
+          }
         } catch (_) {}
       }
     } catch (e) {
