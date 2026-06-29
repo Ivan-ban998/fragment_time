@@ -450,6 +450,12 @@ class _MainHomeScreenState extends State<MainHomeScreen> {
     });
   }
 
+  // 6/29 13:56: quote 变 prefs key 也要变 — 不然同一天 quote_saved 状态串台
+  String get _currentQuoteKey {
+    if (_dailyQuote == null || _dailyQuote!.isEmpty) return '';
+    return _dailyQuote!.hashCode.toString();
+  }
+
   // 6/24 AI 私教: 调用 LLM 生成本周总结 (周日 20:00 之后 + 本周未生成)
   // 最小版: 不做后台 timer, 启动时一次性检查
   Future<void> _checkWeeklyRecap() async {
@@ -1197,29 +1203,50 @@ class _DailyEncouragementBannerState extends State<_DailyEncouragementBanner> {
     _loadSaved();
   }
 
+  // 6/29 14:59 Brien 反馈: "已进收藏的爱心还会变空心" — 真凶: didUpdateWidget 里 _saved=false 立即 setState,
+  // 但 _loadSaved 是 async, 中间空心帧
+  // 修: 不预先 setState(_saved=false), 走 _loadSaved async 查 prefs 后才 setState
+  @override
+  void didUpdateWidget(covariant _DailyEncouragementBanner oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    if (oldWidget.quote != widget.quote) {
+      _loadSaved();
+    }
+  }
+
   // 6/24 v9: 从 SharedPreferences 读今日是否已收藏 (重启后保持 ❤️)
   // 6/25 修 bug: 同时查订阅 list 验证 (双重保险, prefs true 但 list 已删 → 重置 prefs)
   // 6/26: id 从 encourage_ 改 quote_ (banner 现在是名言不是鼓励)
+// 6/29 13:56: 改 key 用 quote text hash — 换名言后状态重置, 不同名言不同 prefs key
   Future<void> _loadSaved() async {
     try {
       final prefs = await SharedPreferences.getInstance();
-      final now = DateTime.now();
-      final key = 'quote_saved_${now.year}_${now.month}_${now.day}';
+      final quoteText = widget.quote ?? '';
+      if (quoteText.isEmpty) {
+        if (mounted) setState(() => _saved = false);
+        _loaded = true;
+        return;
+      }
+      final key = 'quote_saved_${quoteText.hashCode}';
       final prefSaved = prefs.getBool(key) ?? false;
+      bool shouldBeSaved = false;
       if (prefSaved) {
         // 验证 list 里还有这条名言 (防止 prefs true 但 list 已删)
-        final id = 'quote_${now.year}_${now.month}_${now.day}';
+        final id = 'quote_${quoteText.hashCode}';
         final items = await LocalSubscriptionService.instance.getSubscribedItems();
         final exists = items.any((it) => it.id == id);
         if (exists) {
-          if (mounted) setState(() => _saved = true);
+          shouldBeSaved = true;
         } else {
           // list 里没了, 重置 prefs (修正数据不一致)
           await prefs.setBool(key, false);
         }
       }
+      // 6/29 14:59: 不管 prefSaved 是什么, 都显式 setState, 避免中间帧 _saved 为默认值 false 闪空心
+      if (mounted) setState(() => _saved = shouldBeSaved);
       _loaded = true;
     } catch (_) {
+      if (mounted) setState(() => _saved = false);
       _loaded = true;
     }
   }
@@ -1228,12 +1255,13 @@ class _DailyEncouragementBannerState extends State<_DailyEncouragementBanner> {
   Future<void> _onSave() async {
     if (_saved) return;
     final now = DateTime.now();
-    // 6/26 Brien 反馈: 收藏里显示"AI 6月26日鼓励"但 Tab 是名言 → 改 id/title 描述一致
-    final id = 'quote_${now.year}_${now.month}_${now.day}';
+    // 6/29 13:56: 改 id 用 quote text hash — 不同名言不同 id/prefs key
+    final quoteText = widget.quote ?? widget.text;
+    final id = 'quote_${quoteText.hashCode}';
     final title = widget.isEn
         ? 'AI ${now.month}/${now.day} quote'
         : 'AI ${now.month}月${now.day}日名言';
-    final desc = widget.quote ?? widget.text; // 6/26: 只存名言本身, 不拼鼓励+引号
+    final desc = quoteText; // 6/26: 只存名言本身, 不拼鼓励+引号
     final item = ContentItem(
       id: id,
       title: title,
@@ -1248,10 +1276,10 @@ class _DailyEncouragementBannerState extends State<_DailyEncouragementBanner> {
       await LocalSubscriptionService.instance.subscribe(item);
       if (!mounted) return;
       // 6/24 v9: 持久化已收藏标记 (重启后保持 ❤️)
-      // 6/26: key 从 encourage_saved_ 改 quote_saved_ (banner 改名言)
+      // 6/29 13:56: key 用 quote hash, 换名言后状态隔离
       try {
         final prefs = await SharedPreferences.getInstance();
-        final key = 'quote_saved_${now.year}_${now.month}_${now.day}';
+        final key = 'quote_saved_${quoteText.hashCode}';
         await prefs.setBool(key, true);
       } catch (_) {}
       if (!mounted) return;

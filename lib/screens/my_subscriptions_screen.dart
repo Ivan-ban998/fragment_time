@@ -206,11 +206,27 @@ class _MySubscriptionsScreenState extends State<MySubscriptionsScreen>
 
   // 6/25 A: 收藏 Tab (内容 / 名言)
   Widget _buildSavedTab(double scale, bool isEn, {bool contentOnly = false, bool quotesOnly = false}) {
-    final filtered = contentOnly
-        ? _items.where((it) => !it.id.startsWith('quote_')).toList()
-        : quotesOnly
-            ? _items.where((it) => it.id.startsWith('quote_')).toList()
-            : _items;
+    // 6/29 14:59 Brien 反馈: 收藏后 Tab 2 看不到新条目 — _items state 不重 load, 显示旧数据
+    // 修: ListenableBuilder 每次 rebuild 都在 FutureBuilder 里重拉 service, 不依赖 _items
+    return FutureBuilder<List<ContentItem>>(
+      future: _subService.getSubscribedItems(),
+      builder: (context, snapshot) {
+        if (!snapshot.hasData) {
+          return ListView.builder(
+            padding: const EdgeInsets.all(16),
+            itemCount: 4,
+            itemBuilder: (_, __) => const Padding(
+              padding: EdgeInsets.only(bottom: 10),
+              child: ListItemSkeleton(),
+            ),
+          );
+        }
+        final items = snapshot.data!;
+        final filtered = contentOnly
+            ? items.where((it) => !it.id.startsWith('quote_')).toList()
+            : quotesOnly
+                ? items.where((it) => it.id.startsWith('quote_')).toList()
+                : items;
 
     if (_loading) {
       return ListView.builder(
@@ -249,6 +265,8 @@ class _MySubscriptionsScreenState extends State<MySubscriptionsScreen>
           },
           onRemove: () => _unsubscribe(item),
         );
+      },
+    );
       },
     );
   }

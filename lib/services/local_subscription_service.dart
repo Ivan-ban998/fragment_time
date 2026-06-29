@@ -26,7 +26,10 @@ class LocalSubscriptionService extends ChangeNotifier {
 
   Future<void> subscribe(ContentItem item) async {
     final items = await getSubscribedItems();
-    if (!items.any((i) => i.title == item.title && i.source == item.source)) {
+    // 6/29 15:33 Brien 反馈: "只能收藏一个名言" — 真凶: 去重用 title+source, 但名言 title 都是
+    // "AI 6月29日名言" 格式 (同一天), 不同名言重复被拒, 只有第一个能入 list
+    // 修: 去重用 item.id (id = quote_<text hash>, 不同名言不同 id)
+    if (!items.any((i) => i.id == item.id)) {
       items.add(item);
       await _save(items);
     }
