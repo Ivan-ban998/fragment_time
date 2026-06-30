@@ -46,14 +46,68 @@ class _AiAssistantScreenState extends State<AiAssistantScreen> {
   final _scrollController = ScrollController();
   final _focusNode = FocusNode(); // 6/30 11:01: 点 "自由聊" chip 自动 focus 输入框 + 弹键盘
   final List<_ChatMessage> _messages = [];
-  static const _historyKey = 'ai_chat_history_v1';
-  static const _maxHistory = 30; // 保留最近 30 条
+  String _dailyGreeting = ''; // 6/30 12:23: sheet 顶部今日总结 (AI 主动提)
+
 
   @override
   void initState() {
     super.initState();
     _loadHistory();
+    _loadDailyGreeting(); // 6/30 12:23: 顶部总结
   }
+
+  // 6/30 12:23: 顶部总结 — 今日历史主题 + 1 句鼓励
+  Future<void> _loadDailyGreeting() async {
+    try {
+      final history = widget.todayHistory ?? const <HistoryItem>[];
+      if (history.isEmpty) {
+        if (!mounted) return;
+        setState(() {
+          _dailyGreeting = widget.isEn
+              ? 'Pick a scene on Home — I\'ll help you digest what you read.'
+              : '去首页选个场景看看，读完来找我帮你理清。';
+        });
+        return;
+      }
+      final topics = history.take(5).map((h) => h.title).join('、');
+      final sys = widget.isEn
+          ? 'You are a warm AI assistant. User just opened the chat. They read these today: $topics. Give a 1-sentence warm greeting under 25 words, no JSON, no quotes.'
+          : '你是温和的 AI 助手。用户刚打开 chat 弹层。他今天读了: $topics。给 1 句不超过 25 字的温暖问候, 不要 JSON, 不要引号。';
+      final buf = StringBuffer();
+      await LlmService.chatStream(messages: [
+        {'role': 'system', 'content': sys},
+        {'role': 'user', 'content': widget.isEn ? 'Hi' : '你好'},
+      ]).timeout(const Duration(seconds: 5), onTimeout: (sink) {
+        sink.close();
+      }).forEach((chunk) {
+        buf.write(chunk);
+      });
+      if (!mounted) return;
+      final greeting = buf.toString().trim();
+      setState(() {
+        _dailyGreeting = greeting.isNotEmpty
+            ? greeting
+            : (widget.isEn
+                ? 'You read $topics today — nice work.'
+                : '今天读了: $topics, 不错!');
+      });
+    } catch (_) {
+      if (!mounted) return;
+      final history = widget.todayHistory ?? const <HistoryItem>[];
+      final topics = history.take(3).map((h) => h.title).join('、');
+      setState(() {
+        _dailyGreeting = history.isEmpty
+            ? (widget.isEn
+                ? 'Pick a scene on Home — I\'ll help you digest what you read.'
+                : '去首页选个场景看看，读完来找我帮你理清。')
+            : (widget.isEn
+                ? 'You read $topics today — nice work.'
+                : '今天读了: $topics, 不错!');
+      });
+    }
+  }
+  static const _historyKey = 'ai_chat_history_v1';
+  static const _maxHistory = 30; // 保留最近 30 条
 
   // 6/29 16:09 Brien 反馈: 关 sheet 重开, 聊天记录丢了
   // 修: SharedPreferences 存最近 30 条消息 (JSON), initState 加载
@@ -896,6 +950,30 @@ Rules:
                 ],
               ),
             ),
+            // 6/30 12:23: 顶部今日总结 banner — AI 主动提 (区别于被动聊天)
+            if (_dailyGreeting.isNotEmpty)
+              Container(
+                width: double.infinity,
+                padding: EdgeInsets.fromLTRB(20 * scale, 8 * scale, 20 * scale, 10 * scale),
+                child: Row(
+                  children: [
+                    Icon(Icons.auto_awesome, size: 14 * scale, color: const Color(0xFF7C5CFC)),
+                    SizedBox(width: 8 * scale),
+                    Expanded(
+                      child: Text(
+                        _dailyGreeting,
+                        style: TextStyle(
+                          fontSize: 12 * scale,
+                          color: Colors.black54,
+                          fontStyle: FontStyle.italic,
+                        ),
+                        maxLines: 2,
+                        overflow: TextOverflow.ellipsis,
+                      ),
+                    ),
+                  ],
+                ),
+              ),
             const Divider(height: 1),
             // 消息列表
             // 6/30 10:01: 3 能力卡挪到输入框左边常驻 (见下面 _AbilityChip), 不再空状态居中

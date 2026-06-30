@@ -21,8 +21,10 @@ import 'package:flutter/foundation.dart';
 import 'package:url_launcher/url_launcher.dart';
 import '../models/models.dart';
 import '../services/llm_service.dart';
+import '../services/history_service.dart';
 import '../theme/app_theme.dart';
 import '../theme/glass_decoration.dart';
+import 'ai_assistant_screen.dart';
 import '../services/eye_protection_scope.dart';
 import '../services/local_subscription_service.dart';
 import '../services/user_preference_service.dart';
@@ -75,6 +77,7 @@ class _ContentScreenState extends State<ContentScreen> {
   List<ContentItem> _recItems = [];
   bool _recLoading = false;
   bool _showCompletionBanner = false;
+  bool _aiOfferShown = false; // 6/30 12:23: 读完弹 AI sheet 防重复
   bool _hasScrolled = false; // 6/26: 滚到过文章中部才显"读完啦"按钮
   bool _ttsPlaying = false;
   bool _showAllDoneDialog = false; // 6 张全看完弹 dialog
@@ -306,6 +309,14 @@ class _ContentScreenState extends State<ContentScreen> {
     if (pos.pixels >= pos.maxScrollExtent - 80 && _progress < 100) {
       _writeProgress(100);
       _showCompletionBanner = true;
+      // 6/30 12:23: 看完后 1.5s 主动弹 AI 答疑 (不防不住: 只弹 1 次)
+      if (!_aiOfferShown) {
+        _aiOfferShown = true;
+        Future.delayed(const Duration(milliseconds: 1500), () {
+          if (!mounted) return;
+          _offerAiAfterReading();
+        });
+      }
     } else if (pos.pixels >= pos.maxScrollExtent / 2 && _progress < 50) {
       _writeProgress(50);
     }
@@ -319,6 +330,33 @@ class _ContentScreenState extends State<ContentScreen> {
     try {
       await LocalSubscriptionService.instance.updateProgress(_aiContentItem!, p);
     } catch (_) {}
+  }
+
+  /// 6/30 12:23: 看完后主动弹 AI sheet — 拿今日历史 + 推用户点 "答疑解惑"
+  Future<void> _offerAiAfterReading() async {
+    if (_aiContentItem == null) return;
+    // 拉今日历史传给 AI sheet
+    final history = await HistoryService.instance.getAll();
+    final now = DateTime.now();
+    final today = history.where((h) {
+      final t = DateTime.fromMillisecondsSinceEpoch(h.readAt);
+      return now.difference(t).inDays < 1;
+    }).toList();
+    if (!mounted) return;
+    showModalBottomSheet(
+      context: context,
+      isScrollControlled: true,
+      backgroundColor: Colors.transparent,
+      barrierColor: Colors.black54,
+      builder: (_) => AiAssistantScreen(
+        isEn: isEn,
+        isElderlyMode: widget.isElderlyMode,
+        userTypeName: widget.userType?.title ?? '',
+        userType: widget.userType,
+        todayHistory: today,
+        contextQuote: _aiContentItem?.title, // 6/30 12:23: 让 AI 知道刚读完这篇
+      ),
+    );
   }
 
   Future<void> _recordOpen() async {
