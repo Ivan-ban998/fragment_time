@@ -5,6 +5,7 @@ import '../theme/glass_decoration.dart';
 import '../services/analytics_service.dart';
 import '../services/time_aware_recommender.dart';
 import '../services/handle_service.dart';
+import '../services/history_service.dart';
 import 'content_screen.dart';
 import 'loading_screen.dart';
 import 'ai_assistant_screen.dart';
@@ -210,6 +211,36 @@ class _SceneScreenState extends State<SceneScreen> {
           ),
         ),
         ),
+      ),
+      // 6/30 09:42: AI 助手浮动按钮 (不占 Tab, 场景页右下角)
+      floatingActionButton: FloatingActionButton(
+        heroTag: 'ai_assistant_fab',
+        backgroundColor: const Color(0xFF7C5CFC),
+        tooltip: isEn ? 'AI Assistant' : 'AI 助手',
+        onPressed: () async {
+          // 6/30 10:11: 答疑需要今日历史, 从 HistoryService 异步拉
+          final today = await HistoryService.instance.getAll();
+          final now = DateTime.now();
+          final todayHistory = today.where((h) {
+            final t = DateTime.fromMillisecondsSinceEpoch(h.readAt);
+            return now.difference(t).inDays < 1;
+          }).toList();
+          if (!context.mounted) return;
+          showModalBottomSheet(
+            context: context,
+            isScrollControlled: true,
+            backgroundColor: Colors.transparent,
+            barrierColor: Colors.black54,
+            builder: (_) => AiAssistantScreen(
+              isEn: isEn,
+              isElderlyMode: isElderlyMode,
+              userTypeName: _getUserTypeName(widget.userType),
+              userType: widget.userType, // 6/30 10:11: 给 LLM 推荐用
+              todayHistory: todayHistory, // 6/30 10:11: 答疑用
+            ),
+          );
+        },
+        child: const Icon(Icons.support_agent, color: Colors.white),
       ),
     );
   }

@@ -8,6 +8,8 @@ import '../services/llm_service.dart';
 import '../services/news_service.dart';
 import '../services/audio_play_service.dart';
 import '../services/tts_service.dart';
+import '../services/robot_name_service.dart';
+import '../services/history_service.dart';
 import '../models/models.dart';
 import 'content_reader_screen.dart';
 import 'package:url_launcher/url_launcher.dart';
@@ -22,6 +24,8 @@ class AiAssistantScreen extends StatefulWidget {
   final bool isElderlyMode;
   final String? contextQuote; // 6/29 段 4: 从 quote banner 传过来
   final String userTypeName;
+  final UserType? userType; // 6/30 10:11: 帮推荐/答疑需要按角色调 LLM
+  final List<HistoryItem>? todayHistory; // 6/30 10:11: 答疑基于今日历史回答
 
   const AiAssistantScreen({
     super.key,
@@ -29,6 +33,8 @@ class AiAssistantScreen extends StatefulWidget {
     required this.isElderlyMode,
     required this.userTypeName,
     this.contextQuote,
+    this.userType,
+    this.todayHistory,
   });
 
   @override
@@ -38,6 +44,7 @@ class AiAssistantScreen extends StatefulWidget {
 class _AiAssistantScreenState extends State<AiAssistantScreen> {
   final _controller = TextEditingController();
   final _scrollController = ScrollController();
+  final _focusNode = FocusNode(); // 6/30 11:01: 点 "自由聊" chip 自动 focus 输入框 + 弹键盘
   final List<_ChatMessage> _messages = [];
   static const _historyKey = 'ai_chat_history_v1';
   static const _maxHistory = 30; // 保留最近 30 条
@@ -159,6 +166,7 @@ class _AiAssistantScreenState extends State<AiAssistantScreen> {
     _saveHistory(); // 6/29 16:09: 保险存盘 (关 sheet)
     _controller.dispose();
     _scrollController.dispose();
+    _focusNode.dispose();
     super.dispose();
   }
 
@@ -197,8 +205,16 @@ class _AiAssistantScreenState extends State<AiAssistantScreen> {
   ];
 
   // 6/29 17:05: chip 渲染流程 — 加用户消息 + 调 NewsService.search 加 card (不走 LLM)
+  // 6/30 10:11: 能力卡分支: recommend → LLM 真推荐; qa → LLM 基于今日历史; chat → Toast
   Future<void> _sendQuick(_QuickPrompt prompt) async {
     if (_sending) return; // 6/29 17:05: 防双击
+    if (prompt.id == 'chat') {
+      // 6/30 11:01: 自由聊 — 自动 focus 输入框 + 弹键盘, 不弹 SnackBar 避免挡底部 nav
+      _focusNode.requestFocus();
+      return;
+    }
+    if (prompt.id == 'recommend') return _handleRecommend();
+    if (prompt.id == 'qa') return _handleQa();
     _sending = true;
     setState(() {
       _messages.add(_ChatMessage(text: prompt.label, isUser: true));
@@ -245,6 +261,237 @@ class _AiAssistantScreenState extends State<AiAssistantScreen> {
       ));
     });
     _scheduleSave();
+  }
+
+  /// 6/30 10:11: 帮我推荐 — LLM 根据 userType 真推荐 3 条, 命中真库渲染 card
+  Future<void> _handleRecommend() async {
+    if (_sending) return;
+    _sending = true;
+    final userLabel = widget.userType?.title ?? widget.userTypeName;
+    setState(() {
+      _messages.add(_ChatMessage(
+        text: widget.isEn
+            ? 'Recommend something for $userLabel'
+            : '为 $userLabel 推荐 3 条',
+        isUser: true,
+      ));
+    });
+    _scheduleSave();
+    final aiIdx = _messages.length;
+    setState(() => _messages.add(_ChatMessage(text: '', isUser: false)));
+    _streamTimer?.cancel();
+    _streamTimer = Timer(const Duration(seconds: 30), () {
+      if (!mounted) return;
+      if (_messages[aiIdx].text.isEmpty) {
+        setState(() {
+          _messages[aiIdx] = _ChatMessage(
+            text: widget.isEn ? '(thinking...)' : '（思考中...）',
+            isUser: false,
+          );
+        });
+      }
+    });
+    final libTitles = widget.isEn
+        ? const [
+            'BBC 6 Minute English',
+            'New Concept English 5 min',
+            'Today Headlines 5 min',
+            'Harvard Business Review 5 min',
+            'Office Meditation 5 min',
+            'Commute Podcast 5 min',
+            'Business Headlines 5 min',
+            'Bedtime English Stories 5 min',
+            '3-Minute Science 5 min',
+            'School Poems Recitation 5 min',
+            'OKR vs KPI 5 min',
+            'Deep Work 5 min',
+          ]
+        : const [
+            'BBC 6 Minute English',
+            '新概念英语：5 分钟一段',
+            '哈佛商业评论：5 分钟',
+            '得到头条：5 分钟',
+            '樊登读书：5 分钟',
+            '5 分钟办公室冥想',
+            '课间 5 分钟：白噪音 + 闭眼',
+            '通勤路上：白噪音 + 闭眼',
+            '今日科普：3 个奇闻',
+            '睡前英语故事：5 分钟',
+            '一级市场：5 分钟看融资',
+            '商业要闻 5 分钟',
+          ];
+    final userTypeTag = widget.isEn
+        ? (widget.userType?.name ?? 'student')
+        : (widget.userType?.title ?? '学生');
+    final sys = widget.isEn
+        ? '''You are an AI reading assistant. The user is "$userTypeTag".
+Recommend 3 items from this library (titles MUST match exactly):
+${libTitles.map((t) => '- $t').join('\n')}
+Reply ONLY a JSON array, no other text. Example:
+[{"title":"BBC 6 Minute English","type":"audio"}]
+Pick 3 different titles, vary types (article / audio / video).'''
+        : '''你是 AI 阅读助手。用户身份: "$userTypeTag"。
+从下面库里推荐 3 条 (标题必须从下面选, 不能编造):
+${libTitles.map((t) => '- $t').join('\n')}
+只返回 JSON 数组, 1-3 条, 不要其他文字。例:
+[{"title":"BBC 6 Minute English","type":"audio"}]
+类型选 3 个不同 (article / audio / video 混着来)。''';
+    final messages = <Map<String, String>>[
+      {'role': 'system', 'content': sys},
+      {'role': 'user', 'content': widget.isEn ? 'Recommend 3 for me' : '帮我推荐 3 条'},
+    ];
+    final buf = StringBuffer();
+    LlmService.chatStream(messages: messages).listen(
+      (chunk) {
+        if (!mounted) return;
+        _streamTimer?.cancel();
+        buf.write(chunk);
+        setState(() {
+          _messages[aiIdx] = _ChatMessage(
+            text: buf.toString(),
+            isUser: false,
+          );
+        });
+        if (_scrollController.hasClients) {
+          _scrollController.animateTo(
+            _scrollController.position.maxScrollExtent,
+            duration: const Duration(milliseconds: 100),
+            curve: Curves.easeOut,
+          );
+        }
+      },
+      onError: (e) {
+        if (!mounted) return;
+        _sending = false;
+        setState(() {
+          _messages[aiIdx] = _ChatMessage(
+            text: widget.isEn
+                ? 'LLM is slow. Tap again to retry.'
+                : 'LLM 慢, 再点一次重试。',
+            isUser: false,
+          );
+        });
+      },
+      onDone: () async {
+        if (!mounted) return;
+        _sending = false;
+        final raw = buf.toString().trim();
+        final cards = await _tryParseCards(raw) ?? <_ContentCard>[];
+        if (cards.isEmpty) {
+          setState(() {
+            _messages[aiIdx] = _ChatMessage(
+              text: widget.isEn
+                  ? 'No library match. Try again.'
+                  : '没命中库, 再点一次。',
+              isUser: false,
+            );
+          });
+          _scheduleSave();
+          return;
+        }
+        setState(() {
+          _messages[aiIdx] = _ChatMessage(
+            text: widget.isEn ? 'Recommended for you:' : '为你推荐:',
+            isUser: false,
+            cards: cards,
+          );
+        });
+        _scheduleSave();
+      },
+    );
+  }
+
+  /// 6/30 10:11: 答疑解惑 — LLM 基于今日历史回答
+  Future<void> _handleQa() async {
+    if (_sending) return;
+    _sending = true;
+    setState(() {
+      _messages.add(_ChatMessage(
+        text: widget.isEn
+            ? 'Help me make sense of today'
+            : '帮我理清今天读的东西',
+        isUser: true,
+      ));
+    });
+    _scheduleSave();
+    final aiIdx = _messages.length;
+    setState(() => _messages.add(_ChatMessage(text: '', isUser: false)));
+    _streamTimer?.cancel();
+    _streamTimer = Timer(const Duration(seconds: 30), () {
+      if (!mounted) return;
+      if (_messages[aiIdx].text.isEmpty) {
+        setState(() {
+          _messages[aiIdx] = _ChatMessage(
+            text: widget.isEn ? '(thinking...)' : '（思考中...）',
+            isUser: false,
+          );
+        });
+      }
+    });
+    final history = widget.todayHistory ?? const <HistoryItem>[];
+    final historyCtx = history.isEmpty
+        ? (widget.isEn ? 'No items read today.' : '今天还没读过。')
+        : history
+            .take(8)
+            .map((h) => '- ${h.title} (${h.source})')
+            .join('\n');
+    final sys = widget.isEn
+        ? '''You are a warm AI reading assistant. The user has read these items today:
+$historyCtx
+
+User just tapped "Help me make sense of today" — give a concise summary, highlight 1-2 connections across items, and suggest 1 next step. Under 80 words. Plain text, no JSON.'''
+        : '''你是温和、简洁的 AI 阅读助手。用户今天读了以下内容:
+$historyCtx
+
+用户刚点了 "帮我理清今天读的东西" — 简要总结今天主题, 指出 1-2 条内容间的联系, 建议 1 个下一步。80 字以内, 不要 JSON。''';
+    final messages = <Map<String, String>>[
+      {'role': 'system', 'content': sys},
+      {'role': 'user', 'content': widget.isEn ? 'Help me make sense' : '帮我理清'},
+    ];
+    final buf = StringBuffer();
+    LlmService.chatStream(messages: messages).listen(
+      (chunk) {
+        if (!mounted) return;
+        _streamTimer?.cancel();
+        buf.write(chunk);
+        setState(() {
+          _messages[aiIdx] = _ChatMessage(
+            text: buf.toString(),
+            isUser: false,
+          );
+        });
+        if (_scrollController.hasClients) {
+          _scrollController.animateTo(
+            _scrollController.position.maxScrollExtent,
+            duration: const Duration(milliseconds: 100),
+            curve: Curves.easeOut,
+          );
+        }
+      },
+      onError: (e) {
+        if (!mounted) return;
+        _sending = false;
+        setState(() {
+          _messages[aiIdx] = _ChatMessage(
+            text: widget.isEn
+                ? 'LLM is slow. Tap again to retry.'
+                : 'LLM 慢, 再点一次重试。',
+            isUser: false,
+          );
+        });
+      },
+      onDone: () {
+        if (!mounted) return;
+        _sending = false;
+        setState(() {
+          _messages[aiIdx] = _ChatMessage(
+            text: buf.toString().trim(),
+            isUser: false,
+          );
+        });
+        _scheduleSave();
+      },
+    );
   }
 
   void _send() {
@@ -568,11 +815,15 @@ Rules:
                     child: Column(
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
-                        Text(
-                          widget.isEn ? 'AI Assistant' : 'AI 助手',
-                          style: TextStyle(
-                            fontSize: 17 * scale,
-                            fontWeight: FontWeight.w700,
+                        // 6/30 09:52: 跟 RobotNameService 联动, 设置改了机器人名字这里也变
+                        ValueListenableBuilder<String>(
+                          valueListenable: RobotNameService.notifier,
+                          builder: (_, name, __) => Text(
+                            name,
+                            style: TextStyle(
+                              fontSize: 17 * scale,
+                              fontWeight: FontWeight.w700,
+                            ),
                           ),
                         ),
                         if (widget.contextQuote != null)
@@ -596,16 +847,33 @@ Rules:
             ),
             const Divider(height: 1),
             // 消息列表
+            // 6/30 10:01: 3 能力卡挪到输入框左边常驻 (见下面 _AbilityChip), 不再空状态居中
             Expanded(
-              child: ListView.builder(
-                controller: _scrollController,
-                padding: EdgeInsets.all(16 * scale),
-                itemCount: _messages.length,
-                itemBuilder: (ctx, i) => _MessageBubble(
-                  message: _messages[i],
-                  isElderlyMode: widget.isElderlyMode,
-                ),
-              ),
+              child: _messages.isEmpty
+                  ? Center(
+                      child: Padding(
+                        padding: EdgeInsets.all(24 * scale),
+                        child: Text(
+                          widget.isEn
+                              ? 'Tap a chip on the left or type below to start.'
+                              : '点左边选项卡或直接打字开始。',
+                          textAlign: TextAlign.center,
+                          style: TextStyle(
+                            fontSize: 13 * scale,
+                            color: Colors.black45,
+                          ),
+                        ),
+                      ),
+                    )
+                  : ListView.builder(
+                      controller: _scrollController,
+                      padding: EdgeInsets.all(16 * scale),
+                      itemCount: _messages.length,
+                      itemBuilder: (ctx, i) => _MessageBubble(
+                        message: _messages[i],
+                        isElderlyMode: widget.isElderlyMode,
+                      ),
+                    ),
             ),
             // 段 4: contextQuote 显示在输入框上方
             if (widget.contextQuote != null)
@@ -678,9 +946,32 @@ Rules:
                 top: false,
                 child: Row(
                   children: [
+                    // 6/30 10:01: 3 个能力卡挪到聊天框左边, 常驻选项卡 (空状态也显示, 不消失)
+                    _AbilityChip(
+                      emoji: '💬',
+                      label: widget.isEn ? 'Free chat' : '自由聊',
+                      scale: scale,
+                      onTap: () => _sendQuick(_AbilityCardsView.prompts[0]),
+                    ),
+                    SizedBox(width: 6 * scale),
+                    _AbilityChip(
+                      emoji: '📚',
+                      label: widget.isEn ? 'Recommend' : '帮我推荐',
+                      scale: scale,
+                      onTap: () => _sendQuick(_AbilityCardsView.prompts[1]),
+                    ),
+                    SizedBox(width: 6 * scale),
+                    _AbilityChip(
+                      emoji: '❓',
+                      label: widget.isEn ? 'Q&A' : '答疑解惑',
+                      scale: scale,
+                      onTap: () => _sendQuick(_AbilityCardsView.prompts[2]),
+                    ),
+                    SizedBox(width: 10 * scale),
                     Expanded(
                       child: TextField(
                         controller: _controller,
+                        focusNode: _focusNode, // 6/30 11:01: 点自由聊 chip 自动获焦
                         style: TextStyle(fontSize: 15 * scale),
                         decoration: InputDecoration(
                           hintText: widget.isEn ? 'Ask anything...' : '问点什么...',
@@ -744,7 +1035,69 @@ class _QuickPrompt {
   final String label;
   final String realTitle;
   final String type;
-  const _QuickPrompt(this.emoji, this.label, this.realTitle, this.type);
+  final String? id; // 6/30 10:11: 能力卡 ID ('recommend' / 'qa' / null=原始 chip)
+  const _QuickPrompt(this.emoji, this.label, this.realTitle, this.type, {this.id});
+}
+
+/// 6/30 09:42: 首次/空状态展示 — 3 个能力卡 (自由聊/帮我推荐/答疑解惑)
+/// 6/30 10:01: 3 个能力卡 → 输入框左侧常驻选项卡 (不随消息消失)
+/// 保留 prompts 常量给 _AbilityChip 复用
+class _AbilityCardsView {
+  static const prompts = <_QuickPrompt>[
+    // 自由聊 — 不接 LLM, 直接走输入框文本路径 (用户在输入框随便问, _send 处理)
+    _QuickPrompt('💬', '自由聊', '', 'article', id: 'chat'),
+    // 帮我推荐 — 走 LLM, 根据 userType 真推荐 3 条命中库
+    _QuickPrompt('📚', '帮我推荐', '', 'article', id: 'recommend'),
+    // 答疑解惑 — 走 LLM, 基于今日历史回答
+    _QuickPrompt('❓', '答疑解惑', '', 'article', id: 'qa'),
+  ];
+}
+
+/// 6/30 10:01: 单个能力 chip — 输入框左侧圆形 emoji 按钮 + tooltip
+class _AbilityChip extends StatelessWidget {
+  final String emoji;
+  final String label;
+  final double scale;
+  final VoidCallback onTap;
+
+  const _AbilityChip({
+    required this.emoji,
+    required this.label,
+    required this.scale,
+    required this.onTap,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    final size = 36.0 * scale;
+    return Tooltip(
+      message: label,
+      child: Material(
+        color: Colors.transparent,
+        child: InkWell(
+          onTap: onTap,
+          borderRadius: BorderRadius.circular(size / 2),
+          child: Container(
+            width: size,
+            height: size,
+            decoration: BoxDecoration(
+              color: const Color(0xFF7C5CFC).withOpacity(0.08),
+              shape: BoxShape.circle,
+              border: Border.all(
+                color: const Color(0xFF7C5CFC).withOpacity(0.3),
+                width: 1,
+              ),
+            ),
+            alignment: Alignment.center,
+            child: Text(
+              emoji,
+              style: TextStyle(fontSize: 18 * scale),
+            ),
+          ),
+        ),
+      ),
+    );
+  }
 }
 
 class _ContentCard {
