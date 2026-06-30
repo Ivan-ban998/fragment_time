@@ -23,6 +23,7 @@ import 'services/analytics_service.dart';
 import 'services/theme_preference_service.dart';
 import 'services/eye_protection_scope.dart';
 import 'services/handle_service.dart';
+import 'services/robot_name_service.dart';
 import 'screens/user_type_screen.dart';
 import 'screens/onboarding_screen.dart';
 import 'screens/welcome_screen.dart';
@@ -575,6 +576,8 @@ class _MainHomeScreenState extends State<MainHomeScreen> {
     final typeName = await _localeService.getSelectedUserTypeName();
     final items = await _subService.getSubscribedItems();
     final msg = await _streakService.getStreakMessage(isEn);
+    // 6/30 11:55: 拉 RobotNameService 写回 notifier (修"刷新人名变默认" bug)
+    await RobotNameService().get();
     setState(() {
       _isInternational = isInt;
       _isElderlyMode = isElderly;
