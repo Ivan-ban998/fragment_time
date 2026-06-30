@@ -418,7 +418,15 @@ class _MainHomeScreenState extends State<MainHomeScreen> {
         return buffer.toString();
       }
 
-      final quote = await _streakService.getDailyQuote(isEn: isEn, llmCall: llmCall);
+      final quote = await _streakService.getDailyQuote(isEn: isEn, llmCall: llmCall)
+          // 6/30 13:02 Brien 反馈: APK 名言加载几十秒才出 (LLM 流卡住)
+          // 修: 加 8s 总超时, 超过兑底给硬编码名言 (避免 banner 一直不显示)
+          .timeout(const Duration(seconds: 8), onTimeout: () {
+        debugPrint('名言 总 8s 超时, 兑底');
+        return isEn
+            ? 'The impediment to action advances action. — Marcus Aurelius'
+            : '竹杖芒鞋轻胜马, 谁怕? 一蓑烟雨任平生。';
+      });
       // 6/26 Brien 反馈: LLM 1.5b 推 250 字新闻, 不是 25 字名言 → 硬截断 50 字
       final trimmed = quote.length > 50 ? '${quote.substring(0, 50)}…' : quote;
       if (!mounted) return;

@@ -6,6 +6,7 @@ import '../services/analytics_service.dart';
 import '../services/time_aware_recommender.dart';
 import '../services/handle_service.dart';
 import '../services/history_service.dart';
+import '../main.dart' as appMain;
 import 'content_screen.dart';
 import 'loading_screen.dart';
 import 'ai_assistant_screen.dart';
@@ -97,6 +98,8 @@ class _SceneScreenState extends State<SceneScreen> {
               // 6/28 Brien 反馈: 保留 LoadingScreen 作为 '强行刷新' 入口
               // LoadingScreen 内部 按 '开始' → ForceReloadSignal.notifyReload() + pop
               // MainHomeScreen._onForceReload 监听到信号后重新拉推荐池
+              // 6/30 13:02 Brien APK bug: 开始按钮点了没反应 — webForceReload 在 APK stub
+              // 修: onComplete 走 Navigator.pop + 通过 globalMainKey 调 MainHomeScreen._reloadAll()
               Navigator.of(context).push(
                 MaterialPageRoute(
                   builder: (_) => LoadingScreen(
@@ -104,6 +107,19 @@ class _SceneScreenState extends State<SceneScreen> {
                     isInternational: widget.isInternational,
                     isElderlyMode: widget.isElderlyMode,
                     languageCode: widget.languageCode,
+                    onComplete: () {
+                      // 6/30 13:02: APK 不走 webForceReload, 走 Navigator.pop + MainHomeScreen reload
+                      Navigator.of(context).pop();
+                      // 调 MainHomeScreen._reloadAll() 重新拉关注列表 + 每日名言
+                      try {
+                        final state = appMain.globalMainKey.currentState;
+                        if (state != null) {
+                          (state as dynamic)._reloadAll();
+                        }
+                      } catch (e) {
+                        debugPrint('[scene] reload failed: $e');
+                      }
+                    },
                   ),
                 ),
               );
