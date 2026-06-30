@@ -361,9 +361,7 @@ class _SearchScreenState extends State<SearchScreen> {
                 onPressed: () async {
                   await LocalSubscriptionService.instance.subscribe(item);
                   if (context.mounted) {
-                    ScaffoldMessenger.of(context).showSnackBar(
-                      SnackBar(content: Text(isEn ? 'Added to Saved' : '已收藏')),
-                    );
+                    _showFloatingSnack(context, isEn ? 'Added to Saved' : '已收藏');
                   }
                 },
               ),
@@ -373,4 +371,16 @@ class _SearchScreenState extends State<SearchScreen> {
       ),
     );
   }
+}
+
+// 6/30 11:43 SOUL #32: 浮起 SnackBar, 不挡底部 nav
+void _showFloatingSnack(BuildContext context, String message) {
+  ScaffoldMessenger.of(context).showSnackBar(
+    SnackBar(
+      content: Text(message),
+      behavior: SnackBarBehavior.floating,
+      margin: const EdgeInsets.only(bottom: 80, left: 16, right: 16),
+      duration: const Duration(seconds: 2),
+    ),
+  );
 }

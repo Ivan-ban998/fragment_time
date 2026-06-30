@@ -748,9 +748,7 @@ class _ContentScreenState extends State<ContentScreen> {
         await LocalSubscriptionService.instance.subscribe(item);
         AnalyticsService.instance.track(AnalyticsService.EVT_SAVE);
         if (mounted) {
-          ScaffoldMessenger.of(context).showSnackBar(
-            SnackBar(content: Text(isEn ? 'Saved' : '已收藏'), duration: const Duration(seconds: 1)),
-          );
+          _showFloatingSnack(context, isEn ? 'Saved' : '已收藏');
         }
       } catch (_) {}
     } else {
@@ -765,9 +763,7 @@ class _ContentScreenState extends State<ContentScreen> {
       await ShareService.instance.shareContent(item, isEn: isEn);
     } catch (e) {
       if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text(isEn ? 'Share failed' : '分享失败')),
-        );
+        _showFloatingSnack(context, isEn ? 'Share failed' : '分享失败');
       }
     }
   }
@@ -1199,9 +1195,7 @@ class _ContentScreenState extends State<ContentScreen> {
       );
     } catch (_) {
       if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text(isEn ? 'Failed to load groups' : '加载小组失败')),
-        );
+        _showFloatingSnack(context, isEn ? 'Failed to load groups' : '加载小组失败');
       }
     }
   }
@@ -1230,9 +1224,7 @@ class _ContentScreenState extends State<ContentScreen> {
       );
     } catch (_) {
       if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text(isEn ? 'Failed to load recap' : '加载周报失败')),
-        );
+        _showFloatingSnack(context, isEn ? 'Failed to load recap' : '加载周报失败');
       }
     }
   }
@@ -1460,4 +1452,16 @@ class _ContentScreenState extends State<ContentScreen> {
         );
     }
   }
+}
+
+// 6/30 11:43 SOUL #32: 浮起 SnackBar, 不挡底部 nav
+void _showFloatingSnack(BuildContext context, String message) {
+  ScaffoldMessenger.of(context).showSnackBar(
+    SnackBar(
+      content: Text(message),
+      behavior: SnackBarBehavior.floating,
+      margin: const EdgeInsets.only(bottom: 80, left: 16, right: 16),
+      duration: const Duration(seconds: 2),
+    ),
+  );
 }
