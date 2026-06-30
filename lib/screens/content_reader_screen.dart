@@ -301,34 +301,18 @@ class _ContentReaderScreenState extends State<ContentReaderScreen> {
       await _subService.unsubscribe(item);
       if (mounted) {
         setState(() => _isSubscribed = false);
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Text(isEn ? 'Removed from Saved' : '已移除收藏'),
-            action: SnackBarAction(
-              label: isEn ? 'Undo' : '撤销',
-              onPressed: () async {
-                await _subService.subscribe(item);
-                if (mounted) setState(() => _isSubscribed = true);
-              },
-            ),
-          ),
+        _showFloatingSnack(
+          context,
+          isEn ? 'Removed from Saved' : '已移除收藏',
         );
       }
     } else {
       await _subService.subscribe(item);
       if (mounted) {
         setState(() => _isSubscribed = true);
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Text(isEn ? 'Added to Saved' : '已收藏'),
-            action: SnackBarAction(
-              label: isEn ? 'View' : '查看',
-              onPressed: () {
-                // 主屏有订阅 tab，但 Navigator.pop 回主屏才能切换
-                Navigator.pop(context);
-              },
-            ),
-          ),
+        _showFloatingSnack(
+          context,
+          isEn ? 'Added to Saved' : '已收藏',
         );
       }
     }
@@ -425,9 +409,7 @@ class _ContentReaderScreenState extends State<ContentReaderScreen> {
     final g = allGroups.firstWhere((x) => x.id == targetGroupId,
         orElse: () => allGroups.first);
     if (!mounted) return;
-    ScaffoldMessenger.of(context).showSnackBar(
-      SnackBar(content: Text(isEn ? 'Added to ${g.name}' : '已加入 ${g.name}')),
-    );
+    _showFloatingSnack(context, isEn ? 'Added to ${g.name}' : '已加入 ${g.name}');
   }
 
   // 6/12 加: 快速创建小组弹窗（不要求选角色 / handle）
@@ -468,9 +450,7 @@ class _ContentReaderScreenState extends State<ContentReaderScreen> {
           FilledButton(
             onPressed: () async {
               if (nameCtrl.text.trim().isEmpty) {
-                ScaffoldMessenger.of(ctx).showSnackBar(
-                  SnackBar(content: Text(isEn ? 'Name required' : '要填小组名')),
-                );
+                _showFloatingSnack(ctx, isEn ? 'Name required' : '要填小组名');
                 return;
               }
               final myHandle = await HandleService().get();
@@ -529,11 +509,15 @@ class _ContentReaderScreenState extends State<ContentReaderScreen> {
               final messenger = ScaffoldMessenger.of(context);
               final ok = await ShareService.instance.shareContent(item, isEn: isEn);
               messenger.showSnackBar(
-                SnackBar(content: Text(
-                  ok
-                      ? (isEn ? 'Card saved' : '已生成卡片')
-                      : (isEn ? 'Copied to clipboard' : '已复制到剪贴板'),
-                )),
+                SnackBar(
+                  content: Text(
+                    ok
+                        ? (isEn ? 'Card saved' : '已生成卡片')
+                        : (isEn ? 'Copied to clipboard' : '已复制到剪贴板'),
+                  ),
+                  behavior: SnackBarBehavior.floating,
+                  margin: const EdgeInsets.only(bottom: 80, left: 16, right: 16),
+                ),
               );
             },
           ),
@@ -1425,4 +1409,17 @@ class _PriceBadgeWidget extends StatelessWidget {
       ),
     );
   }
+}
+
+
+// 6/30 11:48 SOUL #32: 浮起 SnackBar, 不挡底部 nav
+void _showFloatingSnack(BuildContext context, String message) {
+  ScaffoldMessenger.of(context).showSnackBar(
+    SnackBar(
+      content: Text(message),
+      behavior: SnackBarBehavior.floating,
+      margin: const EdgeInsets.only(bottom: 80, left: 16, right: 16),
+      duration: const Duration(seconds: 2),
+    ),
+  );
 }
