@@ -78,9 +78,7 @@ class SettingsTab extends StatelessWidget {
     if (result != null) {
       await HandleService().set(result);
       if (context.mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text(isEn ? 'Handle saved' : 'handle 已保存')),
-        );
+        _showFloatingSnack(context, isEn ? 'Handle saved' : 'handle 已保存');
       }
     }
   }
@@ -113,9 +111,7 @@ class SettingsTab extends StatelessWidget {
     if (result != null) {
       await RobotNameService().set(result);
       if (context.mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text(isEn ? 'AI name saved' : 'AI 昵称已保存')),
-        );
+        _showFloatingSnack(context, isEn ? 'AI name saved' : 'AI 昵称已保存');
       }
     }
   }
@@ -180,9 +176,7 @@ class SettingsTab extends StatelessWidget {
     } catch (e) {
       if (context.mounted) Navigator.pop(context); // 关 loading
       if (context.mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text(isEn ? 'Recap failed: $e' : '回顾失败: $e')),
-        );
+        _showFloatingSnack(context, isEn ? 'Recap failed: $e' : '回顾失败: $e');
       }
       return;
     }
@@ -899,3 +893,15 @@ String _userTypeNameEn(UserType t) {
 }
 
 
+
+// 6/30 11:36 SOUL #32: 浮起 SnackBar, 不挡底部 nav (默认底部弹会压 nav)
+void _showFloatingSnack(BuildContext context, String message) {
+  ScaffoldMessenger.of(context).showSnackBar(
+    SnackBar(
+      content: Text(message),
+      behavior: SnackBarBehavior.floating,
+      margin: const EdgeInsets.only(bottom: 80, left: 16, right: 16),
+      duration: const Duration(seconds: 2),
+    ),
+  );
+}
