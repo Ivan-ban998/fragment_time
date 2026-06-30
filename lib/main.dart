@@ -511,6 +511,8 @@ class _MainHomeScreenState extends State<MainHomeScreen> {
 
   // 6/12 加: 检查是否首启
   // 6/18 改: 强制跳过 onboarding (Brien 看完 3 屏后确认 30s 引导是累赘)
+  // 6/30 12:11 WARNING: onboarding 已被 Brien 判定累赘, 代码强制跳过 (_showOnboarding=false)
+  // 不要加任何 "恢复 onboarding" 的逻辑, 要恢复跟 Brien 确认
   Future<void> _checkOnboarding() async {
     // 直接写 prefs,跟 OnboardingScreen._kShownKey = 'onboarding_shown_v1' 一致
     final prefs = await SharedPreferences.getInstance();
