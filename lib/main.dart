@@ -38,7 +38,6 @@ import 'services/news_service.dart';
 import 'services/llm_service.dart';
 import 'screens/content_reader_screen.dart';
 import 'screens/ai_assistant_screen.dart';
-import 'screens/ai_tab_screen.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
 /// 6/14 v4 公开跨屏导航入口:content_screen "去搜索" 按钣直接调
@@ -343,7 +342,7 @@ class _MainHomeScreenState extends State<MainHomeScreen> {
   UserType? _selectedUserType;
   List<ContentItem> _subscribedItems = [];
   int _subscriptionCount = 0;
-  int _selectedIndex = 0;
+  int _selectedIndex = 0; // 6/30 09:42: 默认进场景 (Tab 0), AI 是场景页浮动按钮
   String _streakMessage = '';
   // 6/12 加: 首次启动引导
   bool _showOnboarding = false;
@@ -793,9 +792,7 @@ class _MainHomeScreenState extends State<MainHomeScreen> {
           IndexedStack(
             index: _selectedIndex,
             children: [
-              // 6/30 00:15: Tab 0 — AI 助手 (头像+按钮+chip 行, 点按钮弹 chat sheet)
-              const AiTabScreen(),
-              // 6/24 v12: Tab 1 — 原 Tab 0, SceneScreen / UserTypeScreen
+              // 6/30 09:42: AI 助手改为场景页 FAB 浮动按钮, 不占 Tab
               _Tab0Switcher(
                 selectedUserType: _selectedUserType,
                 config: config,
@@ -958,17 +955,16 @@ class _MainHomeScreenState extends State<MainHomeScreen> {
               decoration: GlassStyle.glassCapsule(),
               child: Row(
                 children: [
-                  _buildNavItem(0, Icons.support_agent_outlined, Icons.support_agent, isEn ? 'AI' : 'AI'),
-                  _buildNavItem(1, Icons.home_outlined, Icons.home, isEn ? 'Home' : '场景'),
-                  _buildNavItem(2, Icons.search_outlined, Icons.search, isEn ? 'Search' : '搜索'),
+                  _buildNavItem(0, Icons.home_outlined, Icons.home, isEn ? 'Home' : '场景'),
+                  _buildNavItem(1, Icons.search_outlined, Icons.search, isEn ? 'Search' : '搜索'),
                   _buildNavItem(
-                    3,
+                    2,
                     Icons.bookmark_outline,
                     Icons.bookmark,
                     isEn ? 'Saved' : '收藏',
                     badge: _subscriptionCount,
                   ),
-                  _buildNavItem(4, Icons.settings_outlined, Icons.settings, isEn ? 'Settings' : '设置'),
+                  _buildNavItem(3, Icons.settings_outlined, Icons.settings, isEn ? 'Settings' : '设置'),
                 ],
               ),
             ),
@@ -1489,11 +1485,13 @@ class _QuoteDetailSheet extends StatelessWidget {
   final bool isEn;
   final String? quote;
   final List<String>? llmKeywords;
+  final UserType? selectedUserType; // 6/30 10:11: 问 AI 用
   const _QuoteDetailSheet({
     required this.recent,
     required this.isEn,
     required this.quote,
     this.llmKeywords,
+    this.selectedUserType,
   });
 
   @override
@@ -1546,6 +1544,7 @@ class _QuoteDetailSheet extends StatelessWidget {
                         isElderlyMode: false, // quote sheet 拿不到 MainHomeScreen isElderlyMode, 兑底 false
                         userTypeName: 'you', // 兑底
                         contextQuote: quote,
+                        userType: selectedUserType, // 6/30 10:11: 帮推荐/答疑用
                       ),
                     );
                   },
