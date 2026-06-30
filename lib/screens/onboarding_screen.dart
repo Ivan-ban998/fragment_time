@@ -7,6 +7,10 @@ import '../theme/glass_decoration.dart';
 
 /// 6/12 加: 首次启动 30s 引导（3 步 + 跳过）
 /// 完成后写 SharedPreferences 标记，下次不再弹
+///
+/// 6/30 12:11 DEPRECATED: Brien 6/18 判定 30s 引导是累赘, main.dart `_checkOnboarding` 强制写 prefs true + 设 `_showOnboarding=false`
+/// 这个 widget 永远不会被渲染. 保留是为了: (1) 防止 main.dart import 报错 (2) 万一以后 Brien 要恢复可用
+/// **不要在这个 widget 上加新逻辑, 也不要在 main.dart 调用它**
 class OnboardingScreen extends StatefulWidget {
   static const _kShownKey = 'onboarding_shown_v1';
 
