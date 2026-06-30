@@ -172,6 +172,7 @@ class _AiAssistantScreenState extends State<AiAssistantScreen> {
 
   Timer? _streamTimer;
   bool _sending = false; // 6/29 17:05: 防双击
+  bool _llmRetried = false; // 6/30 12:03: LLM 第一次失败自动重试 1 次, 防死循环
 
   // 6/29 16:59: 快捷选项卡 — 6 个一键选项, 直接走硬编码真 title (不调 LLM, 免 30s+ 慢)
   // 6/29 17:05: chip 跳过 LLM, 直接 add 真 card, 0 慢
@@ -362,7 +363,24 @@ ${libTitles.map((t) => '- $t').join('\n')}
       },
       onError: (e) {
         if (!mounted) return;
+        if (!_llmRetried) {
+          // 6/30 12:03: 第一次失败自动重试 1 次 (免用户手点)
+          _llmRetried = true;
+          setState(() {
+            _messages[aiIdx] = _ChatMessage(
+              text: widget.isEn ? '(retrying...)' : '（重试中...）',
+              isUser: false,
+            );
+          });
+          Future.delayed(const Duration(milliseconds: 1500), () {
+            if (!mounted) return;
+            _sending = false;
+            _handleRecommend(); // 重新调, 不重建 stream, _llmRetried 会阻止再次 retry
+          });
+          return;
+        }
         _sending = false;
+        _llmRetried = false;
         setState(() {
           _messages[aiIdx] = _ChatMessage(
             text: widget.isEn
@@ -375,6 +393,7 @@ ${libTitles.map((t) => '- $t').join('\n')}
       onDone: () async {
         if (!mounted) return;
         _sending = false;
+        _llmRetried = false;
         final raw = buf.toString().trim();
         final cards = await _tryParseCards(raw) ?? <_ContentCard>[];
         if (cards.isEmpty) {
@@ -470,7 +489,24 @@ $historyCtx
       },
       onError: (e) {
         if (!mounted) return;
+        if (!_llmRetried) {
+          // 6/30 12:03: 第一次失败自动重试 1 次 (免用户手点)
+          _llmRetried = true;
+          setState(() {
+            _messages[aiIdx] = _ChatMessage(
+              text: widget.isEn ? '(retrying...)' : '（重试中...）',
+              isUser: false,
+            );
+          });
+          Future.delayed(const Duration(milliseconds: 1500), () {
+            if (!mounted) return;
+            _sending = false;
+            _handleQa();
+          });
+          return;
+        }
         _sending = false;
+        _llmRetried = false;
         setState(() {
           _messages[aiIdx] = _ChatMessage(
             text: widget.isEn
@@ -483,6 +519,7 @@ $historyCtx
       onDone: () {
         if (!mounted) return;
         _sending = false;
+        _llmRetried = false;
         setState(() {
           _messages[aiIdx] = _ChatMessage(
             text: buf.toString().trim(),
@@ -619,6 +656,7 @@ Rules:
       onError: (e) {
         if (!mounted) return;
         _sending = false; // 6/29 17:05: 错误也释放防双击
+        _llmRetried = false; // 6/30 12:03: _send 走手动重试, 重置 flag
         setState(() {
           _messages[aiIdx] = _ChatMessage(
             text: widget.isEn
