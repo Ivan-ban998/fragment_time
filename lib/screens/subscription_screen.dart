@@ -50,9 +50,7 @@ class _SubscriptionScreenState extends State<SubscriptionScreen> {
     await Future.delayed(const Duration(milliseconds: 200));
     if (!mounted) return;
     setState(() => _saving = false);
-    ScaffoldMessenger.of(context).showSnackBar(
-      SnackBar(content: Text(widget.isEn ? 'Saved' : '已保存')),
-    );
+    _showFloatingSnack(context, widget.isEn ? 'Saved' : '已保存');
   }
 
   Future<void> _toggleSource(ContentSource source) async {
@@ -377,4 +375,17 @@ class _SubscriptionScreenState extends State<SubscriptionScreen> {
       ],
     );
   }
+}
+
+
+// 6/30 11:52 SOUL #32: 浮起 SnackBar, 不挡底部 nav
+void _showFloatingSnack(BuildContext context, String message) {
+  ScaffoldMessenger.of(context).showSnackBar(
+    SnackBar(
+      content: Text(message),
+      behavior: SnackBarBehavior.floating,
+      margin: const EdgeInsets.only(bottom: 80, left: 16, right: 16),
+      duration: const Duration(seconds: 2),
+    ),
+  );
 }
