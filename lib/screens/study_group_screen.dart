@@ -106,7 +106,7 @@ class _StudyGroupScreenState extends State<StudyGroupScreen> {
               FilledButton(
                 onPressed: () async {
                   if (nameCtrl.text.trim().isEmpty || topicCtrl.text.trim().isEmpty || handleCtrl.text.trim().isEmpty) {
-                    ScaffoldMessenger.of(ctx).showSnackBar(SnackBar(content: Text(isEn ? 'fill all fields' : '填全部字段')));
+                    _showFloatingSnack(ctx, isEn ? 'fill all fields' : '填全部字段');
                     return;
                   }
                   await StudyGroupService.instance.create(
@@ -222,9 +222,7 @@ class _StudyGroupScreenState extends State<StudyGroupScreen> {
                 // 6/9 share-link：复制 URL 到剪贴板
                 final url = 'http://100.89.204.123:9090/#/study/${groups[i].id}';
                 Clipboard.setData(ClipboardData(text: url));
-                ScaffoldMessenger.of(context).showSnackBar(
-                  SnackBar(content: Text(widget.isEn ? 'Link copied: $url' : '链接已复制：$url')),
-                );
+                _showFloatingSnack(context, widget.isEn ? 'Link copied: $url' : '链接已复制：$url');
               },
             ),
           );
@@ -385,4 +383,17 @@ class _GroupCard extends StatelessWidget {
       ),
     );
   }
+}
+
+
+// 6/30 11:51 SOUL #32: 浮起 SnackBar, 不挡底部 nav
+void _showFloatingSnack(BuildContext context, String message) {
+  ScaffoldMessenger.of(context).showSnackBar(
+    SnackBar(
+      content: Text(message),
+      behavior: SnackBarBehavior.floating,
+      margin: const EdgeInsets.only(bottom: 80, left: 16, right: 16),
+      duration: const Duration(seconds: 2),
+    ),
+  );
 }

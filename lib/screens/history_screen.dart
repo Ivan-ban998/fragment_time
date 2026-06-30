@@ -39,9 +39,7 @@ class _HistoryScreenState extends State<HistoryScreen> {
     await HistoryService.instance.clear();
     await _load();
     if (mounted) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text(widget.isEn ? 'History cleared' : '历史已清空')),
-      );
+      _showFloatingSnack(context, widget.isEn ? 'History cleared' : '历史已清空');
     }
   }
 
@@ -73,9 +71,7 @@ class _HistoryScreenState extends State<HistoryScreen> {
     await HistoryService.instance.removeById(id);
     await _load();
     if (mounted) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text(isEn ? 'Entry deleted' : '已删除')),
-      );
+      _showFloatingSnack(context, isEn ? 'Entry deleted' : '已删除');
     }
   }
 
@@ -252,4 +248,17 @@ class _HistoryCard extends StatelessWidget {
         return Icons.article_outlined;
     }
   }
+}
+
+
+// 6/30 11:51 SOUL #32: 浮起 SnackBar, 不挡底部 nav
+void _showFloatingSnack(BuildContext context, String message) {
+  ScaffoldMessenger.of(context).showSnackBar(
+    SnackBar(
+      content: Text(message),
+      behavior: SnackBarBehavior.floating,
+      margin: const EdgeInsets.only(bottom: 80, left: 16, right: 16),
+      duration: const Duration(seconds: 2),
+    ),
+  );
 }
