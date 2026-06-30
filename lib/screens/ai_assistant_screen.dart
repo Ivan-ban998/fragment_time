@@ -47,6 +47,7 @@ class _AiAssistantScreenState extends State<AiAssistantScreen> {
   final _focusNode = FocusNode(); // 6/30 11:01: 点 "自由聊" chip 自动 focus 输入框 + 弹键盘
   final List<_ChatMessage> _messages = [];
   String _dailyGreeting = ''; // 6/30 12:23: sheet 顶部今日总结 (AI 主动提)
+  List<String> _contextSuggestions = []; // 6/30 12:40: 基于今日历史的 3 个可点提问
 
 
   @override
@@ -58,53 +59,75 @@ class _AiAssistantScreenState extends State<AiAssistantScreen> {
 
   // 6/30 12:23: 顶部总结 — 今日历史主题 + 1 句鼓励
   Future<void> _loadDailyGreeting() async {
+    final history = widget.todayHistory ?? const <HistoryItem>[];
+    if (history.isEmpty) {
+      // 6/30 12:23: 历史为空 → 1 句引导 (不调 LLM, 避免冷启动)
+      if (!mounted) return;
+      setState(() {
+        _dailyGreeting = widget.isEn
+            ? 'Pick a scene on Home — I\'ll help you digest what you read.'
+            : '去首页选个场景看看，读完来找我帮你理清。';
+        _contextSuggestions = [];
+      });
+      return;
+    }
+    // 6/30 12:40: 有历史 → 3 个上下文建议 (AI 生成, 5s 超时 fallback 静态)
+    final topics = history.take(5).map((h) => h.title).join('、');
+    final sys = widget.isEn
+        ? '''You are an AI assistant. User opened chat. They read today: $topics.
+Suggest 3 short questions (under 15 words each) they'd want to ask. One per line, no numbering, no quotes.'''
+        : '''你是 AI 助手。用户刚打开 chat。他今天读了: $topics。
+建议 3 个他可能想问的提问 (每条不超过 15 字)。每行一个, 不要编号, 不要引号。''';
     try {
-      final history = widget.todayHistory ?? const <HistoryItem>[];
-      if (history.isEmpty) {
-        if (!mounted) return;
-        setState(() {
-          _dailyGreeting = widget.isEn
-              ? 'Pick a scene on Home — I\'ll help you digest what you read.'
-              : '去首页选个场景看看，读完来找我帮你理清。';
-        });
-        return;
-      }
-      final topics = history.take(5).map((h) => h.title).join('、');
-      final sys = widget.isEn
-          ? 'You are a warm AI assistant. User just opened the chat. They read these today: $topics. Give a 1-sentence warm greeting under 25 words, no JSON, no quotes.'
-          : '你是温和的 AI 助手。用户刚打开 chat 弹层。他今天读了: $topics。给 1 句不超过 25 字的温暖问候, 不要 JSON, 不要引号。';
       final buf = StringBuffer();
       await LlmService.chatStream(messages: [
         {'role': 'system', 'content': sys},
-        {'role': 'user', 'content': widget.isEn ? 'Hi' : '你好'},
+        {'role': 'user', 'content': widget.isEn ? 'Suggest' : '建议'},
       ]).timeout(const Duration(seconds: 5), onTimeout: (sink) {
         sink.close();
       }).forEach((chunk) {
         buf.write(chunk);
       });
       if (!mounted) return;
-      final greeting = buf.toString().trim();
-      setState(() {
-        _dailyGreeting = greeting.isNotEmpty
-            ? greeting
-            : (widget.isEn
-                ? 'You read $topics today — nice work.'
-                : '今天读了: $topics, 不错!');
-      });
+      final raw = buf.toString().trim();
+      // 拆行, 去空, 取前 3
+      final suggestions = raw
+          .split(RegExp(r'[\n\r]'))
+          .map((s) => s.trim().replaceAll(RegExp(r'^[\d\.\-\*\s]+'), ''))
+          .where((s) => s.isNotEmpty && s.length <= 30)
+          .take(3)
+          .toList();
+      if (mounted) {
+        setState(() {
+          _contextSuggestions = suggestions.isNotEmpty
+              ? suggestions
+              : _staticSuggestions(history, topics);
+          _dailyGreeting = '';
+        });
+      }
     } catch (_) {
       if (!mounted) return;
-      final history = widget.todayHistory ?? const <HistoryItem>[];
-      final topics = history.take(3).map((h) => h.title).join('、');
       setState(() {
-        _dailyGreeting = history.isEmpty
-            ? (widget.isEn
-                ? 'Pick a scene on Home — I\'ll help you digest what you read.'
-                : '去首页选个场景看看，读完来找我帮你理清。')
-            : (widget.isEn
-                ? 'You read $topics today — nice work.'
-                : '今天读了: $topics, 不错!');
+        _contextSuggestions = _staticSuggestions(history, topics);
+        _dailyGreeting = '';
       });
     }
+  }
+
+  // 6/30 12:40: LLM 失败 fallback 静态 3 个建议
+  List<String> _staticSuggestions(List<HistoryItem> history, String topics) {
+    final firstTitle = history.first.title;
+    return widget.isEn
+        ? [
+            'Summarize what I read today',
+            'Why does "$firstTitle" matter?',
+            'What should I read next?',
+          ]
+        : [
+            '总结一下今天读的',
+            '为什么《$firstTitle》重要?',
+            '下一篇读什么?',
+          ];
   }
   static const _historyKey = 'ai_chat_history_v1';
   static const _maxHistory = 30; // 保留最近 30 条
@@ -951,25 +974,45 @@ Rules:
               ),
             ),
             // 6/30 12:23: 顶部今日总结 banner — AI 主动提 (区别于被动聊天)
-            if (_dailyGreeting.isNotEmpty)
+            // 6/30 12:40 升级: 3 个上下文建议 chip (可点) — C 功能的落地
+            if (_contextSuggestions.isNotEmpty)
               Container(
                 width: double.infinity,
-                padding: EdgeInsets.fromLTRB(20 * scale, 8 * scale, 20 * scale, 10 * scale),
-                child: Row(
+                padding: EdgeInsets.fromLTRB(20 * scale, 8 * scale, 20 * scale, 8 * scale),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    Icon(Icons.auto_awesome, size: 14 * scale, color: const Color(0xFF7C5CFC)),
-                    SizedBox(width: 8 * scale),
-                    Expanded(
-                      child: Text(
-                        _dailyGreeting,
-                        style: TextStyle(
-                          fontSize: 12 * scale,
-                          color: Colors.black54,
-                          fontStyle: FontStyle.italic,
+                    Row(
+                      children: [
+                        Icon(Icons.auto_awesome, size: 14 * scale, color: const Color(0xFF7C5CFC)),
+                        SizedBox(width: 6 * scale),
+                        Text(
+                          widget.isEn ? 'Based on today' : '基于今日',
+                          style: TextStyle(
+                            fontSize: 11 * scale,
+                            color: const Color(0xFF7C5CFC),
+                            fontWeight: FontWeight.w600,
+                          ),
                         ),
-                        maxLines: 2,
-                        overflow: TextOverflow.ellipsis,
-                      ),
+                      ],
+                    ),
+                    SizedBox(height: 6 * scale),
+                    Wrap(
+                      spacing: 6 * scale,
+                      runSpacing: 4 * scale,
+                      children: _contextSuggestions.map((s) => ActionChip(
+                        label: Text(
+                          s,
+                          style: TextStyle(fontSize: 12 * scale),
+                        ),
+                        backgroundColor: const Color(0xFF7C5CFC).withOpacity(0.08),
+                        side: BorderSide(color: const Color(0xFF7C5CFC).withOpacity(0.3)),
+                        onPressed: () {
+                          // 点 chip → 直接送到输入框 (用户可改后再发)
+                          _controller.text = s;
+                          _focusNode.requestFocus();
+                        },
+                      )).toList(),
                     ),
                   ],
                 ),
