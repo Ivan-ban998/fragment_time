@@ -433,6 +433,22 @@ ${libTitles.map((t) => '- $t').join('\n')}
       ));
     });
     _scheduleSave();
+    // 6/30 12:16: 历史为空时不调 LLM (避免冷启动 30s 等), 直接给友好回复
+    final history = widget.todayHistory ?? const <HistoryItem>[];
+    if (history.isEmpty) {
+      if (!mounted) return;
+      _sending = false;
+      setState(() {
+        _messages.add(_ChatMessage(
+          text: widget.isEn
+              ? 'You haven\'t read anything today yet — open the Home tab and pick a scene, then come back. I\'ll make sense of what you read.'
+              : '你今天还没读过东西——去首页选个场景看看吧。读完了再来找我帮你理清。',
+          isUser: false,
+        ));
+      });
+      _scheduleSave();
+      return;
+    }
     final aiIdx = _messages.length;
     setState(() => _messages.add(_ChatMessage(text: '', isUser: false)));
     _streamTimer?.cancel();
@@ -447,13 +463,10 @@ ${libTitles.map((t) => '- $t').join('\n')}
         });
       }
     });
-    final history = widget.todayHistory ?? const <HistoryItem>[];
-    final historyCtx = history.isEmpty
-        ? (widget.isEn ? 'No items read today.' : '今天还没读过。')
-        : history
-            .take(8)
-            .map((h) => '- ${h.title} (${h.source})')
-            .join('\n');
+    final historyCtx = history
+        .take(8)
+        .map((h) => '- ${h.title} (${h.source})')
+        .join('\n');
     final sys = widget.isEn
         ? '''You are a warm AI reading assistant. The user has read these items today:
 $historyCtx
