@@ -25,6 +25,7 @@ class AiAssistantScreen extends StatefulWidget {
   final String? contextQuote; // 6/29 段 4: 从 quote banner 传过来
   final String userTypeName;
   final UserType? userType; // 6/30 10:11: 帮推荐/答疑需要按角色调 LLM
+  final Scene? scene; // 7/1: 推荐兑底用 userType + scene 调 NewsService
   final List<HistoryItem>? todayHistory; // 6/30 10:11: 答疑基于今日历史回答
 
   const AiAssistantScreen({
@@ -34,6 +35,7 @@ class AiAssistantScreen extends StatefulWidget {
     required this.userTypeName,
     this.contextQuote,
     this.userType,
+    this.scene,
     this.todayHistory,
   });
 
@@ -474,14 +476,28 @@ ${libTitles.map((t) => '- $t').join('\n')}
         final raw = buf.toString().trim();
         final cards = await _tryParseCards(raw) ?? <_ContentCard>[];
         if (cards.isEmpty) {
-          setState(() {
-            _messages[aiIdx] = _ChatMessage(
-              text: widget.isEn
-                  ? 'No library match. Try again.'
-                  : '没命中库, 再点一次。',
-              isUser: false,
-            );
-          });
+          // 7/1 优化: 兜底给 3 条随机库内容, 不让用户卡住
+          final fallbacks = await _fallbackCards();
+          if (fallbacks.isEmpty) {
+            setState(() {
+              _messages[aiIdx] = _ChatMessage(
+                text: widget.isEn
+                    ? 'No library match. Try again.'
+                    : '没命中库, 再点一次。',
+                isUser: false,
+              );
+            });
+          } else {
+            setState(() {
+              _messages[aiIdx] = _ChatMessage(
+                text: widget.isEn
+                    ? 'Library fallback (try more keywords next time):'
+                    : '库里兑底（下次换关键词试试）:',
+                isUser: false,
+                cards: fallbacks,
+              );
+            });
+          }
           _scheduleSave();
           return;
         }
@@ -511,6 +527,7 @@ ${libTitles.map((t) => '- $t').join('\n')}
     });
     _scheduleSave();
     // 6/30 12:16: 历史为空时不调 LLM (避免冷启动 30s 等), 直接给友好回复
+    // 7/1: 保留现有提示 + 附建议性 follow-up (不像之前那样跳出菜单, 避免占用邮箱)
     final history = widget.todayHistory ?? const <HistoryItem>[];
     if (history.isEmpty) {
       if (!mounted) return;
@@ -518,8 +535,8 @@ ${libTitles.map((t) => '- $t').join('\n')}
       setState(() {
         _messages.add(_ChatMessage(
           text: widget.isEn
-              ? 'You haven\'t read anything today yet — open the Home tab and pick a scene, then come back. I\'ll make sense of what you read.'
-              : '你今天还没读过东西——去首页选个场景看看吧。读完了再来找我帮你理清。',
+              ? 'No read history for today yet. Tap 📚 above to get a recommendation — once you finish one, come back and I\'ll help you make sense of it.'
+              : '今天还没有阅读记录。点上方📚 让小 O 推荐一篇, 读完了再来找我帮你理清。',
           isUser: false,
         ));
       });
@@ -845,6 +862,7 @@ Rules:
         }
         if (title.isEmpty) continue;
         // 搜真内容 — 6/29 16:35: 找不到就不渲染该 card (避免点开错位)
+        // 7/1 优化: 模糊匹配兜底 — title 切词后任一 keyword 命中都算
         ContentItem? realItem;
         try {
           final hits = await newsService.search(title);
@@ -854,6 +872,20 @@ Rules:
               (it) => _matchType(it.contentType, type),
               orElse: () => hits.first,
             );
+          } else {
+            // L2 fuzzy: title 按空白 + 中文标点切片, 任一 ≥2 字 keyword 命中标题/描述
+            final kw = _splitTitleKeywords(title);
+            for (final k in kw) {
+              if (k.length < 2) continue;
+              final fuzzyHits = await newsService.search(k);
+              if (fuzzyHits.isNotEmpty) {
+                realItem = fuzzyHits.firstWhere(
+                  (it) => _matchType(it.contentType, type),
+                  orElse: () => fuzzyHits.first,
+                );
+                break;
+              }
+            }
           }
         } catch (_) {}
         if (realItem == null) continue; // 6/29 16:35: 过滤掉找不到的 card
@@ -871,6 +903,59 @@ Rules:
     } catch (_) {
       return null;
     }
+  }
+
+  /// 7/1 优化: 全库拿 3 条随机兑底 (userType + scene 过滤, 不真的纯随机)
+  Future<List<_ContentCard>> _fallbackCards() async {
+    try {
+      final newsService = NewsService();
+      final ut = widget.userType ?? UserType.student;
+      // 7/1: 显式 navor 避开 dead_null_aware warning
+      final Scene scene = widget.scene ?? Scene.learn;
+      final pool = await newsService.getRecommendations(ut, scene);
+      if (pool.isEmpty) return [];
+      pool.shuffle();
+      return pool.take(3).map((item) {
+        return _ContentCard(
+          title: item.title,
+          type: item.contentType == ContentType.audio ? 'audio'
+              : item.contentType == ContentType.video ? 'video'
+              : item.contentType == ContentType.short ? 'short'
+              : 'article',
+          source: item.source,
+          duration: item.duration ?? '',
+          url: item.externalUrl ?? '',
+          audioUrl: item.audioUrl,
+          realItem: item,
+        );
+      }).toList();
+    } catch (_) {
+      return [];
+    }
+  }
+
+  // 7/1 优化: title 切片 — 模糊匹配兜底用
+  // 例如 "BBC 6 Minute English" → ['BBC', '6', 'Minute', 'English']
+  // 例如 "5 分钟办公室冥想" → ['5', '分钟', '办公室冥想']  (中文保留连词)
+  List<String> _splitTitleKeywords(String title) {
+    final t = title.trim();
+    final out = <String>[];
+    // 优先按中文标点切: '：' '·' '（' 等
+    final parts = t.split(RegExp(r'[\s：·、，。；！？\u3000]+'));
+    for (final p in parts) {
+      final s = p.trim();
+      if (s.isEmpty) continue;
+      // 中文短词保留整, 英文长词再切单词
+      if (RegExp(r'[一-龥]').hasMatch(s)) {
+        out.add(s);
+      } else if (s.length > 12) {
+        // 长英文词 (e.g. CommutePodcast) 按 Camel 拆
+        out.addAll(s.split(RegExp(r'(?=[A-Z])')).where((x) => x.length >= 3));
+      } else {
+        out.add(s);
+      }
+    }
+    return out;
   }
 
   // 6/29 段 6: ContentType → AI type 字符串映射

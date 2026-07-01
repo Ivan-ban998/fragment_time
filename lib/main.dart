@@ -37,6 +37,7 @@ import 'screens/settings_tab.dart';
 import 'screens/about_screen.dart';
 import 'services/news_service.dart';
 import 'services/llm_service.dart';
+import 'services/time_aware_recommender.dart'; // 7/1: quote sheet 弹 AI 时传 scene
 import 'screens/content_reader_screen.dart';
 import 'screens/ai_assistant_screen.dart';
 import 'package:shared_preferences/shared_preferences.dart';
@@ -1558,6 +1559,8 @@ class _QuoteDetailSheet extends StatelessWidget {
                         userTypeName: 'you', // 兑底
                         contextQuote: quote,
                         userType: selectedUserType, // 6/30 10:11: 帮推荐/答疑用
+                        scene: TimeAwareRecommender.recommendAt(DateTime.now(), currentUserType: selectedUserType).scene, // 7/1 推荐兑底用
+
                       ),
                     );
                   },
