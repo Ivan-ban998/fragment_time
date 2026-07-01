@@ -10,6 +10,7 @@ import '../main.dart' as appMain;
 import 'content_screen.dart';
 import 'loading_screen.dart';
 import 'ai_assistant_screen.dart';
+import 'about_screen.dart'; // 7/1: AppBar 加反馈按钮
 
 class SceneScreen extends StatefulWidget {
   final UserType userType;
@@ -124,6 +125,12 @@ class _SceneScreenState extends State<SceneScreen> {
                 ),
               );
             },
+          ),
+          // 7/1: 反馈按钮 (AppBar 顶部常驻, 用户哪都能反馈)
+          IconButton(
+            tooltip: isEn ? 'Feedback / Talk to 章鱼' : '反馈 / 跟章鱼说话',
+            icon: const Text('🐙', style: TextStyle(fontSize: 20)),
+            onPressed: () => AboutScreen.showFeedbackDialog(context, widget.languageCode),
           ),
         ],
       ),

@@ -23,7 +23,6 @@ class TimeAwareRecommender {
     // - 学生/小朋友/宝爸宝妈 → learn (学习场景)
     // - 上班族/创业者 → listen (资讯/通勤)
     // - 退休人群 → relax (慢节奏)
-    bool preferLearn() => ut == UserType.student || ut == UserType.child || ut == UserType.parent;
     bool preferListen() => ut == UserType.officeWorker || ut == UserType.entrepreneur;
     bool preferRelax() => ut == UserType.senior;
 
