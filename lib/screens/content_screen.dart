@@ -281,9 +281,21 @@ class _ContentScreenState extends State<ContentScreen> {
         _recItems = rec;
         _recLoading = false;
       });
-    } catch (_) {
-      if (!mounted) return;
-      setState(() => _recLoading = false);
+    } catch (e) {
+      // 7/1: ContentAggregator 失败 → fallback NewsService 24 桶 (避免 _recItems 永远空 → Tinder 卡不显示)
+      debugPrint('[recommend] ContentAggregator error: $e, fallback to NewsService 24 buckets');
+      try {
+        final fallback = await NewsService().getRecommendations(widget.userType, widget.scene);
+        if (!mounted) return;
+        setState(() {
+          _recItems = fallback;
+          _recLoading = false;
+        });
+      } catch (e2) {
+        debugPrint('[recommend] fallback NewsService also failed: $e2');
+        if (!mounted) return;
+        setState(() => _recLoading = false);
+      }
     }
   }
 
