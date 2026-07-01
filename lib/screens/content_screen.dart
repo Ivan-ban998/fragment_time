@@ -964,84 +964,100 @@ class _ContentScreenState extends State<ContentScreen> {
 
   // 6/22 audio 入口: 推送 ContentReaderScreen 播音频
   // 7/1 优化: 副文案 → "小 O 念你听" (TTS 体,不像假播放按钮), + 原文外部跳转
+  // 7/1 bug fix v3: 不用嵌套 InkWell (Flutter web hit-test bug), 改用 Stack + 外层 GestureDetector
   Widget _buildAudioEntry(ContentItem item) {
     final extUrl = item.externalUrl;
     final hasExt = extUrl != null && extUrl.isNotEmpty;
     return Material(
       color: AppTheme.primary.withOpacity(0.1),
       borderRadius: BorderRadius.circular(16),
-      child: InkWell(
-        borderRadius: BorderRadius.circular(16),
-        onTap: () => _pushToReader(item),
-        child: Padding(
-          padding: EdgeInsets.all(12 * _scale),
-          child: Row(
-            children: [
-              Container(
-                width: 40 * _scale,
-                height: 40 * _scale,
-                decoration: BoxDecoration(
-                  color: AppTheme.primary,
-                  borderRadius: BorderRadius.circular(20),
-                ),
-                // 7/1: 从 play_arrow 改为 record_voice_over (TTS 提示)
-                child: Icon(Icons.record_voice_over, color: Colors.white, size: 22 * _scale),
-              ),
-              SizedBox(width: 12 * _scale),
-              Expanded(
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
+      child: Stack(
+        children: [
+          // 整张卡: 点击推详情
+          Positioned.fill(
+            child: GestureDetector(
+              behavior: HitTestBehavior.opaque,
+              onTap: () => _pushToReader(item),
+              child: Padding(
+                padding: EdgeInsets.all(12 * _scale),
+                child: Row(
                   children: [
-                    Text(item.title, style: TextStyle(fontSize: 14 * _scale, fontWeight: FontWeight.w700), maxLines: 1, overflow: TextOverflow.ellipsis),
-                    Row(
-                      children: [
-                        Text(
-                          _t('小 O 念你听', 'Voice by 小 O'),
-                          style: TextStyle(fontSize: 11 * _scale, color: AppTheme.primary, fontWeight: FontWeight.w600),
-                        ),
-                        if (item.duration != null && item.duration!.isNotEmpty) ...[
-                          Text(
-                            ' · ${item.duration}',
-                            style: TextStyle(fontSize: 11 * _scale, color: AppTheme.textLight),
+                    Container(
+                      width: 40 * _scale,
+                      height: 40 * _scale,
+                      decoration: BoxDecoration(
+                        color: AppTheme.primary,
+                        borderRadius: BorderRadius.circular(20),
+                      ),
+                      child: Icon(Icons.record_voice_over, color: Colors.white, size: 22 * _scale),
+                    ),
+                    SizedBox(width: 12 * _scale),
+                    Expanded(
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Text(item.title, style: TextStyle(fontSize: 14 * _scale, fontWeight: FontWeight.w700), maxLines: 1, overflow: TextOverflow.ellipsis),
+                          Row(
+                            children: [
+                              Text(
+                                _t('小 O 念你听', 'Voice by 小 O'),
+                                style: TextStyle(fontSize: 11 * _scale, color: AppTheme.primary, fontWeight: FontWeight.w600),
+                              ),
+                              if (item.duration != null && item.duration!.isNotEmpty) ...[
+                                Text(
+                                  ' · ${item.duration}',
+                                  style: TextStyle(fontSize: 11 * _scale, color: AppTheme.textLight),
+                                ),
+                              ],
+                            ],
                           ),
                         ],
-                      ],
+                      ),
                     ),
+                    // 预留 chip 宽度空间 (避免被 chevron 压)
+                    if (hasExt) SizedBox(width: 56 * _scale),
+                    Icon(Icons.chevron_right, color: AppTheme.textLight),
                   ],
                 ),
               ),
-              // 7/1: 加外部链接 chip (有源 URL 时) — 一键开原站
-              if (hasExt)
-                GestureDetector(
-                  onTap: () async {
-                    try {
-                      await launchUrl(Uri.parse(extUrl), mode: LaunchMode.externalApplication);
-                    } catch (_) {}
-                  },
-                  child: Container(
-                    margin: EdgeInsets.only(right: 4 * _scale),
-                    padding: EdgeInsets.symmetric(horizontal: 8 * _scale, vertical: 4 * _scale),
-                    decoration: BoxDecoration(
-                      color: AppTheme.primary.withOpacity(0.15),
-                      borderRadius: BorderRadius.circular(12),
-                    ),
-                    child: Row(
-                      mainAxisSize: MainAxisSize.min,
-                      children: [
-                        Icon(Icons.open_in_new, size: 12 * _scale, color: AppTheme.primary),
-                        SizedBox(width: 3 * _scale),
-                        Text(
-                          _t('原站', 'Open'),
-                          style: TextStyle(fontSize: 10 * _scale, color: AppTheme.primary, fontWeight: FontWeight.w600),
-                        ),
-                      ],
+            ),
+          ),
+          // chip 飘在右上角, 独立 InkWell, 不参与外层 hit-test
+          if (hasExt)
+            Positioned(
+              right: 32 * _scale,
+              top: 0,
+              bottom: 0,
+              child: Center(
+                child: Material(
+                  color: AppTheme.primary.withOpacity(0.15),
+                  borderRadius: BorderRadius.circular(12),
+                  child: InkWell(
+                    borderRadius: BorderRadius.circular(12),
+                    onTap: () async {
+                      try {
+                        await launchUrl(Uri.parse(extUrl), mode: LaunchMode.externalApplication);
+                      } catch (_) {}
+                    },
+                    child: Padding(
+                      padding: EdgeInsets.symmetric(horizontal: 10 * _scale, vertical: 6 * _scale),
+                      child: Row(
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          Icon(Icons.open_in_new, size: 12 * _scale, color: AppTheme.primary),
+                          SizedBox(width: 3 * _scale),
+                          Text(
+                            _t('原站', 'Open'),
+                            style: TextStyle(fontSize: 10 * _scale, color: AppTheme.primary, fontWeight: FontWeight.w600),
+                          ),
+                        ],
+                      ),
                     ),
                   ),
                 ),
-              Icon(Icons.chevron_right, color: AppTheme.textLight),
-            ],
-          ),
-        ),
+              ),
+            ),
+        ],
       ),
     );
   }
