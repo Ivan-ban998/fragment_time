@@ -184,3 +184,58 @@ MIT — 见 [LICENSE](LICENSE)
 - #35 token 含 unicode (如 …) 被 URL encode 断, helper 不读用 URL inline
 - #36 历史/数据为空时不调 LLM 走 fallback
 - #37 新功能 ROI 评估 4 问
+
+## 📝 7/1 变更日志 (AI 体验 + 反馈系统)
+
+### AI 体验优化 (3 件)
+- 模糊匹配兜底: LLM 返回内容没命中 → fallback 静态 + NewsService 24 桶随机 3 条
+- LLM 冷启动宽容: 兑底 30s → 60s, 文案柔和 ("还在想, 约 1 分钟内")
+- 答疑空态友好: 历史空不调 LLM, 提示 "点上方 📚 推荐一篇"
+
+### AI sheet 体验
+- 问候语跟昵称联动: "你好, 我是你的 AI 助手 {nickname}"
+
+### Audio 体验 (2 件)
+- audio 入口卡文案: "点击播放音频" → "小 O 念你听 · 5min" (TTS 体, 不误导)
+- audio 入口卡加 "原站" chip (有 externalUrl 时, 一键跳喜马拉雅搜索页)
+- TTS 进度可视化: reader play bar 加 LinearProgressIndicator
+- Ollama keep_alive 续命 (避免冷启动 12-20s)
+
+### 反馈系统 (新功能闭环)
+- 设置 Tab 顶部加 "🐙 反馈 / 跟章鱼说话" 卡片 (一进就看到)
+- AboutScreen.showFeedbackDialog static: 文字 + 附带截图 (RenderRepaintBoundary → base64 PNG)
+- POST /api/feedback → NAS 写盘 `/volume1/.../feedback/{ts}-{rand}.json` + 同名 .png
+- 失败兑底: SharedPreferences FIFO 50, synced=false 标记
+- python server 加 do_POST (/api/feedback), base64 PNG 解码 + 落盘
+
+### UI 修复 (3 件)
+- audio chip v3: 不用嵌套 InkWell, 改 Stack + Positioned.fill + 独立 Positioned (修 Flutter web hit-test bug)
+- 设置页 sticky header: "设置" 标题 SliverAppBar pinned, 滚动时固定
+- 清理死代码: _OctopusActionRow (定义了但未引用) 保留以防回归
+
+### OpenClaw 升级 (后台, 自动)
+- 2026.5.27 → 2026.6.11 (npm install -g openclaw@latest)
+- 修复 managed-service-handoff-unavailable 问题 (清了过期 handoff/sentinel 锁文件)
+- CLI PATH 调整: .local/bin 优先 .npm-global/bin (.bashrc)
+
+### 13 commit (今日全推 GitHub)
+- 61952b6 LLM 自动重试 (6/30 待推)
+- 5336926 onboarding DEPRECATED (6/30 待推)
+- edb6a74 答疑空态秒回 (6/30 待推)
+- 9908a81 AI 智能化 3 件 (A banner + D 看完弹 + G 角色) (6/30 待推)
+- f8e9211 AI 智能化 C 上下文 chip (6/30 待推)
+- 156113e APK 2 bug 修 (6/30 待推)
+- b1f5ae4 README 6/30 变更日志 (6/30 待推)
+- d256215 7/1 AI 体验优化 3 件 (模糊匹配 + 兑底 + 答疑空态)
+- 384c5b1 7/1 LLM 兑底 30s → 60s + 文案柔和
+- 9aac982 7/1 AI sheet 问候语加 nickname 联动
+- 10b8a9e 7/1 audio 入口卡文案 + 原站跳转
+- c82021b 7/1 audio TTS 进度可视化 + Ollama keep_alive
+- 0f3cd2f 7/1 反馈系统 + chip v3 + 设置 sticky header
+
+### SOUL 累积 10 条 (7/1)
+- #38 大改动 fresh shell 自验, 别拿 "symlink 建了" 推论 "功能 OK"
+- #39 嵌套手势 = AbsorbPointer, 不是 Listener (Listener 只 listen 不 absorb)
+- #40 嵌套 InkWell Flutter web hit-test 不可靠 → Stack + Positioned 独立 hit-test
+- + #13 加强: 改 UI 必 puppeteer 真点一次, 不靠 build + analyze 推论 "能用"
+- + #14 加强: push 走 URL inline (ghp_xxx@github.com), helper 抓不到设备就死
