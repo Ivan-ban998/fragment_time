@@ -515,14 +515,4 @@ class AboutScreen extends StatelessWidget {
 }
 
 
-// 6/30 11:52 SOUL #32: 浮起 SnackBar, 不挡底部 nav
-void _showFloatingSnack(BuildContext context, String message) {
-  ScaffoldMessenger.of(context).showSnackBar(
-    SnackBar(
-      content: Text(message),
-      behavior: SnackBarBehavior.floating,
-      margin: const EdgeInsets.only(bottom: 80, left: 16, right: 16),
-      duration: const Duration(seconds: 3),
-    ),
-  );
-}
+// 6/30 11:52 SOUL #32: 浮起 SnackBar, 不挡底部 nav — 被 _showFloatingSnackStatic 替代

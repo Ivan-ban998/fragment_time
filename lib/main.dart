@@ -456,12 +456,6 @@ class _MainHomeScreenState extends State<MainHomeScreen> {
     });
   }
 
-  // 6/29 13:56: quote 变 prefs key 也要变 — 不然同一天 quote_saved 状态串台
-  String get _currentQuoteKey {
-    if (_dailyQuote == null || _dailyQuote!.isEmpty) return '';
-    return _dailyQuote!.hashCode.toString();
-  }
-
   // 6/24 AI 私教: 调用 LLM 生成本周总结 (周日 20:00 之后 + 本周未生成)
   // 最小版: 不做后台 timer, 启动时一次性检查
   Future<void> _checkWeeklyRecap() async {
@@ -574,7 +568,6 @@ class _MainHomeScreenState extends State<MainHomeScreen> {
   }
 
   bool get isEn => _languageCode == 'en';
-  double get _scale => _isElderlyMode ? 1.3 : 1.0;
 
   Future<void> _loadSettings() async {
     final isInt = await _localeService.getIsInternational();
@@ -982,25 +975,6 @@ class _MainHomeScreenState extends State<MainHomeScreen> {
         ),
       ),
     );
-  }
-
-  void _handleUnsubscribe(ContentItem item) async {
-    await _subService.unsubscribe(item);
-    await _loadSettings();
-    if (mounted) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: Text(isEn ? 'Unsubscribed' : '已取消订阅'),
-          action: SnackBarAction(
-            label: isEn ? 'Undo' : '撤销',
-            onPressed: () async {
-              await _subService.subscribe(item);
-              await _loadSettings();
-            },
-          ),
-        ),
-      );
-    }
   }
 }
 
