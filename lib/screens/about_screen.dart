@@ -3,8 +3,12 @@
 // 2026-06-06 改：从一行"v0.1.0" 升级为完整介绍页
 
 import 'package:flutter/material.dart';
+import 'package:flutter/rendering.dart'; // 7/1: RenderRepaintBoundary 截图
 import 'package:shared_preferences/shared_preferences.dart';
+import 'package:http/http.dart' as http;
 import 'dart:convert';
+import 'dart:typed_data'; // 7/1: ByteData base64Encode
+import 'dart:ui' as ui; // 7/1: 反馈截图 ui.Image
 import '../theme/app_theme.dart';
 import '../theme/glass_decoration.dart';
 import 'dart:ui';
@@ -15,6 +19,99 @@ class AboutScreen extends StatelessWidget {
   const AboutScreen({super.key, required this.languageCode});
 
   bool get isEn => languageCode == 'en';
+
+  // 7/1: 公开静态入口, 让 settings_tab 也能调反馈 dialog (不需要 push AboutScreen)
+  static Future<void> showFeedbackDialog(BuildContext context, String languageCode) async {
+    final isEn = languageCode == 'en';
+    final ctrl = TextEditingController();
+    bool attachScreenshot = true;
+    final result = await showDialog<String>(
+      context: context,
+      builder: (ctx) => StatefulBuilder(builder: (ctx, setState) {
+        return AlertDialog(
+          title: Row(
+            children: [
+              const Text('🐙 '),
+              Text(isEn ? 'Talk to 章鱼' : '跟章鱼说话'),
+            ],
+          ),
+          content: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Text(
+                isEn
+                    ? 'Your message will be sent directly to the author\'s NAS. Optional screenshot helps locate bugs.'
+                    : '反馈会直接发到作者 NAS。可选截图方便定位问题。',
+                style: const TextStyle(fontSize: 12, color: AppTheme.textLight),
+              ),
+              const SizedBox(height: 12),
+              TextField(
+                controller: ctrl,
+                maxLines: 5,
+                autofocus: true,
+                decoration: InputDecoration(
+                  hintText: isEn ? 'Bug report / idea / anything...' : 'Bug / 想法 / 任何事...',
+                  border: const OutlineInputBorder(),
+                ),
+              ),
+              const SizedBox(height: 8),
+              CheckboxListTile(
+                contentPadding: EdgeInsets.zero,
+                controlAffinity: ListTileControlAffinity.leading,
+                value: attachScreenshot,
+                onChanged: (v) => setState(() => attachScreenshot = v ?? true),
+                title: Text(isEn ? 'Attach screenshot (web only)' : '附带截图 (仅网页版)', style: const TextStyle(fontSize: 13)),
+              ),
+            ],
+          ),
+          actions: [
+            TextButton(onPressed: () => Navigator.pop(ctx), child: Text(isEn ? 'Cancel' : '取消')),
+            FilledButton(
+              onPressed: () async {
+                final msg = ctrl.text.trim();
+                if (msg.isEmpty) return;
+                Navigator.pop(ctx, msg + '|||' + attachScreenshot.toString());
+              },
+              child: Text(isEn ? 'Send' : '发送'),
+            ),
+          ],
+        );
+      }),
+    );
+    if (result == null || !context.mounted) return;
+    final parts = result.split('|||');
+    final msg = parts[0];
+    final attach = parts.length > 1 ? parts[1] == 'true' : true;
+    String? screenshotB64;
+    if (attach) {
+      try {
+        screenshotB64 = await _captureScreenshot();
+      } catch (e) {
+        // 忽略
+      }
+    }
+    final ok = await _submitFeedback(msg, screenshotB64, languageCode);
+    if (!context.mounted) return;
+    _showFloatingSnackStatic(
+      context,
+      ok
+          ? (isEn ? 'Sent to author NAS! 🐙' : '已发到作者 NAS! 🐙')
+          : (isEn ? 'Saved locally, will retry later.' : '已本地保存,稍后重试。'),
+    );
+  }
+
+  // 7/1: 静态 SnackBar 提示 (供 showFeedbackDialog 调用, 不依赖 instance)
+  static void _showFloatingSnackStatic(BuildContext context, String msg) {
+    final isEn = Localizations.localeOf(context).languageCode == 'en';
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(
+        content: Text(msg),
+        behavior: SnackBarBehavior.floating,
+        margin: const EdgeInsets.only(bottom: 80, left: 16, right: 16),
+      ),
+    );
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -193,7 +290,7 @@ class AboutScreen extends StatelessWidget {
                   context: context,
                   icon: Icons.chat_bubble_outline,
                   label: isEn ? 'Talk to 章鱼' : '对章鱼说话',
-                  onTap: () => _showFeedbackDialog(context, isEn),
+                  onTap: () => showFeedbackDialog(context, languageCode),
                 ),
               ),
               const SizedBox(width: 12),
@@ -272,77 +369,79 @@ class AboutScreen extends StatelessWidget {
     );
   }
 
-  // 6/14 v5: 对章鱼说话 — 反馈 dialog
-  Future<void> _showFeedbackDialog(BuildContext context, bool isEn) async {
-    final ctrl = TextEditingController();
-    final result = await showDialog<String>(
-      context: context,
-      builder: (ctx) => AlertDialog(
-        title: Row(
-          children: [
-            const Text('🐙 '),
-            Text(isEn ? 'Talk to 章鱼' : '跟章鱼说话'),
-          ],
-        ),
-        content: Column(
-          mainAxisSize: MainAxisSize.min,
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Text(
-              isEn
-                  ? 'Your message will be saved locally. The 章鱼 (OpenClaw) will pick it up next time you chat with it on the web.'
-                  : '你的反馈会保存到本地。下次你在 OpenClaw webchat 里跟章鱼说话,会自动同步过去。',
-              style: const TextStyle(fontSize: 12, color: AppTheme.textLight),
-            ),
-            const SizedBox(height: 12),
-            TextField(
-              controller: ctrl,
-              maxLines: 5,
-              autofocus: true,
-              decoration: InputDecoration(
-                hintText: isEn ? 'Bug report / idea / anything...' : 'Bug / 想法 / 任何事...',
-                border: const OutlineInputBorder(),
-              ),
-            ),
-          ],
-        ),
-        actions: [
-          TextButton(onPressed: () => Navigator.pop(ctx), child: Text(isEn ? 'Cancel' : '取消')),
-          FilledButton(
-            onPressed: () async {
-              final msg = ctrl.text.trim();
-              if (msg.isEmpty) return;
-              await _saveFeedback(msg);
-              if (ctx.mounted) Navigator.pop(ctx, msg);
-            },
-            child: Text(isEn ? 'Send' : '发送'),
-          ),
-        ],
-      ),
-    );
-    if (result != null && context.mounted) {
-      _showFloatingSnack(
-        context,
-        isEn ? 'Saved! Talk to 章鱼 on OpenClaw to sync.' : '已保存!下次跟章鱼说话会自动同步。',
-      );
+  // 7/1: 抓 Flutter web 截图 (canvaskit 不暴露 DOM canvas, 用 RenderRepaintBoundary + toImage)
+  // 思路: 找 MaterialApp 的 root RenderRepaintBoundary → toImage → ByteData PNG → base64
+  static Future<String?> _captureScreenshot() async {
+    try {
+      // 拿当前页面 RenderRepaintBoundary: dialog/popup 可能有自己 boundary
+      // 简化: 用 WidgetsBinding.instance.rootElement + 层层找
+      final RenderObject? root = WidgetsBinding.instance.rootElement?.renderObject;
+      if (root == null) return null;
+      // 递归找一个 RenderRepaintBoundary
+      RenderRepaintBoundary? boundary;
+      void visit(RenderObject node) {
+        if (boundary != null) return;
+        if (node is RenderRepaintBoundary) {
+          boundary = node;
+          return;
+        }
+        node.visitChildren(visit);
+      }
+      visit(root);
+      if (boundary == null) return null;
+      final ui.Image image = await boundary!.toImage(pixelRatio: 1.0);
+      final ByteData? byteData = await image.toByteData(format: ui.ImageByteFormat.png);
+      if (byteData == null) return null;
+      return base64Encode(byteData.buffer.asUint8List());
+    } catch (_) {
+      return null;
     }
   }
 
-  // 6/14 v5: 反馈写到 SharedPreferences (FIFO 50)
-  Future<void> _saveFeedback(String msg) async {
+  // 7/1: 提交反馈 (写 prefs + POST 到 NAS)
+  static Future<bool> _submitFeedback(String msg, String? screenshotB64, String languageCode) async {
     final prefs = await SharedPreferences.getInstance();
-    final raw = prefs.getString('feedback_log') ?? '[]';
-    final list = (jsonDecode(raw) as List).cast<Map<String, dynamic>>();
-    list.add({
+    final entry = {
       'ts': DateTime.now().millisecondsSinceEpoch,
       'msg': msg,
+      'hasScreenshot': screenshotB64 != null,
       'synced': false,
-    });
-    // FIFO 50
-    if (list.length > 50) {
-      list.removeRange(0, list.length - 50);
-    }
+    };
+    // 写本地 (FIFO 50)
+    final raw = prefs.getString('feedback_log') ?? '[]';
+    final list = (jsonDecode(raw) as List).cast<Map<String, dynamic>>();
+    list.add(entry);
+    if (list.length > 50) list.removeRange(0, list.length - 50);
     await prefs.setString('feedback_log', jsonEncode(list));
+
+    // POST 到 NAS
+    try {
+      final payload = <String, dynamic>{
+        'ts': entry['ts'],
+        'msg': msg,
+        'appVersion': '0.7.0',
+        'platform': 'web',
+        'language': languageCode,
+      };
+      if (screenshotB64 != null) {
+        payload['screenshot'] = screenshotB64;
+      }
+      final resp = await http.post(
+        Uri.parse('${Uri.base.origin}/api/feedback'),
+        headers: {'Content-Type': 'application/json'},
+        body: jsonEncode(payload),
+      ).timeout(const Duration(seconds: 10));
+      if (resp.statusCode == 200) {
+        entry['synced'] = true;
+        // 更新 prefs synced 标志
+        list[list.length - 1]['synced'] = true;
+        await prefs.setString('feedback_log', jsonEncode(list));
+        return true;
+      }
+    } catch (_) {
+      // 网络失败, prefs 已保留 synced: false
+    }
+    return false;
   }
 
   // 6/14 v5: 项目宪法 dialog (写死关键条文, 不读文件避免 web asset path 问题)

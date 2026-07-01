@@ -272,13 +272,26 @@ class SettingsTab extends StatelessWidget {
     final isEn = languageCode == 'en';
     final scale = isElderlyMode ? 1.3 : 1.0;
     return SafeArea(
-      child: SingleChildScrollView(
-        padding: EdgeInsets.all(20 * scale),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Text(isEn ? 'Settings' : '设置', style: TextStyle(fontSize: 24 * scale, fontWeight: FontWeight.bold)),
-            SizedBox(height: 24 * scale),
+      // 7/1: "设置" 标题用 CustomScrollView + SliverAppBar pinned 固定 (滚不走)
+      // 其他卡片 SliverList 走滚动
+      child: CustomScrollView(
+        slivers: [
+          SliverAppBar(
+            pinned: true,
+            backgroundColor: Theme.of(context).scaffoldBackgroundColor,
+            elevation: 0,
+            scrolledUnderElevation: 0.5,
+            toolbarHeight: 56 * scale,
+            title: Text(
+              isEn ? 'Settings' : '设置',
+              style: TextStyle(fontSize: 24 * scale, fontWeight: FontWeight.bold),
+            ),
+            automaticallyImplyLeading: false,
+          ),
+          SliverPadding(
+            padding: EdgeInsets.fromLTRB(20 * scale, 8 * scale, 20 * scale, 20 * scale),
+            sliver: SliverList(
+              delegate: SliverChildListDelegate([
             Card(
               child: Column(children: [
                 // 6/24 v12: 切换角色 — 弹出 6 角色选择对话框
@@ -388,6 +401,19 @@ class SettingsTab extends StatelessWidget {
             // 6/12 改: “关注管理”入口从设置 Tab 删了
             // 理由: 收藏 Tab ⋮ 菜单和空状态都有，3 个入口是重复
             // 设置 Tab 只保留个人设置/工具/关于
+            // 7/1: 反馈按钮 (顶部常驻, 一进设置就能看到)
+            Card(
+              child: ListTile(
+                leading: const Text('🐙', style: TextStyle(fontSize: 24)),
+                title: Text(isEn ? 'Feedback / Talk to 章鱼' : '反馈 / 跟章鱼说话', style: TextStyle(fontSize: 16 * scale, fontWeight: FontWeight.w600)),
+                subtitle: Text(
+                  isEn ? 'Bug report, idea, anything — sent to author NAS' : 'Bug/想法/任何事 → 直接发作者 NAS',
+                  style: TextStyle(fontSize: 12 * scale),
+                ),
+                trailing: Icon(Icons.chevron_right, size: 24 * scale, color: AppTheme.textLight),
+                onTap: () => AboutScreen.showFeedbackDialog(context, languageCode),
+              ),
+            ),
             Card(
               child: ListTile(
                 leading: Icon(Icons.history, size: 24 * scale, color: AppTheme.primary),
@@ -525,8 +551,10 @@ class SettingsTab extends StatelessWidget {
                 ),
               ),
             ),
-          ],
-        ),
+          ]),
+            ),
+          ),
+        ],
       ),
     );
   }
