@@ -252,6 +252,7 @@ class _SceneScreenState extends State<SceneScreen> {
               isElderlyMode: isElderlyMode,
               userTypeName: _getUserTypeName(widget.userType),
               userType: widget.userType, // 6/30 10:11: 给 LLM 推荐用
+              scene: TimeAwareRecommender.recommendAt(DateTime.now(), currentUserType: widget.userType).scene, // 7/1 推荐兑底用
               todayHistory: todayHistory, // 6/30 10:11: 答疑用
             ),
           );
