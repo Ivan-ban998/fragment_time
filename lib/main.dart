@@ -38,9 +38,7 @@ import 'screens/about_screen.dart';
 import 'services/news_service.dart';
 import 'services/llm_service.dart';
 import 'services/time_aware_recommender.dart'; // 7/1: quote sheet 弹 AI 时传 scene
-import 'screens/content_reader_screen.dart';
 import 'screens/ai_assistant_screen.dart';
-import 'package:shared_preferences/shared_preferences.dart';
 
 /// 6/14 v4 公开跨屏导航入口:content_screen "去搜索" 按钣直接调
 void navigateToMainTab(int index) {
@@ -264,7 +262,6 @@ class _MainHomeScreenState extends State<MainHomeScreen> {
   // 6/13 护眼 auto 跨时段：每 1 分钟检查一次
   // 19:00-7:00 间 isEyeProtectionOn() 返回值会变
   Timer? _eyeCheckTimer;
-  int _lastEyeHourBucket = -1;
 
   void _startEyeTimer() {
     _eyeCheckTimer?.cancel();
@@ -334,7 +331,6 @@ class _MainHomeScreenState extends State<MainHomeScreen> {
   final LocalSubscriptionService _subService = LocalSubscriptionService.instance;
   final LocaleService _localeService = LocaleService();
   final StreakService _streakService = StreakService();
-  final AudioPlayService _audioService = AudioPlayService();
 
   bool _isInternational = false;
   bool _isElderlyMode = false;
