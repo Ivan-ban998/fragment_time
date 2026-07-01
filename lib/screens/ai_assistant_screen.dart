@@ -188,18 +188,20 @@ Suggest 3 short questions (under 15 words each) they'd want to ask. One per line
   }
 
   void _addWelcome() {
+    // 7/1: 取 RobotNameService.notifier.value (跟设置页里机器人昵称字段联动)
+    final name = RobotNameService.notifier.value;
     if (widget.contextQuote != null) {
       _messages.add(_ChatMessage(
         text: widget.isEn
-            ? 'I see you tapped a quote. Ask me anything about it.'
-            : '看到你点的名言了,问吧。',
+            ? 'Hi, I am your AI assistant $name. I see you tapped a quote — ask me anything about it.'
+            : '你好,我是你的 AI 助手 $name。看到你点的名言了,问吧。',
         isUser: false,
       ));
     } else {
       _messages.add(_ChatMessage(
         text: widget.isEn
-            ? 'Hi, I am your AI assistant. What do you want to read today?'
-            : '你好,我是你的 AI 助手。今天想看点什么?',
+            ? 'Hi, I am your AI assistant $name. What do you want to read today?'
+            : '你好,我是你的 AI 助手 $name。今天想看点什么?',
         isUser: false,
       ));
     }
