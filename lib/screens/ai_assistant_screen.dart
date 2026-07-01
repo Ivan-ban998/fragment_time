@@ -360,12 +360,13 @@ Suggest 3 short questions (under 15 words each) they'd want to ask. One per line
     final aiIdx = _messages.length;
     setState(() => _messages.add(_ChatMessage(text: '', isUser: false)));
     _streamTimer?.cancel();
-    _streamTimer = Timer(const Duration(seconds: 30), () {
+    // 7/1 优化: 兑底 30s → 60s — Ollama 7b cold start 5-58s (puppeteer 实测), 30s 太短总被划为"超时"
+    _streamTimer = Timer(const Duration(seconds: 60), () {
       if (!mounted) return;
       if (_messages[aiIdx].text.isEmpty) {
         setState(() {
           _messages[aiIdx] = _ChatMessage(
-            text: widget.isEn ? '(thinking...)' : '（思考中...）',
+            text: widget.isEn ? '(still thinking...)' : '（还在想, 约 1 分钟内）',
             isUser: false,
           );
         });
@@ -546,12 +547,13 @@ ${libTitles.map((t) => '- $t').join('\n')}
     final aiIdx = _messages.length;
     setState(() => _messages.add(_ChatMessage(text: '', isUser: false)));
     _streamTimer?.cancel();
-    _streamTimer = Timer(const Duration(seconds: 30), () {
+    // 7/1 优化: 兑底 30s → 60s — Ollama 7b cold start 5-58s (puppeteer 实测), 30s 太短总被划为"超时"
+    _streamTimer = Timer(const Duration(seconds: 60), () {
       if (!mounted) return;
       if (_messages[aiIdx].text.isEmpty) {
         setState(() {
           _messages[aiIdx] = _ChatMessage(
-            text: widget.isEn ? '(thinking...)' : '（思考中...）',
+            text: widget.isEn ? '(still thinking...)' : '（还在想, 约 1 分钟内）',
             isUser: false,
           );
         });
@@ -724,16 +726,16 @@ Rules:
       _messages.add(_ChatMessage(text: '', isUser: false));
     });
 
-    // 兑底 30s (6/14 v3 LLM keepalive 模式)
+    // 7/1 优化: 兑底 30s → 60s — Ollama 7b cold start 5-58s, 太短总被划为"超时"
     _streamTimer?.cancel();
-    _streamTimer = Timer(const Duration(seconds: 30), () {
+    _streamTimer = Timer(const Duration(seconds: 60), () {
       if (!mounted) return;
       if (_messages[aiIdx].text.isEmpty) {
         setState(() {
           _messages[aiIdx] = _ChatMessage(
             text: widget.isEn
-                ? '(LLM slow, retrying...)'
-                : '（LLM 慢, 重试中...）',
+                ? '(still thinking, ~1 min)'
+                : '（还在想, 约 1 分钟内）',
             isUser: false,
           );
         });
@@ -892,10 +894,10 @@ Rules:
         out.add(_ContentCard(
           title: title,
           type: type,
-          source: realItem?.source ?? '',
-          duration: realItem?.duration ?? '',
-          url: realItem?.externalUrl ?? '',
-          audioUrl: realItem?.audioUrl,
+          source: realItem.source, // 7/1: 移掉死循环 null-aware (realItem 已 non-null)
+          duration: realItem.duration ?? '',
+          url: realItem.externalUrl ?? '',
+          audioUrl: realItem.audioUrl,
           realItem: realItem,
         ));
       }
