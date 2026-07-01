@@ -414,6 +414,8 @@ class SettingsTab extends StatelessWidget {
                 onTap: () => AboutScreen.showFeedbackDialog(context, languageCode),
               ),
             ),
+            // 7/1: 最近反馈列表 (复用 _OctopusFeedbackList, 让用户看到自己刚发的话)
+            _OctopusFeedbackList(scale: scale, isEn: isEn),
             Card(
               child: ListTile(
                 leading: Icon(Icons.history, size: 24 * scale, color: AppTheme.primary),
@@ -561,118 +563,6 @@ class SettingsTab extends StatelessWidget {
 }
 
 // 6/14 v5: 章鱼入口按钮组 (跟章鱼说话 + 关于页)
-class _OctopusActionRow extends StatelessWidget {
-  final double scale;
-  final bool isEn;
-  final VoidCallback onTalkToOctopus;
-  final VoidCallback onAbout;
-  const _OctopusActionRow({
-    required this.scale,
-    required this.isEn,
-    required this.onTalkToOctopus,
-    required this.onAbout,
-  });
-
-  @override
-  Widget build(BuildContext context) {
-    return Row(
-      children: [
-        Expanded(
-          child: _buildButton(
-            context: context,
-            icon: '🐙',
-            label: isEn ? 'Talk to 章鱼' : '跟章鱼说话',
-            onTap: onTalkToOctopus,
-            primary: true,
-          ),
-        ),
-        const SizedBox(width: 12),
-        Expanded(
-          child: _buildButton(
-            context: context,
-            icon: Icons.info_outline,
-            label: isEn ? 'About' : '关于',
-            onTap: onAbout,
-            primary: false,
-          ),
-        ),
-      ],
-    );
-  }
-
-  Widget _buildButton({
-    required BuildContext context,
-    required dynamic icon,  // String emoji OR IconData
-    required String label,
-    required VoidCallback onTap,
-    required bool primary,
-  }) {
-    final accent = AppTheme.primary;
-    return ClipRRect(
-      borderRadius: BorderRadius.circular(16),
-      child: BackdropFilter(
-        filter: ImageFilter.blur(sigmaX: 25, sigmaY: 25),
-        child: Material(
-          color: Colors.transparent,
-          child: InkWell(
-            onTap: onTap,
-            borderRadius: BorderRadius.circular(16),
-            child: Container(
-              padding: EdgeInsets.symmetric(vertical: 14 * scale, horizontal: 12 * scale),
-              decoration: BoxDecoration(
-                color: primary
-                    ? accent.withOpacity(0.85)
-                    : Colors.white.withOpacity(0.55),
-                borderRadius: BorderRadius.circular(16),
-                border: Border.all(
-                  color: primary
-                      ? Colors.white.withOpacity(0.4)
-                      : Colors.white.withOpacity(0.5),
-                  width: 1.2,
-                ),
-                boxShadow: [
-                  if (primary)
-                    BoxShadow(
-                      color: accent.withOpacity(0.35),
-                      blurRadius: 12,
-                      offset: const Offset(0, 4),
-                    )
-                  else
-                    BoxShadow(
-                      color: Colors.black.withOpacity(0.08),
-                      blurRadius: 12,
-                      offset: const Offset(0, 4),
-                    ),
-                ],
-              ),
-              child: Row(
-                mainAxisAlignment: MainAxisAlignment.center,
-                children: [
-                  if (icon is String)
-                    Text(icon, style: const TextStyle(fontSize: 18))
-                  else
-                    Icon(icon, size: 18, color: primary ? Colors.white : accent),
-                  SizedBox(width: 8 * scale),
-                  Flexible(
-                    child: Text(
-                      label,
-                      style: TextStyle(
-                        fontSize: 13 * scale,
-                        fontWeight: FontWeight.w700,
-                        color: primary ? Colors.white : AppTheme.textDark,
-                      ),
-                      overflow: TextOverflow.ellipsis,
-                    ),
-                  ),
-                ],
-              ),
-            ),
-          ),
-        ),
-      ),
-    );
-  }
-}
 
 // 6/14 v5: 章鱼反馈历史 (本地 prefs 读)
 class _OctopusFeedbackList extends StatefulWidget {
@@ -783,49 +673,6 @@ class _OctopusFeedbackListState extends State<_OctopusFeedbackList> {
   }
 }
 
-class _DialogOption extends StatelessWidget {
-  final IconData icon;
-  final String title;
-  final String desc;
-  final VoidCallback onTap;
-  const _DialogOption({required this.icon, required this.title, required this.desc, required this.onTap});
-
-  @override
-  Widget build(BuildContext context) {
-    return Material(
-      color: Colors.transparent,
-      child: InkWell(
-        onTap: onTap,
-        borderRadius: BorderRadius.circular(12),
-        child: Container(
-          padding: const EdgeInsets.all(12),
-          decoration: BoxDecoration(
-            color: Colors.white.withOpacity(0.5),
-            borderRadius: BorderRadius.circular(12),
-            border: Border.all(color: Colors.white.withOpacity(0.5), width: 1),
-          ),
-          child: Row(
-            children: [
-              Icon(icon, size: 22, color: AppTheme.primary),
-              const SizedBox(width: 12),
-              Expanded(
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Text(title, style: const TextStyle(fontSize: 13, fontWeight: FontWeight.w600)),
-                    const SizedBox(height: 2),
-                    Text(desc, style: const TextStyle(fontSize: 11, color: AppTheme.textLight, height: 1.4)),
-                  ],
-                ),
-              ),
-              const Icon(Icons.chevron_right, size: 18, color: AppTheme.textLight),
-            ],
-          ),
-        ),
-      ),
-    );
-  }
-}
 
 class _WeeklyRecapCard extends StatelessWidget {
   final bool isEn;
