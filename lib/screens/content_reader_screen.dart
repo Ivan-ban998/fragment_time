@@ -649,6 +649,40 @@ class _ContentReaderScreenState extends State<ContentReaderScreen> {
                   item.duration,
                   style: TextStyle(fontSize: 12 * scale, color: AppTheme.textLight),
                 ),
+                // 7/1: audio 类型给 "原站" 外跳按钮 (TTS 听不下, 去原站听真音频)
+                if (item.contentType == ContentType.audio &&
+                    item.externalUrl != null &&
+                    item.externalUrl!.isNotEmpty) ...[
+                  SizedBox(width: 8 * scale),
+                  GestureDetector(
+                    onTap: () async {
+                      try {
+                        await launchUrl(
+                          Uri.parse(item.externalUrl!),
+                          mode: LaunchMode.externalApplication,
+                        );
+                      } catch (_) {}
+                    },
+                    child: Container(
+                      padding: EdgeInsets.symmetric(horizontal: 6 * scale, vertical: 2 * scale),
+                      decoration: BoxDecoration(
+                        color: AppTheme.primary.withOpacity(0.1),
+                        borderRadius: BorderRadius.circular(6),
+                      ),
+                      child: Row(
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          Icon(Icons.open_in_new, size: 12 * scale, color: AppTheme.primary),
+                          SizedBox(width: 3 * scale),
+                          Text(
+                            isEn ? 'Original' : '原站',
+                            style: TextStyle(fontSize: 11 * scale, color: AppTheme.primary, fontWeight: FontWeight.w600),
+                          ),
+                        ],
+                      ),
+                    ),
+                  ),
+                ],
                 const Spacer(),
                 _PriceBadgeWidget(item: item, scale: scale),
               ],
@@ -833,6 +867,19 @@ class _ContentReaderScreenState extends State<ContentReaderScreen> {
                   ],
                 ),
               ),
+            // 7/1: 朗读进度条 (4px 高, TtsService.progress ValueNotifier 0..1)
+            ValueListenableBuilder<double>(
+              valueListenable: TtsService.progress,
+              builder: (_, value, __) => Padding(
+                padding: EdgeInsets.symmetric(horizontal: 12 * scale),
+                child: LinearProgressIndicator(
+                  value: _isSpeaking ? value : 0,
+                  minHeight: 4 * scale,
+                  backgroundColor: AppTheme.primary.withOpacity(0.1),
+                  valueColor: AlwaysStoppedAnimation<Color>(AppTheme.primary.withOpacity(0.7)),
+                ),
+              ),
+            ),
             SizedBox(height: 24 * scale),
             // 付费内容提示（6/7 新加）
             if (item.priceType == ContentPriceType.paid || item.priceType == ContentPriceType.membership)
