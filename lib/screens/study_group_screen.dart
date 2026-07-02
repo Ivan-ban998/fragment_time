@@ -212,7 +212,7 @@ class _StudyGroupScreenState extends State<StudyGroupScreen> {
                         source: 'Study Group',
                         sourceType: ContentSource.news36kr,
                         contentType: ContentType.article,
-                        externalUrl: 'https://search.bilibili.com/all?keyword=${Uri.encodeComponent(groups[i].topic)}',
+                        externalUrl: 'https://search.bilibili.com/video?keyword=${Uri.encodeComponent(groups[i].topic)}',
                       ),
                     ),
                   ),

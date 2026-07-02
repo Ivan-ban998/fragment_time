@@ -33,6 +33,7 @@ import '../services/tts_service.dart';
 import '../services/share_service.dart';
 import '../services/analytics_service.dart';
 import '../services/news_service.dart';
+import '../services/bilibili_service.dart';
 import '../widgets/tinder_recommendation_stack.dart';
 import '../widgets/iframe_video_view.dart';
 import '../widgets/quiz_panel.dart';
@@ -75,6 +76,8 @@ class _ContentScreenState extends State<ContentScreen> {
   int _streak = 0;
   int _recOffset = 0; // 6 张看完换 6 张 offset
   List<ContentItem> _recItems = [];
+  // 7/2 B 站真 BV 缓存: itemId → 首条结果 (避免重复 API 调用, 嵌 iframe 用)
+  final Map<String, BilibiliVideoResult> _biliCache = {};
   bool _recLoading = false;
   bool _showCompletionBanner = false;
   bool _aiOfferShown = false; // 6/30 12:23: 读完弹 AI sheet 防重复
@@ -121,6 +124,7 @@ class _ContentScreenState extends State<ContentScreen> {
       );
     }
     _loadRecommendations();
+    _loadBiliPreviews(); // 7/2 视频类并发查 B 站真 BV, 走 iframe 不走搜索页
     _loadInProgress();
     _loadTodayCount();
     _loadTlDr();
@@ -389,6 +393,39 @@ class _ContentScreenState extends State<ContentScreen> {
         scene: widget.scene,
       );
     } catch (_) {}
+  }
+
+  // 7/2 B 站真 BV 预览: 对当前 AI 主体 + 推荐池中所有 video 类并发查真 BV
+  // 优先 iframe 嵌 player.bilibili.com, 失败 fallback externalUrl (B 站搜索)
+  Future<void> _loadBiliPreviews() async {
+    try {
+      final candidates = <ContentItem>[];
+      final item = _aiContentItem;
+      if (item != null && item.contentType == ContentType.video) candidates.add(item);
+      for (final r in _recItems) {
+        if (r.contentType == ContentType.video && !candidates.any((c) => c.id == r.id)) {
+          candidates.add(r);
+        }
+      }
+      if (candidates.isEmpty) return;
+      debugPrint('[bili-pre] ${candidates.length} video items to search');
+      final futures = candidates.take(6).map((c) async {
+        try {
+          final vids = await BilibiliService.instance.searchVideos(c.title, limit: 1);
+          if (vids.isNotEmpty && mounted) {
+            setState(() => _biliCache[c.id] = vids.first);
+            debugPrint('[bili-pre] ${c.title} → ${vids.first.bvid} (${vids.first.play}播放)');
+          } else {
+            debugPrint('[bili-pre] ${c.title} → 无结果');
+          }
+        } catch (e) {
+          debugPrint('[bili-pre] ${c.title} err: $e');
+        }
+      });
+      await Future.wait(futures);
+    } catch (e) {
+      debugPrint('[bili-pre] outer err: $e');
+    }
   }
 
   // 续读: 拉订阅里 progress 0-100 的
@@ -958,7 +995,15 @@ class _ContentScreenState extends State<ContentScreen> {
   }
 
   Widget _buildVideoIfNeeded(ContentItem item) {
-    final embedUrl = buildVideoEmbedUrl(item);
+    // 7/2: 优先用 BilibiliService 查到的真 BV (api.bilibili.com/x/web-interface/search/type?search_type=video)
+    // _biliCache 没查到 (API 失败/加载中) 才 fallback 到 externalUrl (search.bilibili.com 跳搜索页)
+    final bili = _biliCache[item.id];
+    String? embedUrl;
+    if (bili != null) {
+      embedUrl = 'https://player.bilibili.com/player.html?bvid=${bili.bvid}&autoplay=0';
+    } else {
+      embedUrl = buildVideoEmbedUrl(item);
+    }
     if (embedUrl == null) return const SizedBox.shrink();
     return Container(
       decoration: BoxDecoration(
