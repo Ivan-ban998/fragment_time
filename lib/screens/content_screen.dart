@@ -124,7 +124,7 @@ class _ContentScreenState extends State<ContentScreen> {
       );
     }
     _loadRecommendations();
-    _loadBiliPreviews(); // 7/2 视频类并发查 B 站真 BV, 走 iframe 不走搜索页
+    // _loadBiliPreviews(); // 7/2 10:36 Brien 反馈: B 站 iframe 触发 null + CSP frame-ancestors 红字, 暂时 disable
     _loadInProgress();
     _loadTodayCount();
     _loadTlDr();
@@ -411,20 +411,24 @@ class _ContentScreenState extends State<ContentScreen> {
       debugPrint('[bili-pre] ${candidates.length} video items to search');
       final futures = candidates.take(6).map((c) async {
         try {
+          debugPrint('[bili-pre] query: "${c.title}" (id=${c.id}, videoId=${c.videoId}, platform=${c.videoPlatform})');
           final vids = await BilibiliService.instance.searchVideos(c.title, limit: 1);
+          debugPrint('[bili-pre] got ${vids.length} results for "${c.title}"');
           if (vids.isNotEmpty && mounted) {
             setState(() => _biliCache[c.id] = vids.first);
             debugPrint('[bili-pre] ${c.title} → ${vids.first.bvid} (${vids.first.play}播放)');
           } else {
             debugPrint('[bili-pre] ${c.title} → 无结果');
           }
-        } catch (e) {
+        } catch (e, st) {
           debugPrint('[bili-pre] ${c.title} err: $e');
+          debugPrint('[bili-pre] stack: $st');
         }
       });
       await Future.wait(futures);
-    } catch (e) {
+    } catch (e, st) {
       debugPrint('[bili-pre] outer err: $e');
+      debugPrint('[bili-pre] outer stack: $st');
     }
   }
 
@@ -995,15 +999,10 @@ class _ContentScreenState extends State<ContentScreen> {
   }
 
   Widget _buildVideoIfNeeded(ContentItem item) {
-    // 7/2: 优先用 BilibiliService 查到的真 BV (api.bilibili.com/x/web-interface/search/type?search_type=video)
-    // _biliCache 没查到 (API 失败/加载中) 才 fallback 到 externalUrl (search.bilibili.com 跳搜索页)
-    final bili = _biliCache[item.id];
-    String? embedUrl;
-    if (bili != null) {
-      embedUrl = 'https://player.bilibili.com/player.html?bvid=${bili.bvid}&autoplay=0';
-    } else {
-      embedUrl = buildVideoEmbedUrl(item);
-    }
+    // 7/2 revert: 嵌真 BV 的 iframe 被 B 站 CSP frame-ancestors 拒了 (CSP 报红字)
+    // 暂时退回走 buildVideoEmbedUrl (externalUrl = search.bilibili.com/video?keyword= 跳原站)
+    // 改后用户点视频卡 → 弹 B 站搜索结果页 (次优但不死), 跟 6/11 一样
+    final embedUrl = buildVideoEmbedUrl(item);
     if (embedUrl == null) return const SizedBox.shrink();
     return Container(
       decoration: BoxDecoration(
