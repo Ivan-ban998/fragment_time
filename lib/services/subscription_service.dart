@@ -262,7 +262,7 @@ class SubscriptionService {
             contentType: ContentType.video,
             videoId: null,
             videoPlatform: null,
-            externalUrl: 'https://search.bilibili.com/all?keyword=%E7%9F%A5%E8%AF%86',
+            externalUrl: 'https://search.bilibili.com/video?keyword=%E7%9F%A5%E8%AF%86',
             priceType: ContentPriceType.free,
           ),
         ];
