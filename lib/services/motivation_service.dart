@@ -1,5 +1,45 @@
 import 'package:shared_preferences/shared_preferences.dart';
-import 'history_service.dart';
+import '../models/quote.dart';
+
+// 7/15 重构后 Quote struct: 用 fallback 池里 struct 化 Quote。
+// 14 + 13 = 27 条 (中 20 条 + 英 7 条), 一周内看不重复。
+class _QuotePool {
+  static final List<Quote> zh = [
+    // 6/26 原文 4 条保留, 补作者 + 出处
+    Quote(text: '竹杖芒鞋轻胜马，谁怕？一蓑烟雨任平生。', author: '苏轼', source: '定风波·莫听穿林打叶声', createdAt: DateTime(2026, 1, 1)),
+    Quote(text: '长风破浪会有时，直挂云帆济沧海。', author: '李白', source: '行路难·其一', createdAt: DateTime(2026, 1, 1)),
+    Quote(text: '采菊东篱下，悠然见南山。', author: '陶渊明', source: '饮酒·其五', createdAt: DateTime(2026, 1, 1)),
+    Quote(text: '行到水穷处，坐看云起时。', author: '王维', source: '终南别业', createdAt: DateTime(2026, 1, 1)),
+    // 6/26 原文另外 3 条
+    Quote(text: '不畏浮云遮望眼，自缘身在最高层。', author: '王安石', source: '登飞来峰', createdAt: DateTime(2026, 1, 1)),
+    Quote(text: '会当凌绝顶，一览众山小。', author: '杜甫', source: '望岳', createdAt: DateTime(2026, 1, 1)),
+    Quote(text: '海纳百川，有容乃大；壁立千仞，无欲则刚。', author: '林则徐', source: '对联·后人辑录', createdAt: DateTime(2026, 1, 1)),
+    // 7/15 补 13 条 (凑到 20, 一周看不重复)
+    Quote(text: '莫愁前路无知己，天下谁人不识君。', author: '高适', source: '别董大', createdAt: DateTime(2026, 1, 1)),
+    Quote(text: '人生如逆旅，我亦是行人。', author: '苏轼', source: '临江仙·送钱穆父', createdAt: DateTime(2026, 1, 1)),
+    Quote(text: '此心安处是吾乡。', author: '苏轼', source: '定风波·南海归赠王定国侍人寓娘', createdAt: DateTime(2026, 1, 1)),
+    Quote(text: '沉舟侧畔千帆过，病树前头万木春。', author: '刘禹锡', source: '酬乐天扬州初逢席上见赠', createdAt: DateTime(2026, 1, 1)),
+    Quote(text: '旧时王谢堂前燕，飞入寻常百姓家。', author: '刘禹锡', source: '乌衣巷', createdAt: DateTime(2026, 1, 1)),
+    Quote(text: '何事吟余忽惆怅，村桥原树似吾乡。', author: '王安石', source: '暮春山居怀耿天衢', createdAt: DateTime(2026, 1, 1)),
+    Quote(text: '落红不是无情物，化作春泥更护花。', author: '龚自珍', source: '己亥杂诗·其五', createdAt: DateTime(2026, 1, 1)),
+    Quote(text: '我劝天公重抖擞，不拘一格降人才。', author: '龚自珍', source: '己亥杂诗·其一二五', createdAt: DateTime(2026, 1, 1)),
+    Quote(text: '纸上得来终觉浅，绝知此事要躬行。', author: '陆游', source: '冬夜读书示子聿', createdAt: DateTime(2026, 1, 1)),
+    Quote(text: '问渠那得清如许？为有源头活水来。', author: '朱熹', source: '观书有感·其一', createdAt: DateTime(2026, 1, 1)),
+    Quote(text: '少壮不努力，老大徒伤悲。', author: '佚名', source: '汉乐府·长歌行', createdAt: DateTime(2026, 1, 1)),
+    Quote(text: '黑发不知勤学早，白首方悔读书迟。', author: '颜真卿', source: '劝学诗', createdAt: DateTime(2026, 1, 1)),
+    Quote(text: '少年辛苦终身事，莫向光阴惰寸功。', author: '杜荀鹤', source: '题弟侄书堂', createdAt: DateTime(2026, 1, 1)),
+  ];
+
+  static final List<Quote> en = [
+    Quote(text: 'The impediment to action advances action. What stands in the way becomes the way.', author: 'Marcus Aurelius', authorEn: 'Marcus Aurelius', source: 'Meditations, Book 5', createdAt: DateTime(2026, 1, 1)),
+    Quote(text: 'We suffer more in imagination than in reality.', author: 'Seneca', authorEn: 'Seneca', source: 'Letters from a Stoic', createdAt: DateTime(2026, 1, 1)),
+    Quote(text: 'No man is free who is not master of himself.', author: 'Epictetus', authorEn: 'Epictetus', source: 'Discourses', createdAt: DateTime(2026, 1, 1)),
+    Quote(text: 'What we do in life echoes in eternity.', author: 'Marcus Aurelius', authorEn: 'Marcus Aurelius', source: 'Meditations, Book 6', createdAt: DateTime(2026, 1, 1)),
+    Quote(text: 'Waste no more time arguing what a good man should be. Be one.', author: 'Marcus Aurelius', authorEn: 'Marcus Aurelius', source: 'Meditations, Book 10', createdAt: DateTime(2026, 1, 1)),
+    Quote(text: 'The only true wisdom is in knowing you know nothing.', author: 'Socrates', authorEn: 'Socrates', source: 'Apology (Plato)', createdAt: DateTime(2026, 1, 1)),
+    Quote(text: 'It is not death that a man should fear, but he should fear never beginning to live.', author: 'Marcus Aurelius', authorEn: 'Marcus Aurelius', source: 'Meditations, Book 2', createdAt: DateTime(2026, 1, 1)),
+  ];
+}
 
 class StreakService {
   static const String _lastOpenDateKey = 'last_open_date';
@@ -133,7 +173,7 @@ class StreakService {
 
   // 6/26 Brien 反馈: 删鼓励 (LLM 1.5b 推鼓励也输出完整新闻, 名言已够用, 各角色通用)
   // 只保留 getDailyQuote
-  Future<String> getDailyEncouragement({
+  Future<Quote> getDailyEncouragement({
     required bool isEn,
     required Future<String> Function(String prompt) llmCall,
   }) async {
@@ -144,15 +184,20 @@ class StreakService {
   // 6/24 v3 亮点: 每日 1 句名言 (按小时选作者, 跟场景色配)
   // 跟鼓励不同: 鼓励基于今天读的内容, 名言是通用智慧
   // 失败兜底: 返回一句硬编码的名言
-  Future<String> getDailyQuote({
+  Future<Quote> getDailyQuote({
     required bool isEn,
     required Future<String> Function(String prompt) llmCall,
   }) async {
     final prefs = await SharedPreferences.getInstance();
     final now = DateTime.now();
-    final dayKey = 'quote_v2_${now.year}-${now.month}-${now.day}'; // 6/26: v2 cache 避免老 quote 缓存
-    final cached = prefs.getString(dayKey);
-    if (cached != null && cached.isNotEmpty) return cached;
+    final dayKey = 'quote_v3_${now.year}-${now.month}-${now.day}'; // 7/15: v3 (Quote struct + JSON cache)
+    final cachedJson = prefs.getString(dayKey);
+    if (cachedJson != null && cachedJson.isNotEmpty) {
+      try {
+        final q = Quote.fromJson(_decodeJson(cachedJson));
+        if (q.text.isNotEmpty) return q;
+      } catch (_) {/* 下走重新生成 */}
+    }
 
     // 按时段选作者
     final hour = now.hour;
@@ -160,65 +205,105 @@ class StreakService {
         ? (hour < 12 ? 'Marcus Aurelius' : hour < 18 ? 'Seneca' : 'Epictetus')
         : (hour < 12 ? '苏轼' : hour < 18 ? '李白' : '陶渊明');
 
+    // 7/15: prompt 改 JSON
     final prompt = isEn
-        ? 'Quote from $author in original English. Maximum 25 words. Return ONLY the quote, no author name, no explanation, no quotation marks.'
-        : '$author 一句诗或名言, 25 字以内。只返回名言本身, 不带作者名, 不带解释, 不带引号。';
+        ? 'Provide a short quote from $author.\n'
+            'Return ONLY a JSON object with these exact fields:\n'
+            '{"text": "<quote, max 25 words, no quotation marks>",'
+            '"author": "$author",'
+            '"source": "<where from, e.g. Meditations Book 5>",'
+            '"textEn": null,'
+            '"authorEn": "$author"}\n'
+            'No explanation, no extra fields, no markdown.'
+        : '提供 $author 一句诗或名言，不超过 25 字。\n'
+            '仅返回 JSON 对象, 字段如下:\n'
+            '{"text": "<名言原文, 不含引号>",'
+            '"author": "$author",'
+            '"source": "<出自哪首诗/书, 如 定风波>",'
+            '"textEn": "<英译, 可选填 null>",'
+            '"authorEn": "<作者英文名, 可选填 null>"}\n'
+            '无解释, 无多余字段, 无 markdown。';
 
-    String out;
+    Quote result;
     try {
-      out = await llmCall(prompt);
-      if (out.isEmpty) throw 'empty';
-      // 6/26 Brien 反馈: LLM 1.5b 推 250 字新闻, 不是 25 字名言 → 超 50 字兑底
-      if (out.length > 50) {
-        throw 'too_long';
+      final raw = await llmCall(prompt);
+      if (raw.isEmpty) throw 'empty';
+      result = Quote.fromLlmJson(raw, now: now);
+      // 兑底: text 空或太长
+      if (result.text.isEmpty || result.text.length > 80) {
+        throw 'parse_failed';
+      }
+      if (result.author.isEmpty) {
+        result = Quote(
+          text: result.text,
+          author: author,
+          source: result.source,
+          textEn: result.textEn,
+          authorEn: result.authorEn,
+          createdAt: result.createdAt,
+        );
       }
     } catch (_) {
-      // 兑底: 硬编码名言 (按时段 + 语种)
-      final quotes = isEn
-          ? ['The impediment to action advances action.', 'We suffer more in imagination than in reality.', 'No man is free who is not master of himself.']
-          : ['竹杖芒鞋轻胜马, 谁怕? 一蓑烟雨任平生。', '长风破浪会有时, 直挂云帆济沧海。', '采菊东篱下, 悠然见南山。'];
-      final idx = (now.day + hour) % quotes.length;
-      out = quotes[idx];
+      // 7/15: fallback 走 _QuotePool (27 条 pool 按天+小时索引)
+      final pool = isEn ? _QuotePool.en : _QuotePool.zh;
+      result = pool[(now.day + hour) % pool.length];
     }
-    await prefs.setString(dayKey, out);
-    return out;
+    await prefs.setString(dayKey, _encodeJson(result.toJson()));
+    return result;
   }
 
   // 6/29 10:59: 随机名言 — 8s LLM 慢, Brien 反馈 "一直转"
   // 修: 不调 LLM, 直接走 hardcoded 池 (7b 冷启动 12-20s, 完 5 名言池够用)
   // 未来 P2: 预热 LLM 后台写 cache, 按钮拿 cache
-  String getRandomQuoteSync({
+  // 7/15: 返回 Quote struct, 不用拼接字符串 (作者在 struct 字段里)
+  Quote getRandomQuoteSync({
     required bool isEn,
   }) {
     final now = DateTime.now();
-    final pool = isEn
-        ? [
-            'The impediment to action advances action. — Marcus Aurelius',
-            'We suffer more in imagination than in reality. — Seneca',
-            'No man is free who is not master of himself. — Epictetus',
-            'What we do in life echoes in eternity. — Marcus Aurelius',
-            'Waste no more time arguing what a good man should be. Be one. — Marcus Aurelius',
-            'The only true wisdom is in knowing you know nothing. — Socrates',
-            'It is not death that a man should fear, but he should fear never beginning to live. — Marcus Aurelius',
-          ]
-        : [
-            '竹杖芒鞋轻胜马, 谁怕? 一蓑烟雨任平生。',
-            '长风破浪会有时, 直挂云帆济沧海。',
-            '采菊东篱下, 悠然见南山。',
-            '行到水穷处, 坐看云起时。',
-            '不畏浮云遮望眼, 自缘身在最高层。',
-            '会当凌绝顶, 一览众山小。',
-            '海纳百川, 有容乃大; 壁立千仞, 无欲则刚。',
-          ];
+    final pool = isEn ? _QuotePool.en : _QuotePool.zh;
     return pool[now.second % pool.length];
   }
 
-  // 保留 async 接口兼容 (未来 LLM 接入点)
-  Future<String> getRandomQuote({
+  // 7/15 保留 async 接口 (返回 Quote)
+  Future<Quote> getRandomQuote({
     required bool isEn,
     Future<String> Function(String prompt)? llmCall,
   }) async {
     return getRandomQuoteSync(isEn: isEn);
+  }
+
+  // 7/15 helper: JSON 编解码 (避开 dart:convert 依赖)
+  String _encodeJson(Map<String, dynamic> m) {
+    final parts = m.entries
+        .where((e) => e.value != null)
+        .map((e) => '"${e.key}":${_encodeValue(e.value)}')
+        .join(',');
+    return '{$parts}';
+  }
+  String _encodeValue(dynamic v) {
+    if (v == null) return 'null';
+    if (v is String) return '"${v.replaceAll('"', '\\"').replaceAll('\n', '\\n')}"';
+    if (v is DateTime) return '"${v.toIso8601String()}"';
+    return '"$v"';
+  }
+  Map<String, dynamic> _decodeJson(String s) {
+    final m = RegExp(r'\{([\s\S]*)\}').firstMatch(s.trim());
+    if (m == null) return {};
+    final body = m.group(1)!;
+    final result = <String, dynamic>{};
+    final entryRe = RegExp(r'"([^"]+)"\s*:\s*("(?:[^"\\]|\\.)*"|null|\d+(?:\.\d+)?)');
+    for (final em in entryRe.allMatches(body)) {
+      final k = em.group(1)!;
+      var v = em.group(2)!;
+      if (v == 'null') {
+        result[k] = null;
+      } else if (v.startsWith('"') && v.endsWith('"')) {
+        result[k] = v.substring(1, v.length - 1).replaceAll('\\"', '"').replaceAll('\\n', '\n');
+      } else {
+        result[k] = num.tryParse(v) ?? v;
+      }
+    }
+    return result;
   }
 
   // 给 streak +1 后的 milestone popup
