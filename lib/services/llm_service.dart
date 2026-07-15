@@ -12,6 +12,13 @@ import 'web_host_stub.dart'
 import '../models/models.dart';
 
 class LlmService {
+
+  // 18:10 安全: web 端永远不走 useRemote (避免 API key 编进 web build 暴露)
+  // 真正安全路径: 用 NAS LLM proxy (待补)
+  static bool get _webSafeUseRemote {
+    if (kIsWeb) return false; // web 强制用 Ollama (本地 100.89.204.123:11434)
+    return _apiKey.isNotEmpty && _remoteEndpoint.isNotEmpty;
+  }
   static const String _apiKey = String.fromEnvironment('LLM_API_KEY', defaultValue: '');
   static const String _remoteEndpoint = String.fromEnvironment('LLM_ENDPOINT', defaultValue: '');
   // 6/10 修复: web 直接走 LAN IP (Ollama CORS 开着的, 不用 proxy)
@@ -30,6 +37,7 @@ class LlmService {
   }
   // 6/25 E: 7b CPU 推理太慢 (首 token 30-60s), 切 1.5b (CPU 上 5-10x 快, 老人模式总结质量仍可)
   static const String _model = 'qwen2.5:7b'; // 6/29 16:55: 1.5b 不理解"音乐/英语/冥想"区别, 回到 7b
+  // 18:10: 本地 Ollama 默认模型; MiniMax 用 MiniMax-M2 (thinking model)
 
   static Stream<String> generateStream({
     required UserType userType,
@@ -41,7 +49,7 @@ class LlmService {
     final systemPrompt = _buildSystemPrompt(userType, languageCode, prefSummary: prefSummary);
     final userPrompt = _buildUserPrompt(userType, scene, languageCode, isInternational);
 
-    final useRemote = _apiKey.isNotEmpty && _remoteEndpoint.isNotEmpty;
+    final useRemote = _webSafeUseRemote;
     final endpoint = useRemote ? _remoteEndpoint : _ollamaEndpoint;
     final model = useRemote ? 'MiniMax-M2.7' : _model;
 
@@ -142,7 +150,7 @@ class LlmService {
 
   // 6/11 加: 原始 prompt 接口 - 给私教/回顾这种需要自定义 prompt 的场景
   static Future<String> generateRaw(String prompt, {bool isEn = true}) async {
-    final useRemote = _apiKey.isNotEmpty && _remoteEndpoint.isNotEmpty;
+    final useRemote = _webSafeUseRemote;
     final endpoint = useRemote ? _remoteEndpoint : _ollamaEndpoint;
     final model = useRemote ? 'MiniMax-M2.7' : _model;
 
@@ -193,7 +201,7 @@ class LlmService {
     required List<Map<String, String>> messages,
     int numPredict = 400,
   }) async* {
-    final useRemote = _apiKey.isNotEmpty && _remoteEndpoint.isNotEmpty;
+    final useRemote = _webSafeUseRemote;
     final endpoint = useRemote ? _remoteEndpoint : _ollamaEndpoint;
     final model = useRemote ? 'MiniMax-M2.7' : _model;
     final headers = {'Content-Type': 'application/json'};
@@ -459,7 +467,7 @@ class LlmService {
     required String description,
     String languageCode = 'zh',
   }) async {
-    final useRemote = _apiKey.isNotEmpty && _remoteEndpoint.isNotEmpty;
+    final useRemote = _webSafeUseRemote;
     final endpoint = useRemote ? _remoteEndpoint : _ollamaEndpoint;
     final model = useRemote ? 'MiniMax-M2.7' : _model;
 
