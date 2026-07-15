@@ -144,7 +144,7 @@ class _SceneScreenState extends State<SceneScreen> {
         child: SafeArea(
         child: Padding(
           // 6/29 10:44 Brien 反馈: banner 跟 4 场景卡顶部重叠 — top 加 60 给 banner 让位
-          padding: EdgeInsets.fromLTRB(20 * _scale, 60, 20 * _scale, 20 * _scale),
+          padding: EdgeInsets.fromLTRB(20 * _scale, 100, 20 * _scale, 20 * _scale),
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [

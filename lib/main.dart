@@ -1389,12 +1389,12 @@ class _DailyEncouragementBannerState extends State<_DailyEncouragementBanner> {
                                   child: AnimatedSwitcher(
                                     duration: const Duration(milliseconds: 200),
                                     child: _saved
-                                        ? Icon(Icons.favorite, key: const ValueKey('saved'), color: Colors.white, size: 16 * scale)
+                                        ? Icon(Icons.favorite, key: const ValueKey('saved'), color: Colors.white, size: 18 * scale)
                                         : Row(
                                             key: const ValueKey('unsaved'),
                                             mainAxisSize: MainAxisSize.min,
                                             children: [
-                                              Icon(Icons.favorite_border, color: Colors.white, size: 16 * scale),
+                                              Icon(Icons.favorite_border, color: Colors.white, size: 18 * scale),
                                               SizedBox(width: 2 * scale),
                                               Text(widget.isEn ? 'Save' : '收藏',
                                                 style: TextStyle(color: Colors.white, fontSize: 10 * scale, fontWeight: FontWeight.w500)),
@@ -1416,12 +1416,12 @@ class _DailyEncouragementBannerState extends State<_DailyEncouragementBanner> {
                                 child: AnimatedSwitcher(
                                   duration: const Duration(milliseconds: 200),
                                   child: _saved
-                                      ? Icon(Icons.favorite, key: const ValueKey('saved'), color: Colors.white, size: 16 * scale)
+                                      ? Icon(Icons.favorite, key: const ValueKey('saved'), color: Colors.white, size: 18 * scale)
                                       : Row(
                                           key: const ValueKey('unsaved'),
                                           mainAxisSize: MainAxisSize.min,
                                           children: [
-                                            Icon(Icons.favorite_border, color: Colors.white, size: 16 * scale),
+                                            Icon(Icons.favorite_border, color: Colors.white, size: 18 * scale),
                                             SizedBox(width: 2 * scale),
                                             Text(widget.isEn ? 'Save' : '收藏',
                                               style: TextStyle(color: Colors.white, fontSize: 10 * scale, fontWeight: FontWeight.w500)),
