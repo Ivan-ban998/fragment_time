@@ -43,3 +43,8 @@ google-services.json
 GoogleService-Info.plist
 .screenshots/
 .envrc
+
+# 7/15 build 产物 (不 commit, 备份在 NAS .openclaw/bin + build_outputs/)
+build_outputs/
+*.apk
+*.apk.sha1
