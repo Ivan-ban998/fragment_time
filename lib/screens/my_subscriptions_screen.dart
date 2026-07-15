@@ -14,11 +14,16 @@ import 'subscription_screen.dart';
 class MySubscriptionsScreen extends StatefulWidget {
   final bool isElderlyMode;
   final bool isEn;
+  // 7/15 17:19: 透传给 ContentReaderScreen (含 quote Hero 卡, 关联阅读用)
+  final UserType? userType;
+  final Scene? scene;
 
   const MySubscriptionsScreen({
     super.key,
     this.isElderlyMode = false,
     this.isEn = false,
+    this.userType,
+    this.scene,
   });
 
   // 6/24 v8: GlobalKey 让详情页订阅后能 reload
@@ -267,6 +272,8 @@ class _MySubscriptionsScreenState extends State<MySubscriptionsScreen>
                   item: item,
                   isElderlyMode: widget.isElderlyMode,
                   isEn: isEn,
+                  userType: widget.userType,
+                  scene: widget.scene,
                 ),
               ),
             );
@@ -298,6 +305,8 @@ class _MySubscriptionsScreenState extends State<MySubscriptionsScreen>
                     item: quotes.first,
                     isElderlyMode: widget.isElderlyMode,
                     isEn: isEn,
+                    userType: widget.userType,
+                    scene: widget.scene,
                   ),
                 ),
               );
@@ -326,6 +335,8 @@ class _MySubscriptionsScreenState extends State<MySubscriptionsScreen>
                             item: item,
                             isElderlyMode: widget.isElderlyMode,
                             isEn: isEn,
+                            userType: widget.userType,
+                            scene: widget.scene,
                           ),
                         ),
                       );
