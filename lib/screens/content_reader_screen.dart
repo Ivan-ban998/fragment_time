@@ -1632,7 +1632,40 @@ class _QuoteReadLayout extends StatelessWidget {
               ],
             ),
           ),
+          SizedBox(height: 20 * scale),
+
+          // 7/15 16:44 修回: TTS 朗读 quote 全文 (听一句)
+          // 听 button (跟通用内容详情页同步, 复用 TtsService)
+          _QuoteTtsSection(quoteText: text, scale: scale, isEn: isEn),
           SizedBox(height: 16 * scale),
+
+          // 7/15 16:44 修回: AI 摘要 (LLM 调用, 30s 兌底)
+          _QuoteAiSummarySection(quoteText: text, author: item.title, scale: scale, isEn: isEn),
+          SizedBox(height: 16 * scale),
+
+          // 7/15 16:44 修回: 延伸阅读 placeholder (Q2 真接时填充, 现在显示'即将开放')
+          Container(
+            padding: EdgeInsets.all(16 * scale),
+            decoration: BoxDecoration(
+              color: Colors.amber.withOpacity(0.08),
+              borderRadius: BorderRadius.circular(12),
+              border: Border.all(color: Colors.amber.withOpacity(0.3)),
+            ),
+            child: Row(
+              children: [
+                Icon(Icons.rocket_launch, size: 18 * scale, color: Colors.amber.shade700),
+                SizedBox(width: 8 * scale),
+                Expanded(
+                  child: Text(
+                    isEn ? 'Related reading — coming soon (Q2 next)' : '相关延伸阅读 - 即将上线 (Q2 下一波)',
+                    style: TextStyle(fontSize: 12 * scale, color: Colors.brown.shade700),
+                  ),
+                ),
+              ],
+            ),
+          ),
+          SizedBox(height: 24 * scale),
+
           // 底部: 问 AI 按钮 (复用 banner 那条)
           SizedBox(
             width: double.infinity,
@@ -1664,6 +1697,197 @@ class _QuoteReadLayout extends StatelessWidget {
               ),
             ),
           ),
+        ],
+      ),
+    );
+  }
+}
+
+// 7/15 16:44 修回: TTS 朗读 (复用 TtsService)
+// 状态机 (跟通用详情页同步)
+class _QuoteTtsSection extends StatefulWidget {
+  final String quoteText;
+  final double scale;
+  final bool isEn;
+  const _QuoteTtsSection({required this.quoteText, required this.scale, required this.isEn});
+  @override
+  State<_QuoteTtsSection> createState() => _QuoteTtsSectionState();
+}
+class _QuoteTtsSectionState extends State<_QuoteTtsSection> {
+  bool _speaking = false;
+  bool _paused = false;
+  bool _checking = true;
+  bool _available = false;
+  @override
+  void initState() {
+    super.initState();
+    TtsService.instance.isAvailable().then((v) {
+      if (mounted) setState(() { _available = v; _checking = false; });
+    });
+  }
+  Future<void> _toggle() async {
+    if (_speaking && !_paused) {
+      await TtsService.instance.pause();
+      setState(() => _paused = true);
+    } else if (_paused) {
+      await TtsService.instance.resume();
+      setState(() => _paused = false);
+    } else {
+      await TtsService.instance.speak(widget.quoteText);
+      setState(() { _speaking = true; _paused = false; });
+    }
+  }
+  Future<void> _stop() async {
+    await TtsService.instance.stop();
+    setState(() { _speaking = false; _paused = false; });
+  }
+  @override
+  void dispose() { TtsService.instance.stop(); super.dispose(); }
+  @override
+  Widget build(BuildContext context) {
+    if (_checking) return const SizedBox.shrink();
+    if (!_available) return const SizedBox.shrink();
+    return Container(
+      padding: EdgeInsets.all(12 * widget.scale),
+      decoration: BoxDecoration(
+        color: AppTheme.primary.withOpacity(0.05),
+        borderRadius: BorderRadius.circular(12),
+        border: Border.all(color: AppTheme.primary.withOpacity(0.2)),
+      ),
+      child: Row(
+        children: [
+          IconButton.filled(
+            onPressed: _toggle,
+            padding: EdgeInsets.all(12 * widget.scale),
+            constraints: BoxConstraints.tightFor(width: 56 * widget.scale, height: 56 * widget.scale),
+            icon: Icon(
+              _speaking && !_paused ? Icons.pause : Icons.play_arrow,
+              color: Colors.white,
+              size: 28 * widget.scale,
+            ),
+          ),
+          SizedBox(width: 8 * widget.scale),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  _speaking ? (_paused ? (widget.isEn ? 'Paused' : '已暂停') : (widget.isEn ? 'Reading...' : '正在朗读...')) : (widget.isEn ? 'Listen to this quote' : '听这句名言'),
+                  style: TextStyle(fontSize: 13 * widget.scale, fontWeight: FontWeight.w600),
+                ),
+                SizedBox(height: 2 * widget.scale),
+                Text(
+                  widget.isEn ? 'Browser TTS · tap to play' : '浏览器原生语音 - 点击试听',
+                  style: TextStyle(fontSize: 11 * widget.scale, color: AppTheme.textLight),
+                ),
+              ],
+            ),
+          ),
+          if (_speaking)
+            IconButton(
+              onPressed: _stop,
+              icon: Icon(Icons.stop, color: AppTheme.textLight),
+            ),
+        ],
+      ),
+    );
+  }
+}
+
+// 7/15 16:44 修回: AI 摘要 (调 Ollama, 30s 兌底)
+class _QuoteAiSummarySection extends StatefulWidget {
+  final String quoteText;
+  final String author;
+  final double scale;
+  final bool isEn;
+  const _QuoteAiSummarySection({required this.quoteText, required this.author, required this.scale, required this.isEn});
+  @override
+  State<_QuoteAiSummarySection> createState() => _QuoteAiSummarySectionState();
+}
+class _QuoteAiSummarySectionState extends State<_QuoteAiSummarySection> {
+  String? _summary;
+  bool _loading = false;
+  bool _failed = false;
+  @override
+  void initState() {
+    super.initState();
+    _generate();
+  }
+  Future<void> _generate() async {
+    if (_loading || _summary != null) return;
+    setState(() { _loading = true; _failed = false; });
+    final prompt = widget.isEn
+        ? '\${widget.author}: "“widget.quoteText”\n\nBriefly explain what this quote means (max 100 words). Reply in English.'
+        : '作者: \${widget.author}\n名言: "\${widget.quoteText}"\n\n用 80 字以内解释这句名言的意思, 不要复述, 不要标题, 直接回答。';
+    try {
+      final result = await LlmService.generateRaw(prompt, isEn: widget.isEn)
+        .timeout(const Duration(seconds: 30), onTimeout: () => widget.isEn ? '(AI summary timeout — exceeds 30s. Ollama cold start may need ~60s for first request.)' : '（AI 摘要超时 - 超过 30s。 Ollama 冷启动首请求需约 60s。）');
+      if (!mounted) return;
+      setState(() { _summary = result.trim(); _loading = false; });
+    } catch (e) {
+      if (!mounted) return;
+      setState(() { _loading = false; _failed = true; });
+    }
+  }
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      padding: EdgeInsets.all(14 * widget.scale),
+      decoration: BoxDecoration(
+        color: AppTheme.primary.withOpacity(0.04),
+        borderRadius: BorderRadius.circular(12),
+        border: Border.all(color: AppTheme.primary.withOpacity(0.15)),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            children: [
+              Icon(Icons.auto_awesome, size: 16 * widget.scale, color: AppTheme.primary),
+              SizedBox(width: 6 * widget.scale),
+              Text(
+                widget.isEn ? 'AI Summary' : 'AI 摘要',
+                style: TextStyle(fontSize: 13 * widget.scale, fontWeight: FontWeight.w600, color: AppTheme.primary),
+              ),
+            ],
+          ),
+          SizedBox(height: 10 * widget.scale),
+          if (_loading)
+            Row(
+              children: [
+                SizedBox(width: 14 * widget.scale, height: 14 * widget.scale, child: const CircularProgressIndicator(strokeWidth: 2)),
+                SizedBox(width: 10 * widget.scale),
+                Expanded(
+                  child: Text(
+                    widget.isEn ? 'Generating... (first run may take 30-60s)' : '生成中... (首次启动需 30-60 秒)',
+                    style: TextStyle(fontSize: 12 * widget.scale, color: AppTheme.textLight),
+                  ),
+                ),
+              ],
+            )
+          else if (_failed)
+            Row(
+              children: [
+                Icon(Icons.error_outline, size: 16 * widget.scale, color: Colors.orange),
+                SizedBox(width: 6 * widget.scale),
+                Expanded(
+                  child: Text(
+                    widget.isEn ? 'Summary unavailable — Ollama offline?' : 'AI 摘要失败 - Ollama 可能离线',
+                    style: TextStyle(fontSize: 12 * widget.scale, color: AppTheme.textLight),
+                  ),
+                ),
+              ],
+            )
+          else if (_summary != null)
+            Text(
+              _summary!,
+              style: TextStyle(fontSize: 13 * widget.scale, height: 1.6, color: AppTheme.textDark),
+            )
+          else
+            Text(
+              widget.isEn ? 'Tap to generate' : '点击生成分析',
+              style: TextStyle(fontSize: 12 * widget.scale, color: AppTheme.textLight),
+            ),
         ],
       ),
     );
