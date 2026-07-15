@@ -450,6 +450,52 @@ class _MainHomeScreenState extends State<MainHomeScreen> {
     });
   }
 
+
+  // 21:00: banner 保存抽出 (banner widget 搬到 SceneScreen 后, save 逻辑留 main.dart)
+  Future<void> _onBannerSaveQuote(Quote quote) async {
+    final now = DateTime.now();
+    final quoteText = quote.text;
+    final id = 'quote_${quoteText.hashCode}';
+    final title = quote.author.isNotEmpty
+        ? quote.author
+        : (isEn ? 'AI Quote' : 'AI 名言');
+    final descParts = <String>[quote.text];
+    if (quote.source != null && quote.source!.isNotEmpty) {
+      descParts.add('《${quote.source}》');
+    }
+    final desc = descParts.join(' — ');
+    final item = ContentItem(
+      id: id,
+      title: title,
+      description: desc,
+      duration: isEn ? '1 min read' : '1 分钟阅读',
+      source: isEn ? 'Daily Quote' : '每日名言',
+      sourceType: ContentSource.rss,
+      contentType: ContentType.card,
+      lastReadAt: now,
+    );
+    try {
+      await LocalSubscriptionService.instance.subscribe(item);
+      try {
+        final prefs = await SharedPreferences.getInstance();
+        await prefs.setBool('quote_saved_${quoteText.hashCode}', true);
+      } catch (_) {}
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text(isEn ? 'Saved to Favorites' : '已收藏到收藏'),
+          duration: const Duration(seconds: 3),
+          action: SnackBarAction(
+            label: isEn ? 'View' : '查看',
+            onPressed: () => navigateToMainTab(2),
+          ),
+        ),
+      );
+    } catch (e) {
+      debugPrint('banner 保存失败: $e');
+    }
+  }
+
   // 6/24 AI 私教: 调用 LLM 生成本周总结 (周日 20:00 之后 + 本周未生成)
   // 最小版: 不做后台 timer, 启动时一次性检查
   Future<void> _checkWeeklyRecap() async {
@@ -808,6 +854,13 @@ class _MainHomeScreenState extends State<MainHomeScreen> {
                 onToggleLanguage: _toggleLanguage,
                 onToggleElderlyMode: _toggleElderlyMode,
                 onUserTypeSelected: _onUserTypeSelected,
+                // 21:00 banner 状态 + 回调 (传给 SceneScreen)
+                dailyQuote: _dailyQuote,
+                handle: _handle,
+                isEn: isEn,
+                onTapBannerDetail: _showQuoteDetailSheet,
+                onNextQuote: () async { _loadNextQuote(); },
+                onSaveQuote: (q) async { await _onBannerSaveQuote(q); },
               ),
               SearchScreen(
                 isElderlyMode: _isElderlyMode,
@@ -887,65 +940,7 @@ class _MainHomeScreenState extends State<MainHomeScreen> {
             ),
           // 6/28 Brien 反馈: 'LoadingScreen 消失后一片白' = LoadingScreen widget 报错 (e.g. _scale getter 未定义) 中断了 main build
           // 修: 加 ErrorWidget 兑底 (出 bug 时显红色块而不是白屏, 便于诊断)
-          // 6/26 Brien 反馈: 恢复 banner, 只显示 1 句名言
-          if (_selectedIndex == 0 && _dailyQuote != null && !_showWelcome && !_showOnboarding && _selectedUserType != null)
-            Positioned(
-              // 6/29 10:38 Brien 反馈: banner 跟 AppBar 挤了 — top 0 跟 AppBar 重叠
-              // 修: top = AppBar toolbarHeight + status bar (MediaQuery padding.top)
-              // 老人模式 AppBar 默认 56×1.3 ≈ 72
-              top: (_isElderlyMode ? 72 : 56) + MediaQuery.of(context).padding.top,
-              left: 0,
-              right: 0,
-              child: _DailyEncouragementBanner(
-                text: '',
-                quote: _dailyQuote,
-                isEn: isEn,
-                isElderlyMode: _isElderlyMode,
-                handle: _handle,
-                onTapDetail: _showQuoteDetailSheet,
-                onNextQuote: _loadNextQuote, // 6/29: 点 "下一个" 按钮
-              ),
-            ),
-            // 6/29 10:54 Brien 反馈: ↻ 按钮从 banner 内挪到外, 放在 64dp 空白区
-            // top 对齐 banner 顶部 (80 老人 96), right 距屏边 8
-            if (_dailyQuote != null && !_showWelcome && !_showOnboarding && _selectedUserType != null && _selectedIndex == 0)
-              Positioned(
-                // 7/15 Brien 反馈: ↻ 按钮垂直居中 (跟 banner 中心对齐), 别靠顶
-                top: (_isElderlyMode ? 72 : 56) + MediaQuery.of(context).padding.top + 18,
-                right: 8,
-                child: Material(
-                  color: Colors.transparent,
-                  child: InkWell(
-                    onTap: _quoteLoading ? null : _loadNextQuote,
-                    borderRadius: BorderRadius.circular(20),
-                    child: Container(
-                      width: _isElderlyMode ? 44 : 36,
-                      height: _isElderlyMode ? 44 : 36,
-                      decoration: BoxDecoration(
-                        color: const Color(0xFF7C5CFC).withOpacity(0.12),
-                        shape: BoxShape.circle,
-                        border: Border.all(
-                          color: const Color(0xFF7C5CFC).withOpacity(0.4),
-                          width: 1,
-                        ),
-                      ),
-                      child: _quoteLoading
-                          ? const Padding(
-                              padding: EdgeInsets.all(8),
-                              child: CircularProgressIndicator(
-                                strokeWidth: 2,
-                                color: Color(0xFF7C5CFC),
-                              ),
-                            )
-                          : Icon(
-                              Icons.shuffle, // 6/29 10:57: 区别于 AppBar 绿色 ↻ (Icons.refresh_outlined)
-                              size: _isElderlyMode ? 22 : 18,
-                              color: const Color(0xFF7C5CFC),
-                            ),
-                    ),
-                  ),
-                ),
-              ),
+          // 21:00 重构: 主页 banner + ↻ 都搬进 SceneScreen Column 顶部了
         ],
       ),
       bottomNavigationBar: (_showWelcome || _showOnboarding || _selectedUserType == null)
@@ -1485,6 +1480,13 @@ class _Tab0Switcher extends StatelessWidget {
   final VoidCallback onToggleLanguage;
   final VoidCallback onToggleElderlyMode;
   final ValueChanged<UserType> onUserTypeSelected;
+  // 21:00 banner 入参转发给 SceneScreen
+  final Quote? dailyQuote;
+  final String handle;
+  final bool isEn;
+  final VoidCallback onTapBannerDetail;
+  final Future<void> Function() onNextQuote;
+  final Future<void> Function(Quote) onSaveQuote;
 
   const _Tab0Switcher({
     required this.selectedUserType,
@@ -1497,6 +1499,12 @@ class _Tab0Switcher extends StatelessWidget {
     required this.onToggleLanguage,
     required this.onToggleElderlyMode,
     required this.onUserTypeSelected,
+    required this.dailyQuote,
+    required this.handle,
+    required this.isEn,
+    required this.onTapBannerDetail,
+    required this.onNextQuote,
+    required this.onSaveQuote,
   });
 
   @override
@@ -1523,6 +1531,13 @@ class _Tab0Switcher extends StatelessWidget {
       isInternational: isInternational,
       isElderlyMode: isElderlyMode,
       languageCode: languageCode,
+      // 21:00 banner 从 main.dart 移进 SceneScreen
+      dailyQuote: dailyQuote,
+      handle: handle,
+      isEn: isEn,
+      onTapBannerDetail: onTapBannerDetail,
+      onNextQuote: onNextQuote,
+      onSaveQuote: onSaveQuote,
     );
   }
 }
