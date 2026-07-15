@@ -80,37 +80,43 @@ class _WelcomeScreenState extends State<WelcomeScreen> {
     }
   }
 
-  @override
+    @override
   Widget build(BuildContext context) {
     final isEn = widget.isEn;
     return Scaffold(
       backgroundColor: Colors.white,
+      // 7/15 修: 用户名+AI 名 两块内容如果超 viewport, 可滚动
+      // 不再用 Spacer 把按钮顶底 (Spacer 在内容超屏时挤压丢失)
+      resizeToAvoidBottomInset: true,
       body: SafeArea(
-        child: Padding(
-          padding: const EdgeInsets.symmetric(horizontal: 32, vertical: 40),
+        // 7/15 修: 改用 SingleChildScrollView (整列可滚动)
+        // 整体往上挪 (顶部 24, 字号 28/72), 按钮靠上空间而非撑底
+        child: SingleChildScrollView(
+          padding: const EdgeInsets.symmetric(horizontal: 32, vertical: 24),
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.stretch,
             children: [
-              const SizedBox(height: 40),
-              Icon(Icons.waving_hand_outlined, size: 80, color: AppTheme.primary),
               const SizedBox(height: 24),
+              Icon(Icons.waving_hand_outlined, size: 72, color: AppTheme.primary),
+              const SizedBox(height: 16),
               Text(
                 isEn ? 'Welcome!' : '欢迎！',
                 textAlign: TextAlign.center,
                 style: TextStyle(
-                  fontSize: 32,
+                  fontSize: 28,
                   fontWeight: FontWeight.w700,
                   color: AppTheme.primary,
                 ),
               ),
+              const SizedBox(height: 8),
               Text(
                 isEn
                     ? "Let's set up your fragment time."
                     : '来设置你的碎片时间。',
                 textAlign: TextAlign.center,
-                style: const TextStyle(fontSize: 16, color: Colors.black54),
+                style: const TextStyle(fontSize: 15, color: Colors.black54),
               ),
-              const SizedBox(height: 40),
+              const SizedBox(height: 28),
               Text(
                 isEn ? 'Pick a handle' : '取个昵称',
                 style: const TextStyle(fontSize: 18, fontWeight: FontWeight.w600),
@@ -122,12 +128,11 @@ class _WelcomeScreenState extends State<WelcomeScreen> {
                     : '随时可以在设置中修改。',
                 style: const TextStyle(fontSize: 13, color: Colors.black45),
               ),
-              const SizedBox(height: 16),
+              const SizedBox(height: 12),
               TextField(
                 controller: _ctrl,
                 decoration: InputDecoration(
                   hintText: isEn ? 'Your name' : '你的昵称',
-                  // 6/26 Brien 反馈: 输入框 @ 前缀图标让人误会要保留 @, 删了
                   border: OutlineInputBorder(
                     borderRadius: BorderRadius.circular(12),
                   ),
@@ -137,22 +142,22 @@ class _WelcomeScreenState extends State<WelcomeScreen> {
                   ),
                 ),
                 autofocus: true,
+                textInputAction: TextInputAction.next,
                 onSubmitted: (_) {},
               ),
-              // 7/15: 加 AI 机器人昵称输入 — Brien 13:53 反馈缺失
-              SizedBox(height: 24),
+              const SizedBox(height: 20),
               Text(
                 isEn ? 'Give your AI helper a name' : '给 AI 机器人取个名字',
                 style: const TextStyle(fontSize: 18, fontWeight: FontWeight.w600),
               ),
-              SizedBox(height: 8),
+              const SizedBox(height: 8),
               Text(
                 isEn
                     ? 'Default name is ${RobotNameService.defaultRobotName}. Skip to keep it.'
                     : '默认叫「${RobotNameService.defaultRobotName}」，可以跳过用默认。',
                 style: TextStyle(fontSize: 13, color: AppTheme.primary.withOpacity(0.7)),
               ),
-              SizedBox(height: 16),
+              const SizedBox(height: 12),
               TextField(
                 controller: _robotCtrl,
                 decoration: InputDecoration(
@@ -166,20 +171,23 @@ class _WelcomeScreenState extends State<WelcomeScreen> {
                     borderSide: BorderSide(color: AppTheme.primary, width: 2),
                   ),
                 ),
+                textInputAction: TextInputAction.done,
                 onSubmitted: (_) => _complete(save: true),
               ),
-              const Spacer(),
+              // 7/15 修: 加 32 间隔 (按钮跟输入框离远点), 不再用 Spacer
+              const SizedBox(height: 32),
               SizedBox(
-                height: 50,
+                height: 56,
                 child: ElevatedButton(
                   onPressed: () => _complete(save: true),
                   style: ElevatedButton.styleFrom(
                     backgroundColor: AppTheme.primary,
+                    foregroundColor: Colors.white,
                     shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
                   ),
                   child: Text(
                     isEn ? 'Continue' : '继续',
-                    style: const TextStyle(fontSize: 16, color: Colors.white, fontWeight: FontWeight.w600),
+                    style: const TextStyle(fontSize: 17, color: Colors.white, fontWeight: FontWeight.w700),
                   ),
                 ),
               ),
