@@ -13,7 +13,26 @@ import '../models/models.dart';
 
 class LlmService {
 
-  // 18:10 安全: web 端永远不走 useRemote (避免 API key 编进 web build 暴露)
+// 18:26 Thinking strip: MiniMax 输出 ... 块, 我们只 yield 答案部分
+    // 18:26 Thinking strip helper (MiniMax 'reasoning model')
+
+  // 18:26 Thinking strip: MiniMax 输出  ... 块, 我们只 yield 答案部分
+  // 简单实现: 接到 chunk 后 strip 完整块, 然后 yield
+  static String stripThinkTags(String s) {
+    var result = s;
+    // 简单 regex: 删除  ...  块 (可以跨 chunk, 但 99% 完整)
+    while (true) {
+      final m = RegExp(r'```').firstMatch(result);
+      if (m == null) break;
+      final end = RegExp(r'```').firstMatch(result.substring(m.end));
+      if (end == null) break;
+      result = result.substring(0, m.start) + result.substring(m.end + end.end);
+    }
+    return result.trim();
+  }
+
+
+    // 18:10 安全: web 端永远不走 useRemote (避免 API key 编进 web build 暴露)
   // 真正安全路径: 用 NAS LLM proxy (待补)
   static bool get _webSafeUseRemote {
     if (kIsWeb) return false; // web 强制用 Ollama (本地 100.89.204.123:11434)
@@ -46,6 +65,9 @@ class LlmService {
     required bool isInternational,
     String? prefSummary, // 6/13 6: 用户偏好摘要, nil = 不用
   }) async* {
+    // 18:26 Thinking strip state (MiniMax reasoning model)
+    String _miniMaxBuffer = '';
+    int _miniMaxYieldedLen = 0;
     final systemPrompt = _buildSystemPrompt(userType, languageCode, prefSummary: prefSummary);
     final userPrompt = _buildUserPrompt(userType, scene, languageCode, isInternational);
 
@@ -122,7 +144,16 @@ class LlmService {
                 if (choices == null || choices.isEmpty) continue;
                 final delta = choices[0]['delta'] as Map?;
                 final content = delta?['content'] as String?;
-                if (content != null && content.isNotEmpty) yield content;
+                // 18:26 MiniMax reasoning model: content 含  ...
+                // 累积 buffer + strip + yield 增量 (隐藏 thinking)
+                if (content != null) {
+                  _miniMaxBuffer += content;
+                  final safe = stripThinkTags(_miniMaxBuffer);
+                  if (safe.length > _miniMaxYieldedLen) {
+                    yield safe.substring(_miniMaxYieldedLen);
+                    _miniMaxYieldedLen = safe.length;
+                  }
+                }
               } catch (_) {}
             }
           }
@@ -189,7 +220,9 @@ class LlmService {
       }
       final json = jsonDecode(response.body) as Map<String, dynamic>;
       final msg = json['message'] as Map<String, dynamic>?;
-      return (msg?['content'] as String?) ?? (isEn ? '(no response)' : '（无回复）');
+      final rawContent = (msg?['content'] as String?) ?? (isEn ? '(no response)' : '（无回复）');
+      // 18:26 MiniMax reasoning strip
+      return useRemote ? stripThinkTags(rawContent) : rawContent;
     } catch (e) {
       return isEn ? '(LLM error: $e)' : '（LLM 错误）';
     }
