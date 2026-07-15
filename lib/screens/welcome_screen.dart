@@ -5,6 +5,7 @@
 import 'package:flutter/material.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import '../services/handle_service.dart';
+import '../services/robot_name_service.dart';
 import '../theme/app_theme.dart';
 import '../main.dart' as app;
 import 'user_type_screen.dart';
@@ -28,18 +29,22 @@ class WelcomeScreen extends StatefulWidget {
 
 class _WelcomeScreenState extends State<WelcomeScreen> {
   late TextEditingController _ctrl;
-  String _currentHandle = HandleService.defaultHandle;
+  late TextEditingController _robotCtrl; // 7/15 Brien 反馈: AI 机器人昵称也要在 welcome 这取
+  final String _currentHandle = HandleService.defaultHandle;
 
   @override
   void initState() {
     super.initState();
     // 6/26 Brien 反馈: 默认值 '@你' 让人以为要保留 @, 改成空 (让用户直接输入)
     _ctrl = TextEditingController(text: _currentHandle == '@你' ? '' : _currentHandle);
+    // 7/15: AI 机器人昵称默认 '小O', 留空代表不改用默认
+    _robotCtrl = TextEditingController();
   }
 
   @override
   void dispose() {
     _ctrl.dispose();
+    _robotCtrl.dispose();
     super.dispose();
   }
 
@@ -48,9 +53,14 @@ class _WelcomeScreenState extends State<WelcomeScreen> {
   //   后续 prefs.setBool + notifyComplete 都没跑。改成 fire-and-forget + 同步 prefs + 立即 notify
   void _complete({bool save = true}) {
     final text = _ctrl.text.trim();
+    final robotName = _robotCtrl.text.trim();
     if (save && text.isNotEmpty) {
       // 不 await, fire-and-forget
       HandleService().set(text).catchError((_) {});
+    }
+    // 7/15: AI 机器人昵称 — 留空保留默认 '小O', 有内容就改
+    if (save && robotName.isNotEmpty && robotName != RobotNameService.defaultRobotName) {
+      RobotNameService().set(robotName).catchError((_) {});
     }
     // prefs 也 fire-and-forget, 不阻塞 UI
     SharedPreferences.getInstance().then((prefs) {
@@ -127,6 +137,35 @@ class _WelcomeScreenState extends State<WelcomeScreen> {
                   ),
                 ),
                 autofocus: true,
+                onSubmitted: (_) {},
+              ),
+              // 7/15: 加 AI 机器人昵称输入 — Brien 13:53 反馈缺失
+              SizedBox(height: 24),
+              Text(
+                isEn ? 'Give your AI helper a name' : '给 AI 机器人取个名字',
+                style: const TextStyle(fontSize: 18, fontWeight: FontWeight.w600),
+              ),
+              SizedBox(height: 8),
+              Text(
+                isEn
+                    ? 'Default name is ${RobotNameService.defaultRobotName}. Skip to keep it.'
+                    : '默认叫「${RobotNameService.defaultRobotName}」，可以跳过用默认。',
+                style: TextStyle(fontSize: 13, color: AppTheme.primary.withOpacity(0.7)),
+              ),
+              SizedBox(height: 16),
+              TextField(
+                controller: _robotCtrl,
+                decoration: InputDecoration(
+                  hintText: isEn ? 'AI helper name (optional)' : 'AI 机器人名字（可选）',
+                  prefixIcon: Icon(Icons.smart_toy, color: AppTheme.primary, size: 20),
+                  border: OutlineInputBorder(
+                    borderRadius: BorderRadius.circular(12),
+                  ),
+                  focusedBorder: OutlineInputBorder(
+                    borderRadius: BorderRadius.circular(12),
+                    borderSide: BorderSide(color: AppTheme.primary, width: 2),
+                  ),
+                ),
                 onSubmitted: (_) => _complete(save: true),
               ),
               const Spacer(),
