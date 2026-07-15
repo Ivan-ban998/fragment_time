@@ -287,6 +287,18 @@ class _MySubscriptionsScreenState extends State<MySubscriptionsScreen>
             totalCount: quotes.length,
             scale: scale,
             isEn: isEn,
+            onTap: () {
+              Navigator.push(
+                context,
+                MaterialPageRoute(
+                  builder: (_) => ContentReaderScreen(
+                    item: quotes.first,
+                    isElderlyMode: widget.isElderlyMode,
+                    isEn: isEn,
+                  ),
+                ),
+              );
+            },
             onRemove: () => _unsubscribe(quotes.first),
           ),
         ),
@@ -654,6 +666,7 @@ class _QuoteHeroCard extends StatelessWidget {
   final int totalCount;
   final double scale;
   final bool isEn;
+  final VoidCallback onTap; // 7/15 加: 点 hero 进 reader
   final VoidCallback onRemove;
 
   const _QuoteHeroCard({
@@ -661,6 +674,7 @@ class _QuoteHeroCard extends StatelessWidget {
     required this.totalCount,
     required this.scale,
     required this.isEn,
+    required this.onTap,
     required this.onRemove,
   });
 
@@ -676,7 +690,11 @@ class _QuoteHeroCard extends StatelessWidget {
     final d = latest.lastReadAt ?? DateTime.now();
     return Padding(
       padding: EdgeInsets.fromLTRB(16 * scale, 16 * scale, 16 * scale, 8 * scale),
-      child: Container(
+      child: InkWell(
+        // 7/15 加: Hero 可点击 (进 reader)
+        onTap: onTap,
+        borderRadius: BorderRadius.circular(24),
+        child: Container(
         decoration: BoxDecoration(
           gradient: const LinearGradient(
             colors: [Color(0xFF7C5CFC), Color(0xFFA48BFF)],
@@ -811,7 +829,8 @@ class _QuoteHeroCard extends StatelessWidget {
             ),
           ],
         ),
-      ),
+        ),
+        ),
     );
   }
 }
