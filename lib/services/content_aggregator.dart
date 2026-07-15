@@ -23,6 +23,13 @@ class ContentAggregator {
     bool isInternational = false,
   }) async {
     try {
+      // 7/14 加: 优先 RSS (国内 36 氪 / 国际 The Verge), 失败 fallback 假数据
+      // 走宪法 §1.1: 只接 metadata, 不存原片
+      final rssResults = await news.fetchFromRss(userType, scene, isInternational: isInternational);
+      if (rssResults.isNotEmpty) {
+        return rssResults;
+      }
+      // RSS 拉空 -> 老逻辑 (硬编码假数据)
       if (isInternational) {
         return await international.getRecommendations(userType, scene);
       } else {
