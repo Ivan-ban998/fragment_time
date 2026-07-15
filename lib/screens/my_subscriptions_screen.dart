@@ -1333,7 +1333,7 @@ class _ContentTimelineItem extends StatelessWidget {
                   SizedBox(height: 4 * s),
                   // 副: 时长 · source · type
                   Text(
-                    '\${item.duration} • \${item.source} • \${item.contentType.label}',
+                    '${item.duration} • ${item.source} • ${item.contentType.label}',
                     style: TextStyle(fontSize: 12 * s, color: AppTheme.textLight),
                     maxLines: 1,
                     overflow: TextOverflow.ellipsis,
