@@ -25,12 +25,19 @@ class ContentReaderScreen extends StatefulWidget {
   final ContentItem item;
   final bool isElderlyMode;
   final bool isEn;
+  // 7/15 17:19 Q2 修: userType/scene 可选传入 (兑底 officeWorker/learn)
+  // 用法: ContentReaderScreen(item: it, userType: ut, scene: Scene.learn)
+  // Hero 卡/quote 详情 不传时 关联算法兑底 (没原本 userType 信息)
+  final UserType? userType;
+  final Scene? scene;
 
   const ContentReaderScreen({
     super.key,
     required this.item,
     this.isElderlyMode = false,
     this.isEn = false,
+    this.userType,
+    this.scene,
   });
 
   @override
@@ -568,7 +575,13 @@ class _ContentReaderScreenState extends State<ContentReaderScreen> {
           // 7/15 Q4: quote 类型走特殊 layout (Hero 风) — 大字 quote + 作者 + 出处
           // 不跑 _isDemo / _needsVpn / AI 摘要 / 视频 iframe / TTS 等通用 block
           if (item.id.startsWith('quote_'))
-            _QuoteReadLayout(item: item, scale: scale, isEn: isEn),
+            _QuoteReadLayout(
+              item: item,
+              scale: scale,
+              isEn: isEn,
+              userType: widget.userType,
+              scene: widget.scene,
+            ),
           if (!item.id.startsWith('quote_'))
           SingleChildScrollView(
             controller: _scrollCtrl,
@@ -1486,11 +1499,16 @@ class _QuoteReadLayout extends StatelessWidget {
   final ContentItem item;
   final double scale;
   final bool isEn;
+  // 7/15 17:19: 跟 widget.item.userType/scene 同源 (Hero 详情 page)
+  final UserType? userType;
+  final Scene? scene;
 
   const _QuoteReadLayout({
     required this.item,
     required this.scale,
     required this.isEn,
+    this.userType,
+    this.scene,
   });
 
   String _authorInit() {
@@ -1646,12 +1664,15 @@ class _QuoteReadLayout extends StatelessWidget {
           SizedBox(height: 16 * scale),
 
           // 7/15 16:56 Q2: 真接关联阅读 (Hero 详情页底部) — 跟 banner sheet 同源算法
+          // 17:19: userType/scene 从 ContentReaderScreen 透传进来 (兑底 officeWorker/learn)
           _QuoteRelatedSection(
             quoteText: text,
             author: item.title,
             source: source,
             scale: scale,
             isEn: isEn,
+            userType: userType,
+            scene: scene,
           ),
           SizedBox(height: 16 * scale),  // 喂内边距到问 AI 按钮
           SizedBox(height: 24 * scale),
@@ -1892,6 +1913,9 @@ class _QuoteRelatedSection extends StatefulWidget {
   final String? source;
   final double scale;
   final bool isEn;
+  // 7/15 17:19: userType/scene 传入 (兑底)
+  final UserType? userType;
+  final Scene? scene;
 
   const _QuoteRelatedSection({
     required this.quoteText,
@@ -1899,6 +1923,8 @@ class _QuoteRelatedSection extends StatefulWidget {
     required this.source,
     required this.scale,
     required this.isEn,
+    this.userType,
+    this.scene,
   });
 
   @override
@@ -1907,6 +1933,9 @@ class _QuoteRelatedSection extends StatefulWidget {
 
 class _QuoteRelatedSectionState extends State<_QuoteRelatedSection> {
   late Future<List<RelatedHit>> _future;
+  // 7/15: 读 widget 上的 userType/scene
+  UserType? get _parentUserType => widget.userType;
+  Scene? get _parentScene => widget.scene;
 
   @override
   void initState() {
@@ -1921,8 +1950,9 @@ class _QuoteRelatedSectionState extends State<_QuoteRelatedSection> {
       source: widget.source,
       createdAt: DateTime.now(),
     );
-    final userType = UserType.officeWorker;  // 7/15: 详情页不知 userType, 兑底
-    final scene = Scene.learn;
+    // 7/15 17:19: 外面传入 userType/scene, 兑底 officeWorker/learn
+    final userType = _parentUserType ?? UserType.officeWorker;
+    final scene = _parentScene ?? Scene.learn;
     return QuoteRelatedEngine.findRelated(
       quote: quote,
       userType: userType,

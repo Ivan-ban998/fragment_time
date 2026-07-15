@@ -818,6 +818,8 @@ class _MainHomeScreenState extends State<MainHomeScreen> {
                 key: MySubscriptionsScreen.reloadKey, // 6/24 v8: reload 刷新
                 isElderlyMode: _isElderlyMode,
                 isEn: isEn,
+                userType: _selectedUserType,
+                scene: TimeAwareRecommender.recommendAt(DateTime.now(), currentUserType: _selectedUserType).scene,
               ),
               SettingsTab(
                 config: config,
