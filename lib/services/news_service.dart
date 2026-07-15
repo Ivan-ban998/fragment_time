@@ -57,6 +57,18 @@ class NewsService {
     ];
   }
 
+  // 7/14 加: 接真 RSS, 失败 fallback 假数据
+  // 走宪法 §1.1: 只接 metadata (title/url/description), 不存原片
+  //
+  // 7/15 BUG: RSS 抓的 link 大多是失效/被撤稿 (36 氪 + The Verge), UI 跳出去
+  // "页面无法访问" 撞爆. Brien 反馈前两周一直没用/没用对看到. 临时 ban RSS 路径,
+  // 直接走 _allContent 老 24 桶假数据. rss_service.dart 留着, 改用 RSSHub/NewsAPI
+  // 等更稳方案后再开.
+  Future<List<ContentItem>> fetchFromRss(UserType userType, Scene scene, {bool isInternational = false}) async {
+    final key = userType.bucketKey + '_' + scene.bucketKey;
+    return _allContent[key] ?? _fallback(userType, scene);
+  }
+
   // 6 角色 × 4 场景 = 24 种推荐，每个 key 至少 4-6 条
   // 6/7 §10 验：24/24 keys 都非空
   static final Map<String, List<ContentItem>> _allContent = {
