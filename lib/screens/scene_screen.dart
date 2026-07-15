@@ -815,50 +815,92 @@ class _DailyEncouragementBannerState extends State<DailyEncouragementBanner> {
                                     ),
                                   ),
                                 ),
-                                GestureDetector(
-                                  onTap: _onSave,
-                                  child: AnimatedSwitcher(
-                                    duration: const Duration(milliseconds: 200),
-                                    child: _saved
-                                        ? Icon(Icons.favorite, key: const ValueKey('saved'), color: Colors.white, size: 32 * scale)
-                                        : Row(
-                                            key: const ValueKey('unsaved'),
-                                            mainAxisSize: MainAxisSize.min,
-                                            children: [
-                                              Icon(Icons.favorite_border, color: Colors.white, size: 32 * scale),
-                                              SizedBox(width: 2 * scale),
-                                              Text(widget.isEn ? 'Save' : '收藏',
-                                                style: TextStyle(color: Colors.white, fontSize: 10 * scale, fontWeight: FontWeight.w500)),
-                                            ],
+                                Row(
+                                  mainAxisSize: MainAxisSize.min,
+                                  children: [
+                                    GestureDetector(
+                                      onTap: _onSave,
+                                      child: AnimatedSwitcher(
+                                        duration: const Duration(milliseconds: 200),
+                                        child: _saved
+                                            ? Icon(Icons.favorite, key: const ValueKey('saved'), color: Colors.white, size: 32 * scale)
+                                            : Row(
+                                                key: const ValueKey('unsaved'),
+                                                mainAxisSize: MainAxisSize.min,
+                                                children: [
+                                                  Icon(Icons.favorite_border, color: Colors.white, size: 32 * scale),
+                                                  SizedBox(width: 2 * scale),
+                                                  Text(widget.isEn ? 'Save' : '收藏',
+                                                    style: TextStyle(color: Colors.white, fontSize: 10 * scale, fontWeight: FontWeight.w500)),
+                                                ],
+                                              ),
+                                      ),
+                                    ),
+                                    // 7/15 22:19: 加 ↻ button (banner 随机换 quote), 跟 ❤️ 共一行
+                                    if (widget.onNextQuote != null) ...[
+                                      SizedBox(width: 8 * scale),
+                                      GestureDetector(
+                                        onTap: () => widget.onNextQuote?.call(),
+                                        child: Container(
+                                          padding: EdgeInsets.all(4 * scale),
+                                          decoration: BoxDecoration(
+                                            color: Colors.white.withOpacity(0.12),
+                                            shape: BoxShape.circle,
+                                            border: Border.all(color: Colors.white.withOpacity(0.4), width: 1),
                                           ),
-                                  ),
+                                          child: Icon(Icons.shuffle, color: Colors.white, size: 16 * scale),
+                                        ),
+                                      ),
+                                    ],
+                                  ],
                                 ),
                               ],
                             ),
                           )
                         else
-                          // 没有作者出处时, 把 ❤ 按钮放这里
+                          // 没有作者出处时, 把 ❤ + ↻ 按钮放这里
                           Padding(
                             padding: EdgeInsets.only(top: 4 * scale),
                             child: Align(
                               alignment: Alignment.centerRight,
-                              child: GestureDetector(
-                                onTap: _onSave,
-                                child: AnimatedSwitcher(
-                                  duration: const Duration(milliseconds: 200),
-                                  child: _saved
-                                      ? Icon(Icons.favorite, key: const ValueKey('saved'), color: Colors.white, size: 32 * scale)
-                                      : Row(
-                                          key: const ValueKey('unsaved'),
-                                          mainAxisSize: MainAxisSize.min,
-                                          children: [
-                                            Icon(Icons.favorite_border, color: Colors.white, size: 32 * scale),
-                                            SizedBox(width: 2 * scale),
-                                            Text(widget.isEn ? 'Save' : '收藏',
-                                              style: TextStyle(color: Colors.white, fontSize: 10 * scale, fontWeight: FontWeight.w500)),
-                                          ],
+                              child: Row(
+                                mainAxisSize: MainAxisSize.min,
+                                children: [
+                                  GestureDetector(
+                                    onTap: _onSave,
+                                    child: AnimatedSwitcher(
+                                      duration: const Duration(milliseconds: 200),
+                                      child: _saved
+                                          ? Icon(Icons.favorite, key: const ValueKey('saved'), color: Colors.white, size: 32 * scale)
+                                          : Row(
+                                              key: const ValueKey('unsaved'),
+                                              mainAxisSize: MainAxisSize.min,
+                                              children: [
+                                                Icon(Icons.favorite_border, color: Colors.white, size: 32 * scale),
+                                                SizedBox(width: 2 * scale),
+                                                Text(widget.isEn ? 'Save' : '收藏',
+                                                  style: TextStyle(color: Colors.white, fontSize: 10 * scale, fontWeight: FontWeight.w500)),
+                                              ],
+                                            ),
+                                    ),
+                                  ),
+                                  // 7/15 22:19: ↻ button
+                                  if (widget.onNextQuote != null) ...[
+                                    SizedBox(width: 8 * scale),
+                                    GestureDetector(
+                                      onTap: () => widget.onNextQuote?.call(),
+                                      child: Container(
+                                        padding: EdgeInsets.all(4 * scale),
+                                        decoration: BoxDecoration(
+                                          color: Colors.white.withOpacity(0.12),
+                                          shape: BoxShape.circle,
+                                          border: Border.all(color: Colors.white.withOpacity(0.4), width: 1),
                                         ),
-                                ),
+                                        child: Icon(Icons.shuffle, color: Colors.white, size: 16 * scale),
+                                      ),
+                                    ),
+                                  ],
+                                ],
                               ),
                             ),
                           ),
