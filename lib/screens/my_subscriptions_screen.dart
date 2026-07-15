@@ -900,7 +900,7 @@ class _QuoteTimelineItem extends StatelessWidget {
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  // 作者 (title) + 日期
+                  // 作者 (title) + 日期 + 已收藏徽章
                   Row(
                     children: [
                       Expanded(
@@ -909,6 +909,26 @@ class _QuoteTimelineItem extends StatelessWidget {
                           style: TextStyle(fontSize: 14 * scale, fontWeight: FontWeight.w700),
                           maxLines: 1,
                           overflow: TextOverflow.ellipsis,
+                        ),
+                      ),
+                      // 7/15 Q3: 跟 Hero ❤️ 同色系紫色徽章 (统一视觉)
+                      Container(
+                        padding: EdgeInsets.symmetric(horizontal: 6 * scale, vertical: 2 * scale),
+                        margin: EdgeInsets.only(right: 6 * scale),
+                        decoration: BoxDecoration(
+                          color: const Color(0xFF7C5CFC).withOpacity(0.12),
+                          borderRadius: BorderRadius.circular(8),
+                        ),
+                        child: Row(
+                          mainAxisSize: MainAxisSize.min,
+                          children: [
+                            Icon(Icons.bookmark, size: 10 * scale, color: const Color(0xFF7C5CFC)),
+                            SizedBox(width: 3 * scale),
+                            Text(
+                              isEn ? 'Saved' : '已收藏',
+                              style: TextStyle(fontSize: 10 * scale, color: const Color(0xFF7C5CFC), fontWeight: FontWeight.w600),
+                            ),
+                          ],
                         ),
                       ),
                       Text(

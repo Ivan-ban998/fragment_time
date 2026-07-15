@@ -158,7 +158,7 @@ class _SceneScreenState extends State<SceneScreen> {
                 languageCode: languageCode,
               ),
               SizedBox(height: 12 * _scale),
-              // 6/24 v12: “现在看什么?” hero 卡
+              // 6/24 v12: 现在看什么 hero 卡 (7/15 统一间距 12)
               _TodayPickCard(
                 scale: _scale,
                 isEn: isEn,
@@ -182,18 +182,18 @@ class _SceneScreenState extends State<SceneScreen> {
                   );
                 },
               ),
-              SizedBox(height: 20 * _scale),
+              SizedBox(height: 12 * _scale),
               Text(
                 // 6/25 联动昵称: '上午好, @你' 而不是 '上午好, 上班族'
                 '${DailyMessage.getGreeting(isEn)} $_handle',
                 style: TextStyle(fontSize: 18 * _scale, fontWeight: FontWeight.bold),
               ),
-              SizedBox(height: 4 * _scale),
+              SizedBox(height: 12 * _scale),
               Text(
                 isEn ? 'What would you like to do?' : '选择你现在想干嘛',
                 style: TextStyle(fontSize: 14 * _scale, color: AppTheme.textLight),
               ),
-              SizedBox(height: 16 * _scale),
+              SizedBox(height: 12 * _scale),
               Expanded(
                 child: GridView.builder(
                   gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(

@@ -17,6 +17,7 @@ import '../services/handle_service.dart';
 import '../services/llm_service.dart';
 import '../services/news_service.dart';
 import '../widgets/inline_read_view.dart';
+import 'ai_assistant_screen.dart';
 
 class ContentReaderScreen extends StatefulWidget {
   final ContentItem item;
@@ -562,6 +563,11 @@ class _ContentReaderScreenState extends State<ContentReaderScreen> {
       ),
       body: Stack(
         children: [
+          // 7/15 Q4: quote 类型走特殊 layout (Hero 风) — 大字 quote + 作者 + 出处
+          // 不跑 _isDemo / _needsVpn / AI 摘要 / 视频 iframe / TTS 等通用 block
+          if (item.id.startsWith('quote_'))
+            _QuoteReadLayout(item: item, scale: scale, isEn: isEn),
+          if (!item.id.startsWith('quote_'))
           SingleChildScrollView(
             controller: _scrollCtrl,
             padding: EdgeInsets.all(20 * scale),
@@ -1469,4 +1475,197 @@ void _showFloatingSnack(BuildContext context, String message) {
       duration: const Duration(seconds: 2),
     ),
   );
+}
+
+
+// 7/15 Q4: Quote 详情页 layout (跟 Hero / banner 同款紫色渐变 + 圆 avatar + 作者出处)
+// 复用 _DailyEncouragementBanner 视觉, 但去 onTap 等动效
+class _QuoteReadLayout extends StatelessWidget {
+  final ContentItem item;
+  final double scale;
+  final bool isEn;
+
+  const _QuoteReadLayout({
+    required this.item,
+    required this.scale,
+    required this.isEn,
+  });
+
+  String _authorInit() {
+    final t = item.title;
+    if (t.isEmpty) return '✦';
+    return t.characters.first;
+  }
+
+  // 从 description 解析 quote text + source (7/15 banner save 格式: "quote — 《source》")
+  (String, String?) _parse() {
+    final desc = item.description ?? '';
+    final idx = desc.indexOf(' — ');
+    if (idx > 0) {
+      return (desc.substring(0, idx), desc.substring(idx + 3));
+    }
+    return (desc, null);
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final (text, sourceRaw) = _parse();
+    final source = sourceRaw != null && sourceRaw.startsWith('《') && sourceRaw.endsWith('》')
+        ? sourceRaw.substring(1, sourceRaw.length - 1)
+        : sourceRaw;
+    final d = item.lastReadAt ?? DateTime.now();
+
+    return SingleChildScrollView(
+      padding: EdgeInsets.fromLTRB(20 * scale, 80 * scale, 20 * scale, 20 * scale), // top 给 AppBar 让位
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          // 顶部紫色 Hero (跟收藏页 hero 卡同款)
+          Container(
+            decoration: BoxDecoration(
+              gradient: const LinearGradient(
+                colors: [Color(0xFF7C5CFC), Color(0xFFA48BFF)],
+                begin: Alignment.topLeft,
+                end: Alignment.bottomRight,
+              ),
+              borderRadius: BorderRadius.circular(24),
+              boxShadow: [
+                BoxShadow(
+                  color: const Color(0xFF7C5CFC).withOpacity(0.25),
+                  blurRadius: 16,
+                  offset: const Offset(0, 4),
+                ),
+              ],
+            ),
+            padding: EdgeInsets.all(24 * scale),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Row(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Container(
+                      width: 72 * scale,
+                      height: 72 * scale,
+                      decoration: BoxDecoration(
+                        color: Colors.white.withOpacity(0.2),
+                        shape: BoxShape.circle,
+                        border: Border.all(color: Colors.white.withOpacity(0.5), width: 2),
+                      ),
+                      alignment: Alignment.center,
+                      child: Text(
+                        _authorInit(),
+                        style: TextStyle(color: Colors.white, fontSize: 28 * scale, fontWeight: FontWeight.w700),
+                      ),
+                    ),
+                    SizedBox(width: 16 * scale),
+                    Expanded(
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          // 作者 (title)
+                          Text(
+                            item.title,
+                            style: TextStyle(color: Colors.white, fontSize: 22 * scale, fontWeight: FontWeight.w700),
+                            maxLines: 1,
+                            overflow: TextOverflow.ellipsis,
+                          ),
+                          if (source != null && source.isNotEmpty)
+                            Padding(
+                              padding: EdgeInsets.only(top: 4 * scale),
+                              child: Text(
+                                '《${source}》',
+                                style: TextStyle(color: Colors.white.withOpacity(0.85), fontSize: 14 * scale),
+                              ),
+                            ),
+                        ],
+                      ),
+                    ),
+                  ],
+                ),
+                SizedBox(height: 20 * scale),
+                // quote 全文 (大 italic)
+                Text(
+                  '“${text}”',
+                  style: TextStyle(
+                    color: Colors.white,
+                    fontSize: 18 * scale,
+                    fontStyle: FontStyle.italic,
+                    height: 1.6,
+                    fontWeight: FontWeight.w500,
+                  ),
+                ),
+                SizedBox(height: 16 * scale),
+                // 底部: 收藏时间
+                Row(
+                  children: [
+                    Icon(Icons.bookmark, color: Colors.white.withOpacity(0.7), size: 14 * scale),
+                    SizedBox(width: 6 * scale),
+                    Text(
+                      '《收藏于 ${d.year}-${d.month.toString().padLeft(2, '0')}-${d.day.toString().padLeft(2, '0')}》',
+                      style: TextStyle(color: Colors.white.withOpacity(0.7), fontSize: 11 * scale),
+                    ),
+                  ],
+                ),
+              ],
+            ),
+          ),
+          SizedBox(height: 20 * scale),
+          // 下面加分隔线 + "在 quote 详情" 提示 (将来加 Q2 关联阅读, 现在先空)
+          Container(
+            padding: EdgeInsets.all(16 * scale),
+            decoration: BoxDecoration(
+              color: AppTheme.primary.withOpacity(0.04),
+              borderRadius: BorderRadius.circular(12),
+              border: Border.all(color: AppTheme.primary.withOpacity(0.15)),
+            ),
+            child: Row(
+              children: [
+                Icon(Icons.info_outline, size: 16, color: AppTheme.primary),
+                SizedBox(width: 8),
+                Expanded(
+                  child: Text(
+                    isEn ? 'Reading time: ${item.duration}' : '阅读时长: ${item.duration}',
+                    style: TextStyle(fontSize: 13 * scale, color: AppTheme.textLight),
+                  ),
+                ),
+              ],
+            ),
+          ),
+          SizedBox(height: 16 * scale),
+          // 底部: 问 AI 按钮 (复用 banner 那条)
+          SizedBox(
+            width: double.infinity,
+            child: OutlinedButton.icon(
+              onPressed: () {
+                showModalBottomSheet(
+                  context: context,
+                  isScrollControlled: true,
+                  backgroundColor: Colors.transparent,
+                  barrierColor: Colors.black54,
+                  builder: (_) => AiAssistantScreen(
+                    isEn: isEn,
+                    isElderlyMode: false,
+                    userTypeName: 'you',
+                    contextQuote: text,
+                    scene: null,
+                  ),
+                );
+              },
+              icon: Icon(Icons.support_agent, size: 18 * scale, color: const Color(0xFF7C5CFC)),
+              label: Text(
+                isEn ? 'Ask AI about this quote' : '问 AI 这句什么意思',
+                style: TextStyle(color: const Color(0xFF7C5CFC), fontWeight: FontWeight.w600),
+              ),
+              style: OutlinedButton.styleFrom(
+                padding: EdgeInsets.symmetric(vertical: 12 * scale),
+                side: BorderSide(color: const Color(0xFF7C5CFC).withOpacity(0.4)),
+                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+              ),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
 }
