@@ -164,16 +164,46 @@ class _SceneScreenState extends State<SceneScreen> {
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              // 7/15 21:00: 主页 banner (从 main.dart Positioned 移入, 现在是 SceneScreen Column 顶部)
+              // 7/15 21:00 + 22:56: 主页 banner (从 main.dart Positioned 移入, 浮 ↻ 在 banner 外右)
               if (widget.dailyQuote != null && widget.onTapBannerDetail != null)
-                DailyEncouragementBanner(
-                  text: '',
-                  quote: widget.dailyQuote,
-                  isEn: widget.isEn,
-                  isElderlyMode: widget.isElderlyMode,
-                  handle: widget.handle,
-                  onTapDetail: widget.onTapBannerDetail!,
-                  onNextQuote: () { widget.onNextQuote?.call(); },
+                Stack(
+                  children: [
+                    DailyEncouragementBanner(
+                      text: '',
+                      quote: widget.dailyQuote,
+                      isEn: widget.isEn,
+                      isElderlyMode: widget.isElderlyMode,
+                      handle: widget.handle,
+                      onTapDetail: widget.onTapBannerDetail!,
+                      // banner 内不再需要 ↻ (外 Positioned 自己管)
+                    ),
+                    // 7/15 22:56: Brien 反馈 ↻ 应在 banner 外右, banner 卡中央对齐
+                    // 老 main.dart 老样式: top=AppBar+statusBar+18, right=8, 36x36 圆形
+                    // SceneScreen Column 内部 Stack — 现在 position 是相对于 banner 的 LocalStack
+                    // banner 高度看 _scale (固定 avatar 44, padding 20, 内容 18ish icon + text) ≈ 64 px
+                    if (widget.onNextQuote != null)
+                      Positioned(
+                        top: 32 * _scale,  // 22:56 banner 中央对齐 (banner 64 px 高, top=32 中部)
+                        right: 8,           // 老 main.dart 老样式 right=8 (跟 banner 边距 8 重合, banner margin-right 16)
+                        child: Material(
+                          color: Colors.transparent,
+                          child: InkWell(
+                            onTap: () => widget.onNextQuote?.call(),
+                            borderRadius: BorderRadius.circular(20),
+                            child: Container(
+                              width: widget.isElderlyMode ? 44 : 36,
+                              height: widget.isElderlyMode ? 44 : 36,
+                              decoration: BoxDecoration(
+                                color: const Color(0xFF7C5CFC).withOpacity(0.12),
+                                shape: BoxShape.circle,
+                                border: Border.all(color: const Color(0xFF7C5CFC).withOpacity(0.4), width: 1),
+                              ),
+                              child: Icon(Icons.shuffle, color: const Color(0xFF7C5CFC), size: widget.isElderlyMode ? 22 : 18),
+                            ),
+                          ),
+                        ),
+                      ),
+                  ],
                 ),
               SizedBox(height: 12 * _scale),
               // 6/24 v12: 顶部推荐区 (时段推荐 banner + 今日推荐 hero)
@@ -836,22 +866,6 @@ class _DailyEncouragementBannerState extends State<DailyEncouragementBanner> {
                                               ),
                                       ),
                                     ),
-                                    // 7/15 22:19: 加 ↻ button (banner 随机换 quote), 跟 ❤️ 共一行
-                                    if (widget.onNextQuote != null) ...[
-                                      SizedBox(width: 8 * scale),
-                                      GestureDetector(
-                                        onTap: () => widget.onNextQuote?.call(),
-                                        child: Container(
-                                          padding: EdgeInsets.all(4 * scale),
-                                          decoration: BoxDecoration(
-                                            color: Colors.white.withOpacity(0.12),
-                                            shape: BoxShape.circle,
-                                            border: Border.all(color: Colors.white.withOpacity(0.4), width: 1),
-                                          ),
-                                          child: Icon(Icons.shuffle, color: Colors.white, size: 16 * scale),
-                                        ),
-                                      ),
-                                    ],
                                   ],
                                 ),
                               ],
