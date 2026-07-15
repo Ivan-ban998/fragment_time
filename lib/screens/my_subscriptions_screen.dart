@@ -436,88 +436,315 @@ class _MySubscriptionsScreenState extends State<MySubscriptionsScreen>
             if (sources.isEmpty && categories.isEmpty) {
               return _buildFollowingEmpty(context, scale, isEn);
             }
-            return SingleChildScrollView(
-              padding: EdgeInsets.all(16 * scale),
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  // 顶部管理按钮
-                  Row(
-                    children: [
-                      Expanded(
-                        child: OutlinedButton.icon(
-                          onPressed: () {
-                            Navigator.push(
-                              context,
-                              MaterialPageRoute(builder: (_) => const SubscriptionScreen()),
-                            );
-                          },
-                          style: OutlinedButton.styleFrom(
-                            side: BorderSide(color: AppTheme.primary.withOpacity(0.5)),
-                            padding: EdgeInsets.symmetric(vertical: 10 * scale),
-                          ),
-                          icon: Icon(Icons.edit, size: 16 * scale, color: AppTheme.primary),
-                          label: Text(
-                            isEn ? 'Manage Following' : '管理关注',
-                            style: TextStyle(fontSize: 14 * scale, color: AppTheme.primary),
-                          ),
-                        ),
-                      ),
-                    ],
+            return ListView(
+              padding: EdgeInsets.fromLTRB(16 * scale, 16 * scale, 16 * scale, 32 * scale),
+              children: [
+                // 17:45 方案 A: Hero 统计
+                _FollowingHeroCard(
+                  platformCount: sources.length,
+                  categoryCount: categories.length,
+                  scale: scale,
+                  isEn: isEn,
+                  onManage: () {
+                    Navigator.push(
+                      context,
+                      MaterialPageRoute(builder: (_) => const SubscriptionScreen()),
+                    );
+                  },
+                ),
+                SizedBox(height: 16 * scale),
+                if (sources.isNotEmpty) ...[
+                  _FollowingSectionHeader(
+                    label: isEn
+                        ? 'PLATFORMS (\${sources.length})'
+                        : '关注平台 (\${sources.length})',
+                    icon: Icons.subscriptions,
+                    scale: scale,
                   ),
+                  SizedBox(height: 12 * scale),
+                  ...sources.map<Widget>((s) => _FollowingSourceRow(
+                        source: s,
+                        isEn: isEn,
+                        scale: scale,
+                        onRemove: () async {
+                          // ignore: use_build_context_synchronously
+                          await SubscriptionService.instance.unsubscribeSource(s);
+                          // 强制刷新: pop+push 重建 tab
+                          (context as Element).markNeedsBuild();
+                        },
+                      )),
                   SizedBox(height: 20 * scale),
-                  // 平台
-                  if (sources.isNotEmpty) ...[
-                    _buildFollowingSectionHeader(
-                      isEn ? 'PLATFORMS (${sources.length})' : '关注平台 (${sources.length})',
-                      Icons.subscriptions,
-                      scale,
-                    ),
-                    SizedBox(height: 12 * scale),
-                    Wrap(
-                      spacing: 8 * scale,
-                      runSpacing: 8 * scale,
-                      children: sources.map<Widget>((s) {
-                        final name = isEn
-                            ? (s.name ?? s.toString())
-                            : _sourceNameZh(s);
-                        return Chip(
-                          label: Text(name),
-                          backgroundColor: AppTheme.primary.withOpacity(0.1),
-                          side: BorderSide(color: AppTheme.primary.withOpacity(0.3)),
-                          labelStyle: TextStyle(fontSize: 13 * scale, color: AppTheme.primary),
-                        );
-                      }).toList(),
-                    ),
-                    SizedBox(height: 24 * scale),
-                  ],
-                  // 类目
-                  if (categories.isNotEmpty) ...[
-                    _buildFollowingSectionHeader(
-                      isEn ? 'CATEGORIES (${categories.length})' : '关注类目 (${categories.length})',
-                      Icons.category_outlined,
-                      scale,
-                    ),
-                    SizedBox(height: 12 * scale),
-                    Wrap(
-                      spacing: 8 * scale,
-                      runSpacing: 8 * scale,
-                      children: categories.map<Widget>((c) => Chip(
-                        label: Text(c),
-                        backgroundColor: AppTheme.primary.withOpacity(0.1),
-                        side: BorderSide(color: AppTheme.primary.withOpacity(0.3)),
-                        labelStyle: TextStyle(fontSize: 13 * scale, color: AppTheme.primary),
-                      )).toList(),
-                    ),
-                  ],
                 ],
-              ),
+                if (categories.isNotEmpty) ...[
+                  _FollowingSectionHeader(
+                    label: isEn
+                        ? 'CATEGORIES (\${categories.length})'
+                        : '关注类目 (\${categories.length})',
+                    icon: Icons.category_outlined,
+                    scale: scale,
+                  ),
+                  SizedBox(height: 12 * scale),
+                  ...categories.map<Widget>((c) => _FollowingCategoryRow(
+                        categoryName: c,
+                        isEn: isEn,
+                        scale: scale,
+                        onRemove: () async {
+                          // ignore: use_build_context_synchronously
+                          await SubscriptionService.instance.unsubscribeCategory(c);
+                          (context as Element).markNeedsBuild();
+                        },
+                      )),
+                ],
+              ],
             );
           },
         );
   }
 
-  // 6/25 A: 关注 Tab 空态 (没有关注任何)
+  // 17:45: 关注 Tab 顶部 Hero 统计 (紫色 24 圆角, 56x56 avatar + 数字 + 管理按钮)
+  Widget _FollowingHeroCard({
+    required int platformCount,
+    required int categoryCount,
+    required double scale,
+    required bool isEn,
+    required VoidCallback onManage,
+  }) {
+    final s = scale;
+    return Container(
+      decoration: BoxDecoration(
+        gradient: const LinearGradient(
+          colors: [Color(0xFF7C5CFC), Color(0xFFA48BFF)],
+          begin: Alignment.topLeft,
+          end: Alignment.bottomRight,
+        ),
+        borderRadius: BorderRadius.circular(24),
+        boxShadow: [
+          BoxShadow(
+            color: const Color(0xFF7C5CFC).withOpacity(0.25),
+            blurRadius: 16,
+            offset: const Offset(0, 4),
+          ),
+        ],
+      ),
+      padding: EdgeInsets.all(20 * s),
+      child: Row(
+        children: [
+          Container(
+            width: 56 * s,
+            height: 56 * s,
+            decoration: BoxDecoration(
+              color: Colors.white.withOpacity(0.2),
+              shape: BoxShape.circle,
+              border: Border.all(color: Colors.white.withOpacity(0.5), width: 2),
+            ),
+            alignment: Alignment.center,
+            child: Icon(Icons.notifications_active, color: Colors.white, size: 24 * s),
+          ),
+          SizedBox(width: 14 * s),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  isEn ? 'My Following' : '我关注了',
+                  style: TextStyle(
+                    color: Colors.white.withOpacity(0.92),
+                    fontSize: 12 * s,
+                    fontWeight: FontWeight.w600,
+                  ),
+                ),
+                SizedBox(height: 6 * s),
+                Row(
+                  children: [
+                    Text(
+                      '$platformCount',
+                      style: TextStyle(
+                        color: Colors.white,
+                        fontSize: 24 * s,
+                        fontWeight: FontWeight.w800,
+                      ),
+                    ),
+                    SizedBox(width: 4 * s),
+                    Text(
+                      isEn ? 'platforms' : '个平台',
+                      style: TextStyle(color: Colors.white.withOpacity(0.85), fontSize: 13 * s),
+                    ),
+                    SizedBox(width: 14 * s),
+                    Text(
+                      '$categoryCount',
+                      style: TextStyle(
+                        color: Colors.white,
+                        fontSize: 24 * s,
+                        fontWeight: FontWeight.w800,
+                      ),
+                    ),
+                    SizedBox(width: 4 * s),
+                    Text(
+                      isEn ? 'categories' : '个类目',
+                      style: TextStyle(color: Colors.white.withOpacity(0.85), fontSize: 13 * s),
+                    ),
+                  ],
+                ),
+              ],
+            ),
+          ),
+          InkWell(
+            onTap: onManage,
+            borderRadius: BorderRadius.circular(12),
+            child: Container(
+              padding: EdgeInsets.symmetric(horizontal: 12 * s, vertical: 8 * s),
+              decoration: BoxDecoration(
+                color: Colors.white,
+                borderRadius: BorderRadius.circular(12),
+              ),
+              child: Row(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  Icon(Icons.edit, size: 14 * s, color: const Color(0xFF7C5CFC)),
+                  SizedBox(width: 4 * s),
+                  Text(
+                    isEn ? 'Manage' : '管理',
+                    style: TextStyle(color: const Color(0xFF7C5CFC), fontSize: 12 * s, fontWeight: FontWeight.w700),
+                  ),
+                ],
+              ),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  // 17:45: 关注 Tab 段头 (紫色 16px + icon)
+  Widget _FollowingSectionHeader({required String label, required IconData icon, required double scale}) {
+    final s = scale;
+    return Row(
+      children: [
+        Icon(icon, size: 14 * s, color: AppTheme.primary),
+        SizedBox(width: 6 * s),
+        Text(
+          label,
+          style: TextStyle(
+            fontSize: 12 * s,
+            fontWeight: FontWeight.w700,
+            color: AppTheme.primary,
+            letterSpacing: 0.5,
+          ),
+        ),
+      ],
+    );
+  }
+
+  // 17:45: 关注 Tab 平台行 (跟内容 Timeline 同款 紫 4% 底 + 12% 边框)
+  Widget _FollowingSourceRow({
+    required dynamic source,
+    required bool isEn,
+    required double scale,
+    required VoidCallback onRemove,
+  }) {
+    final s = scale;
+    final sourceObj = source as ContentSource;
+    final name = isEn ? sourceObj.name : _sourceNameZh(sourceObj);
+    final sourceColor = sourceObj == ContentSource.bilibili
+        ? const Color(0xFFFB7299)
+        : sourceObj == ContentSource.zhihu
+            ? const Color(0xFF0084FF)
+            : sourceObj == ContentSource.ximalaya
+                ? const Color(0xFFFF6E0E)
+                : AppTheme.primary;
+
+    return Container(
+      margin: EdgeInsets.only(bottom: 8 * s),
+      padding: EdgeInsets.symmetric(vertical: 12 * s, horizontal: 8 * s),
+      decoration: BoxDecoration(
+        color: AppTheme.primary.withOpacity(0.04),
+        borderRadius: BorderRadius.circular(14),
+        border: Border.all(color: AppTheme.primary.withOpacity(0.12)),
+      ),
+      child: Row(
+        children: [
+          Container(
+            width: 40 * s,
+            height: 40 * s,
+            decoration: BoxDecoration(
+              color: Colors.white,
+              shape: BoxShape.circle,
+              border: Border.all(color: sourceColor.withOpacity(0.4), width: 1.5),
+            ),
+            alignment: Alignment.center,
+            child: Icon(sourceObj.icon, color: sourceColor, size: 18 * s),
+          ),
+          SizedBox(width: 12 * s),
+          Expanded(
+            child: Text(
+              name,
+              style: TextStyle(fontSize: 14 * s, fontWeight: FontWeight.w700),
+              maxLines: 1,
+              overflow: TextOverflow.ellipsis,
+            ),
+          ),
+          IconButton(
+            onPressed: onRemove,
+            icon: Icon(Icons.close, size: 18, color: AppTheme.textLight),
+            padding: EdgeInsets.zero,
+            constraints: const BoxConstraints.tightFor(width: 28, height: 28),
+            tooltip: isEn ? 'Unsubscribe' : '取消关注',
+          ),
+        ],
+      ),
+    );
+  }
+
+  // 17:45: 关注 Tab 类目行 (同款 紫 4% 底)
+  Widget _FollowingCategoryRow({
+    required String categoryName,
+    required bool isEn,
+    required double scale,
+    required VoidCallback onRemove,
+  }) {
+    final s = scale;
+    return Container(
+      margin: EdgeInsets.only(bottom: 8 * s),
+      padding: EdgeInsets.symmetric(vertical: 12 * s, horizontal: 8 * s),
+      decoration: BoxDecoration(
+        color: AppTheme.primary.withOpacity(0.04),
+        borderRadius: BorderRadius.circular(14),
+        border: Border.all(color: AppTheme.primary.withOpacity(0.12)),
+      ),
+      child: Row(
+        children: [
+          Container(
+            width: 40 * s,
+            height: 40 * s,
+            decoration: BoxDecoration(
+              color: Colors.white,
+              shape: BoxShape.circle,
+              border: Border.all(color: AppTheme.primary.withOpacity(0.4), width: 1.5),
+            ),
+            alignment: Alignment.center,
+            child: Icon(Icons.local_offer, color: AppTheme.primary, size: 18 * s),
+          ),
+          SizedBox(width: 12 * s),
+          Expanded(
+            child: Text(
+              categoryName,
+              style: TextStyle(fontSize: 14 * s, fontWeight: FontWeight.w700),
+              maxLines: 1,
+              overflow: TextOverflow.ellipsis,
+            ),
+          ),
+          IconButton(
+            onPressed: onRemove,
+            icon: Icon(Icons.close, size: 18, color: AppTheme.textLight),
+            padding: EdgeInsets.zero,
+            constraints: const BoxConstraints.tightFor(width: 28, height: 28),
+            tooltip: isEn ? 'Unsubscribe' : '取消关注',
+          ),
+        ],
+      ),
+    );
+  }
+
   Widget _buildFollowingEmpty(BuildContext context, double scale, bool isEn) {
     return Center(
       child: Padding(
