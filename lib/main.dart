@@ -899,7 +899,8 @@ class _MainHomeScreenState extends State<MainHomeScreen> {
             // top 对齐 banner 顶部 (80 老人 96), right 距屏边 8
             if (_dailyQuote != null && !_showWelcome && !_showOnboarding && _selectedUserType != null && _selectedIndex == 0)
               Positioned(
-                top: (_isElderlyMode ? 72 : 56) + MediaQuery.of(context).padding.top + 4,
+                // 7/15 Brien 反馈: ↻ 按钮垂直居中 (跟 banner 中心对齐), 别靠顶
+                top: (_isElderlyMode ? 72 : 56) + MediaQuery.of(context).padding.top + 18,
                 right: 8,
                 child: Material(
                   color: Colors.transparent,
@@ -1389,12 +1390,12 @@ class _DailyEncouragementBannerState extends State<_DailyEncouragementBanner> {
                                   child: AnimatedSwitcher(
                                     duration: const Duration(milliseconds: 200),
                                     child: _saved
-                                        ? Icon(Icons.favorite, key: const ValueKey('saved'), color: Colors.white, size: 18 * scale)
+                                        ? Icon(Icons.favorite, key: const ValueKey('saved'), color: Colors.white, size: 22 * scale)
                                         : Row(
                                             key: const ValueKey('unsaved'),
                                             mainAxisSize: MainAxisSize.min,
                                             children: [
-                                              Icon(Icons.favorite_border, color: Colors.white, size: 18 * scale),
+                                              Icon(Icons.favorite_border, color: Colors.white, size: 22 * scale),
                                               SizedBox(width: 2 * scale),
                                               Text(widget.isEn ? 'Save' : '收藏',
                                                 style: TextStyle(color: Colors.white, fontSize: 10 * scale, fontWeight: FontWeight.w500)),
@@ -1416,12 +1417,12 @@ class _DailyEncouragementBannerState extends State<_DailyEncouragementBanner> {
                                 child: AnimatedSwitcher(
                                   duration: const Duration(milliseconds: 200),
                                   child: _saved
-                                      ? Icon(Icons.favorite, key: const ValueKey('saved'), color: Colors.white, size: 18 * scale)
+                                      ? Icon(Icons.favorite, key: const ValueKey('saved'), color: Colors.white, size: 22 * scale)
                                       : Row(
                                           key: const ValueKey('unsaved'),
                                           mainAxisSize: MainAxisSize.min,
                                           children: [
-                                            Icon(Icons.favorite_border, color: Colors.white, size: 18 * scale),
+                                            Icon(Icons.favorite_border, color: Colors.white, size: 22 * scale),
                                             SizedBox(width: 2 * scale),
                                             Text(widget.isEn ? 'Save' : '收藏',
                                               style: TextStyle(color: Colors.white, fontSize: 10 * scale, fontWeight: FontWeight.w500)),
