@@ -412,6 +412,28 @@ class _TinderRecommendationStackState extends State<TinderRecommendationStack> {
                           style: const TextStyle(color: Colors.white, fontSize: 11, fontWeight: FontWeight.w600),
                         ),
                       ),
+                      // 7/14 加: 真 RSS 来的 item 标 "Live" 红点 (rss_* id 前缀)
+                      if (item.id.startsWith('rss_')) ...[
+                        const SizedBox(width: 4),
+                        Container(
+                          padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                          decoration: BoxDecoration(
+                            color: const Color(0xFFD32F2F),
+                            borderRadius: BorderRadius.circular(4),
+                          ),
+                          child: Row(
+                            mainAxisSize: MainAxisSize.min,
+                            children: [
+                              Container(width: 6, height: 6, decoration: const BoxDecoration(color: Colors.white, shape: BoxShape.circle)),
+                              const SizedBox(width: 3),
+                              Text(
+                                widget.isEn ? 'Live' : '实时',
+                                style: const TextStyle(color: Colors.white, fontSize: 10, fontWeight: FontWeight.w700),
+                              ),
+                            ],
+                          ),
+                        ),
+                      ],
                       const SizedBox(width: 8),
                       Icon(Icons.access_time, size: 11, color: textColor.withOpacity(0.6)),
                       const SizedBox(width: 3),

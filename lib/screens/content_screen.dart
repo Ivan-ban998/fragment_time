@@ -87,6 +87,8 @@ class _ContentScreenState extends State<ContentScreen> {
   List<ContentItem> _inProgressItems = []; // 续读
   int _todayCompleteCount = 0; // 今日完成计数
   bool _showTlDrBanner = false; // TL;DR 精要 banner
+  bool _tlDrExpanded = false; // 7/2 默认折叠 1 行, 点展开看 3 行
+  bool _continueExpanded = false; // 7/2 默认折叠 1 条续读, 点展开看 3 条
   String _tlDrText = ''; // TL;DR 文本
   int _quizAnswers = 0; // quiz 答对
   bool _showStudyGroupEntry = false; // 学习小组入口
@@ -124,7 +126,7 @@ class _ContentScreenState extends State<ContentScreen> {
       );
     }
     _loadRecommendations();
-    // _loadBiliPreviews(); // 7/2 10:36 Brien 反馈: B 站 iframe 触发 null + CSP frame-ancestors 红字, 暂时 disable
+    _loadBiliPreviews(); // 7/2 v2 重新启用: 只拿缩略图 + BV (不嵌 iframe), 视频卡改显示缩略 + 跳按钮
     _loadInProgress();
     _loadTodayCount();
     _loadTlDr();
@@ -894,7 +896,7 @@ class _ContentScreenState extends State<ContentScreen> {
   Widget _buildTlDrBanner() {
     return Container(
       margin: EdgeInsets.only(bottom: 8 * _scale),
-      padding: EdgeInsets.all(12 * _scale),
+      padding: EdgeInsets.all(10 * _scale),
       decoration: BoxDecoration(
         color: AppTheme.primary.withOpacity(0.08),
         borderRadius: BorderRadius.circular(12),
@@ -907,18 +909,29 @@ class _ContentScreenState extends State<ContentScreen> {
             children: [
               Icon(Icons.bolt, size: 14 * _scale, color: AppTheme.primary),
               SizedBox(width: 4 * _scale),
-              Text(
-                isEn ? 'TL;DR · from last time' : 'TL;DR · 上次总结',
-                style: TextStyle(fontSize: 11 * _scale, color: AppTheme.primary, fontWeight: FontWeight.w700),
+              Expanded(
+                child: Text(
+                  isEn ? 'TL;DR · from last time' : 'TL;DR · 上次总结',
+                  style: TextStyle(fontSize: 11 * _scale, color: AppTheme.primary, fontWeight: FontWeight.w700),
+                ),
+              ),
+              // 7/2 展开/折叠
+              GestureDetector(
+                onTap: () => setState(() => _tlDrExpanded = !_tlDrExpanded),
+                child: Icon(
+                  _tlDrExpanded ? Icons.expand_less : Icons.expand_more,
+                  size: 16 * _scale, color: AppTheme.primary,
+                ),
               ),
             ],
           ),
           SizedBox(height: 4 * _scale),
+          // 7/2 默认 1 行 (fold 状态), 点展开看 3 行
           Text(
             _tlDrText,
-            maxLines: 3,
+            maxLines: _tlDrExpanded ? 3 : 1,
             overflow: TextOverflow.ellipsis,
-            style: TextStyle(fontSize: 13 * _scale, color: AppTheme.primary.withOpacity(0.85), height: 1.4),
+            style: TextStyle(fontSize: 12 * _scale, color: AppTheme.primary.withOpacity(0.85), height: 1.4),
           ),
         ],
       ),
@@ -927,6 +940,10 @@ class _ContentScreenState extends State<ContentScreen> {
 
   // 6/9 续读小卡 (3 条 progress 0-100)
   Widget _buildContinueReadingCard() {
+    // 7/2 默认只看 1 条 (_continueExpanded=false), 点展开看 3 条
+    final showItems = _continueExpanded
+        ? _inProgressItems
+        : (_inProgressItems.length > 1 ? _inProgressItems.take(1).toList() : _inProgressItems);
     return Container(
       margin: EdgeInsets.only(bottom: 8 * _scale),
       padding: EdgeInsets.all(12 * _scale),
@@ -938,14 +955,25 @@ class _ContentScreenState extends State<ContentScreen> {
             children: [
               Icon(Icons.history, size: 14 * _scale, color: AppTheme.primary),
               SizedBox(width: 4 * _scale),
-              Text(
-                isEn ? 'Continue reading' : '续读',
-                style: TextStyle(fontSize: 11 * _scale, color: AppTheme.primary, fontWeight: FontWeight.w700),
+              Expanded(
+                child: Text(
+                  isEn ? 'Continue reading' : '续读',
+                  style: TextStyle(fontSize: 11 * _scale, color: AppTheme.primary, fontWeight: FontWeight.w700),
+                ),
               ),
+              // 7/2 展开/折叠 (仅在 2+ 条时显示)
+              if (_inProgressItems.length > 1)
+                GestureDetector(
+                  onTap: () => setState(() => _continueExpanded = !_continueExpanded),
+                  child: Icon(
+                    _continueExpanded ? Icons.expand_less : Icons.expand_more,
+                    size: 16 * _scale, color: AppTheme.primary,
+                  ),
+                ),
             ],
           ),
           SizedBox(height: 8 * _scale),
-          for (final item in _inProgressItems)
+          for (final item in showItems)
             InkWell(
               onTap: () => _pushToReader(item),
               borderRadius: BorderRadius.circular(8),
@@ -999,23 +1027,98 @@ class _ContentScreenState extends State<ContentScreen> {
   }
 
   Widget _buildVideoIfNeeded(ContentItem item) {
-    // 7/2 revert: 嵌真 BV 的 iframe 被 B 站 CSP frame-ancestors 拒了 (CSP 报红字)
-    // 暂时退回走 buildVideoEmbedUrl (externalUrl = search.bilibili.com/video?keyword= 跳原站)
-    // 改后用户点视频卡 → 弹 B 站搜索结果页 (次优但不死), 跟 6/11 一样
-    final embedUrl = buildVideoEmbedUrl(item);
-    if (embedUrl == null) return const SizedBox.shrink();
-    return Container(
-      decoration: BoxDecoration(
-        color: Colors.black,
-        borderRadius: BorderRadius.circular(16),
-      ),
-      clipBehavior: Clip.antiAlias,
-      child: IframeVideoView(
-        embedUrl: embedUrl,
-        externalUrl: item.externalUrl,
-        aspectRatio: 16 / 9,
+    // 7/2 v3: 紧凑视频卡 — 缩略 3:2 (不到 16:9 高) + 紧凑文字行
+    // 7/2 10:56 Brien 反馈: 16:9 + 文字还是太大 (16%+ 屏幕), v3 再压
+    // 后面: B 站视频直链可考虑, 但 v3 先验证“卡小”够不够
+    final bili = _biliCache[item.id];
+    final coverUrl = bili?.cover ?? '';
+    final extUrl = item.externalUrl;
+
+    return InkWell(
+      onTap: () async {
+        final target = bili != null
+            ? Uri.parse('https://www.bilibili.com/video/${bili.bvid}')
+            : (extUrl != null && extUrl.isNotEmpty ? Uri.parse(extUrl) : null);
+        if (target != null && await canLaunchUrl(target)) {
+          await launchUrl(target, mode: LaunchMode.externalApplication);
+        }
+      },
+      borderRadius: BorderRadius.circular(12),
+      child: Container(
+        decoration: BoxDecoration(
+          color: AppTheme.primary.withOpacity(0.08),
+          borderRadius: BorderRadius.circular(12),
+          border: Border.all(color: AppTheme.primary.withOpacity(0.2), width: 1),
+        ),
+        clipBehavior: Clip.antiAlias,
+        // 横向: 缩略 64x64 + 标题 1 行 + 时长 1 行
+        // 总高度 ~80px (手机窄屏上 9% 屏幕)
+        child: Padding(
+          padding: const EdgeInsets.all(10),
+          child: Row(
+            crossAxisAlignment: CrossAxisAlignment.center,
+            children: [
+              // 小缩略 64x64
+              ClipRRect(
+                borderRadius: BorderRadius.circular(8),
+                child: SizedBox(
+                  width: 64, height: 64,
+                  child: coverUrl.isNotEmpty
+                      ? Image.network(coverUrl, fit: BoxFit.cover, errorBuilder: (_, __, ___) => _videoPlaceholder(item))
+                      : _videoPlaceholder(item),
+                ),
+              ),
+              const SizedBox(width: 10),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  mainAxisAlignment: MainAxisAlignment.center,
+                  children: [
+                    // 标题 1 行
+                    Text(
+                      bili?.title ?? item.title,
+                      style: const TextStyle(fontSize: 14, fontWeight: FontWeight.w600),
+                      maxLines: 1, overflow: TextOverflow.ellipsis,
+                    ),
+                    const SizedBox(height: 2),
+                    // 副标题 1 行: 时长 · 播放量
+                    Text(
+                      [
+                        if (bili != null && bili.duration.isNotEmpty) bili.duration,
+                        if (bili != null) _formatPlayCount(bili.play),
+                        if (bili == null && item.duration.isNotEmpty) '时长 ${item.duration}',
+                      ].whereType<String>().where((s) => s.isNotEmpty).join(' · '),
+                      style: TextStyle(fontSize: 11, color: AppTheme.textLight),
+                      maxLines: 1, overflow: TextOverflow.ellipsis,
+                    ),
+                  ],
+                ),
+              ),
+              const SizedBox(width: 8),
+              // “去 B 站” 文字按钮
+              Text(
+                '在 B 站看 →',
+                style: TextStyle(color: AppTheme.primary, fontSize: 12, fontWeight: FontWeight.w600),
+              ),
+            ],
+          ),
+        ),
       ),
     );
+  }
+
+  Widget _videoPlaceholder(ContentItem item) {
+    return Container(
+      color: Colors.black12,
+      child: Center(
+        child: Icon(Icons.movie, size: 48, color: AppTheme.primary.withOpacity(0.5)),
+      ),
+    );
+  }
+
+  String _formatPlayCount(int n) {
+    if (n >= 10000) return '${(n / 10000).toStringAsFixed(1)}万播放';
+    return '$n 播放';
   }
 
   // 6/22 audio 入口: 推送 ContentReaderScreen 播音频
@@ -1417,18 +1520,54 @@ class _ContentScreenState extends State<ContentScreen> {
   }
 
   Widget _buildRecommendationHeader() {
+    // 7/14 加: 显示 RSS 真数据来源 (国内 36 氪 / 国际 The Verge)
+    final hasRss = _recItems.any((r) => r.id.startsWith('rss_'));
+    final isIntl = widget.isInternational;
+    final sourceLabel = hasRss
+        ? (isIntl
+            ? 'Live from The Verge'
+            : 'Live from 36氪')
+        : null;
     return Row(
+      mainAxisAlignment: MainAxisAlignment.spaceBetween,
       children: [
-        Icon(Icons.favorite_outline, size: 14 * _scale, color: AppTheme.textLight),
-        SizedBox(width: 4 * _scale),
-        Text(
-          isEn ? 'You may also like' : '你可能还喜欢',
-          style: TextStyle(
-            fontSize: 12 * _scale,
-            color: AppTheme.textLight,
-            fontWeight: FontWeight.w500,
-          ),
+        Row(
+          children: [
+            Icon(Icons.favorite_outline, size: 14 * _scale, color: AppTheme.textLight),
+            SizedBox(width: 4 * _scale),
+            Text(
+              isEn ? 'You may also like' : '你可能还喜欢',
+              style: TextStyle(
+                fontSize: 12 * _scale,
+                color: AppTheme.textLight,
+                fontWeight: FontWeight.w500,
+              ),
+            ),
+          ],
         ),
+        if (sourceLabel != null)
+          Row(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Container(
+                width: 6,
+                height: 6,
+                decoration: const BoxDecoration(
+                  color: Color(0xFFD32F2F),
+                  shape: BoxShape.circle,
+                ),
+              ),
+              SizedBox(width: 4 * _scale),
+              Text(
+                sourceLabel,
+                style: TextStyle(
+                  fontSize: 11 * _scale,
+                  color: const Color(0xFFD32F2F),
+                  fontWeight: FontWeight.w600,
+                ),
+              ),
+            ],
+          ),
       ],
     );
   }
