@@ -16,6 +16,15 @@
 - **进度追踪** — 阅读进度 + 续读提示 + 已读成就
 - **跨设备同步**: 本地 SharedPreferences (未来接云同步)
 
+### 📡 数据源 (7/14 起混合)
+
+- **国内版 (domestic)**: 36 氪 hot feed (`https://36kr.com/feed`, 110 KB RSS 2.0)
+  - 实时拉,失败 fallback 到原硬编码 288 条精选
+  - 自动 1 小时 cron 重建拉新数据 (`build_ft_7080.sh` 自动跑)
+- **国际版 (international)**: The Verge (`https://www.theverge.com/rss/index.xml`)
+- **宪法 §1.1 合规**: 只接 metadata (title + url + description), **不缓存原片**, 自动跳原站
+- **Live 标识**: 真 RSS 来的项目卡会显示红点 + "Live from 36氪" / "Live from The Verge" 字幕
+
 ## 🏗️ 技术栈
 
 - **Flutter 3.5.4** (Dart 3.5.4) — Web 优先 (HTML renderer)

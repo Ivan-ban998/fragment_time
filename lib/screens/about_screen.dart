@@ -148,6 +148,14 @@ class AboutScreen extends StatelessWidget {
                   isEn ? 'Your AI-powered time fragment companion' : 'AI 驱动的碎片时间陪伴',
                   style: TextStyle(fontSize: 14, color: AppTheme.textLight),
                 ),
+                const SizedBox(height: 6),
+                Text(
+                  isEn
+                      ? 'A Rover Life product, crafted by Soulvag'
+                      : 'Soulvag 出品 · 隶属 Rover Life 产品线',
+                  style: TextStyle(fontSize: 12, color: AppTheme.primary, fontWeight: FontWeight.w600),
+                  textAlign: TextAlign.center,
+                ),
                 const SizedBox(height: 8),
                 Container(
                   padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),

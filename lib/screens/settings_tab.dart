@@ -433,6 +433,21 @@ class SettingsTab extends StatelessWidget {
                 },
               ),
             ),
+            // 7/14: About FragmentTime 入口 (推到 AboutScreen 实例 + 让 build() 不被 tree-shake)
+            Card(
+              child: ListTile(
+                leading: Icon(Icons.info_outline, size: 24 * scale, color: AppTheme.primary),
+                title: Text(isEn ? 'About FragmentTime' : '关于 FragmentTime', style: TextStyle(fontSize: 16 * scale, fontWeight: FontWeight.w600)),
+                subtitle: Text(isEn ? 'Brand, version, project constitution' : '品牌/版本/项目宪法', style: TextStyle(fontSize: 13 * scale)),
+                trailing: Icon(Icons.chevron_right, size: 24 * scale, color: AppTheme.textLight),
+                onTap: () {
+                  Navigator.push(
+                    context,
+                    MaterialPageRoute(builder: (_) => AboutScreen(languageCode: languageCode)),
+                  );
+                },
+              ),
+            ),
             SizedBox(height: 16 * scale),
             // 6/12 改: 工具 / 关于折叠
             Card(
@@ -576,6 +591,7 @@ class _OctopusFeedbackList extends StatefulWidget {
 
 class _OctopusFeedbackListState extends State<_OctopusFeedbackList> {
   List<Map<String, dynamic>> _items = [];
+  bool _expanded = false; // 7/2 Brien 反馈: 默认隐藏, 点 "查看历史反馈" 才显示
 
   @override
   void initState() {
@@ -590,6 +606,27 @@ class _OctopusFeedbackListState extends State<_OctopusFeedbackList> {
     // 倒序 (最新在前)
     list.sort((a, b) => (b['ts'] as int).compareTo(a['ts'] as int));
     if (mounted) setState(() => _items = list);
+  }
+
+  // 7/2: 清空本地缓存 (已同步的留在 NAS, 不删)
+  Future<void> _clearLocal() async {
+    final ok = await showDialog<bool>(
+      context: context,
+      builder: (_) => AlertDialog(
+        title: Text(widget.isEn ? 'Clear local feedback cache?' : '清空本地反馈缓存?'),
+        content: Text(widget.isEn
+            ? 'Synced feedback stays on NAS. Only local cache cleared.'
+            : '已同步的还留在 NAS, 只清本地缓存。'),
+        actions: [
+          TextButton(onPressed: () => Navigator.pop(context, false), child: Text(widget.isEn ? 'Cancel' : '取消')),
+          TextButton(onPressed: () => Navigator.pop(context, true), child: Text(widget.isEn ? 'Clear' : '清空')),
+        ],
+      ),
+    );
+    if (ok != true) return;
+    final prefs = await SharedPreferences.getInstance();
+    await prefs.setString('feedback_log', '[]');
+    if (mounted) setState(() => _items = []);
   }
 
   @override
@@ -610,7 +647,7 @@ class _OctopusFeedbackListState extends State<_OctopusFeedbackList> {
               const Text('🐙', style: TextStyle(fontSize: 14)),
               SizedBox(width: 6 * widget.scale),
               Text(
-                widget.isEn ? 'Recent feedback to 章鱼' : '最近跟章鱼说的话',
+                widget.isEn ? 'Your feedback history' : '你的反馈历史',
                 style: TextStyle(
                   fontSize: 12 * widget.scale,
                   fontWeight: FontWeight.w600,
@@ -633,7 +670,61 @@ class _OctopusFeedbackListState extends State<_OctopusFeedbackList> {
             ],
           ),
           SizedBox(height: 8 * widget.scale),
-          ...(_items.take(3).map((it) => _buildItem(it))),
+          // 7/2 v2: 默认隐藏明细, 点 "查看历史" 按钮才显示 (避免别人/家人窥屏)
+          if (!_expanded)
+            Row(
+              children: [
+                Expanded(
+                  child: Text(
+                    widget.isEn
+                        ? '${_items.length} ${_items.length == 1 ? "message" : "messages"} sent · synced to NAS'
+                        : '已发 ${_items.length} 条 · 已同步到 NAS',
+                    style: TextStyle(fontSize: 11 * widget.scale, color: AppTheme.textLight),
+                  ),
+                ),
+                TextButton.icon(
+                  onPressed: () => setState(() => _expanded = true),
+                  icon: Icon(Icons.visibility_outlined, size: 14 * widget.scale),
+                  label: Text(widget.isEn ? 'Show' : '查看', style: TextStyle(fontSize: 11 * widget.scale)),
+                  style: TextButton.styleFrom(
+                    padding: const EdgeInsets.symmetric(horizontal: 8),
+                    minimumSize: Size.zero,
+                    tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+                  ),
+                ),
+              ],
+            )
+          else ...[
+            // 展开后: 隐藏 + 清空按钮
+            Row(
+              children: [
+                TextButton.icon(
+                  onPressed: () => setState(() => _expanded = false),
+                  icon: Icon(Icons.visibility_off_outlined, size: 14 * widget.scale),
+                  label: Text(widget.isEn ? 'Hide' : '隐藏', style: TextStyle(fontSize: 11 * widget.scale)),
+                  style: TextButton.styleFrom(
+                    padding: const EdgeInsets.symmetric(horizontal: 8),
+                    minimumSize: Size.zero,
+                    tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+                  ),
+                ),
+                const Spacer(),
+                TextButton.icon(
+                  onPressed: _clearLocal,
+                  icon: Icon(Icons.delete_outline, size: 14 * widget.scale, color: Colors.red.shade400),
+                  label: Text(widget.isEn ? 'Clear' : '清空本地',
+                      style: TextStyle(fontSize: 11 * widget.scale, color: Colors.red.shade400)),
+                  style: TextButton.styleFrom(
+                    padding: const EdgeInsets.symmetric(horizontal: 8),
+                    minimumSize: Size.zero,
+                    tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+                  ),
+                ),
+              ],
+            ),
+            SizedBox(height: 4 * widget.scale),
+            for (final it in _items.take(3)) _buildItem(it),
+          ],
         ],
       ),
     );
