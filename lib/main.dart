@@ -10,6 +10,7 @@ import 'web_helpers_stub.dart'
 export 'web_helpers_stub.dart'
     if (dart.library.js) 'web_helpers_web.dart';
 import 'models/models.dart';
+import 'models/quote.dart';
 import 'theme/app_theme.dart';
 import 'theme/glass_decoration.dart';
 import 'services/local_subscription_service.dart';
@@ -387,7 +388,7 @@ class _MainHomeScreenState extends State<MainHomeScreen> {
   }
 
   // 6/26 Brien 反馈: 名言对各角色通用, 删掉鼓励字段
-  String? _dailyQuote; // 每日名言 — banner 唯一内容
+  Quote? _dailyQuote; // 7/15 重构: 每日名言 — banner 唯一内容, Quote struct (含 作者/出处/翻译/日期)
   String _handle = HandleService.defaultHandle; // 6/25 昵称扩展: 从 HandleService 传入
   bool _quoteLoading = false; // 6/29: 防止点 "下一个" 按钮时双击
 
@@ -411,17 +412,11 @@ class _MainHomeScreenState extends State<MainHomeScreen> {
         return buffer.toString();
       }
 
-      final quote = await _streakService.getDailyQuote(isEn: isEn, llmCall: llmCall)
-          // 6/30 13:02 Brien 反馈: APK 名言加载几十秒才出 (LLM 流卡住)
-          // 修: 加 8s 总超时, 超过兑底给硬编码名言 (避免 banner 一直不显示)
-          .timeout(const Duration(seconds: 8), onTimeout: () {
-        debugPrint('名言 总 8s 超时, 兑底');
-        return isEn
-            ? 'The impediment to action advances action. — Marcus Aurelius'
-            : '竹杖芒鞋轻胜马, 谁怕? 一蓑烟雨任平生。';
-      });
-      // 6/26 Brien 反馈: LLM 1.5b 推 250 字新闻, 不是 25 字名言 → 硬截断 50 字
-      final trimmed = quote.length > 50 ? '${quote.substring(0, 50)}…' : quote;
+      final quote = await _streakService.getDailyQuote(isEn: isEn, llmCall: llmCall);
+      // 7/15: LLM 或 fallback 返 Quote, 超过 80 字兑底 (仍返回原 Quote, 让 banner 截)
+      final trimmed = quote.text.length > 80
+          ? Quote(text: quote.text.substring(0, 80) + '…', author: quote.author, source: quote.source, textEn: quote.textEn, authorEn: quote.authorEn, createdAt: quote.createdAt)
+          : quote;
       if (!mounted) return;
       setState(() {
         _dailyQuote = trimmed;
@@ -431,9 +426,10 @@ class _MainHomeScreenState extends State<MainHomeScreen> {
       // 真凶: 这里 catch 之后 _dailyQuote 永不被设值, main.dart 的 banner condition 永远失败
       // 修: 兑底给一句硬编码名言 + 仍 setState
       debugPrint('名言 加载失败 (兑底): $e');
-      final fallback = isEn
-          ? 'The impediment to action advances action. — Marcus Aurelius'
-          : '竹杖芒鞋轻胜马, 谁怕? 一蓑烟雨任平生。';
+      final pool = isEn
+          ? _QuotePoolFallback.en
+          : _QuotePoolFallback.zh;
+      final fallback = pool[DateTime.now().day % pool.length];
       if (!mounted) return;
       setState(() {
         _dailyQuote = fallback;
@@ -441,7 +437,7 @@ class _MainHomeScreenState extends State<MainHomeScreen> {
     }
   }
 
-  // 6/29 10:59: 简化 — 不调 LLM, 走 hardcoded 池 (快)
+  // 7/15: 简化 — 不调 LLM, 走 hardcoded 池 (快), 返回 Quote struct
   void _loadNextQuote() {
     if (_quoteLoading) return;
     if (!mounted) return;
@@ -674,11 +670,11 @@ class _MainHomeScreenState extends State<MainHomeScreen> {
       return now.difference(t).inDays <= 7;
     }).take(10).toList();
 
-    // 6/24 v16: 名言 LLM 升级 — 调 LLM 生成 3 个相关关键词作为 sheet 顶部提示
+    // 7/15: 用 Quote.text 提词
     List<String>? llmKeywords;
-    if (_dailyQuote != null && _dailyQuote!.isNotEmpty) {
+    if (_dailyQuote != null && _dailyQuote!.text.isNotEmpty) {
       try {
-        llmKeywords = await _getLLMKeywordsForQuote(_dailyQuote!);
+        llmKeywords = await _getLLMKeywordsForQuote(_dailyQuote!.text);
       } catch (_) {
         llmKeywords = null;
       }
@@ -1153,7 +1149,7 @@ class _AutoQuizWrapperState extends State<_AutoQuizWrapper> {
 // 6/24 v6: ❤️ 收藏按钮 - 把鼓励 + 名言当一条收藏存到 Tab 2
 class _DailyEncouragementBanner extends StatefulWidget {
   final String text;
-  final String? quote;
+  final Quote? quote; // 7/15: 改 Quote 结构 (text/author/source/createdAt/textEn/authorEn)
   final bool isEn;
   final bool isElderlyMode;
   final String handle; // 6/25: 昵称 (从 HandleService 传入)
@@ -1197,11 +1193,12 @@ class _DailyEncouragementBannerState extends State<_DailyEncouragementBanner> {
   // 6/24 v9: 从 SharedPreferences 读今日是否已收藏 (重启后保持 ❤️)
   // 6/25 修 bug: 同时查订阅 list 验证 (双重保险, prefs true 但 list 已删 → 重置 prefs)
   // 6/26: id 从 encourage_ 改 quote_ (banner 现在是名言不是鼓励)
-// 6/29 13:56: 改 key 用 quote text hash — 换名言后状态重置, 不同名言不同 prefs key
+  // 6/29 13:56: 改 key 用 quote text hash — 换名言后状态重置, 不同名言不同 prefs key
+  // 7/15: banner 接 Quote? 后 id/prefs key 都用 quote.text.hashCode
   Future<void> _loadSaved() async {
     try {
       final prefs = await SharedPreferences.getInstance();
-      final quoteText = widget.quote ?? '';
+      final quoteText = widget.quote?.text ?? '';
       if (quoteText.isEmpty) {
         if (mounted) setState(() => _saved = false);
         _loaded = true;
@@ -1218,11 +1215,9 @@ class _DailyEncouragementBannerState extends State<_DailyEncouragementBanner> {
         if (exists) {
           shouldBeSaved = true;
         } else {
-          // list 里没了, 重置 prefs (修正数据不一致)
           await prefs.setBool(key, false);
         }
       }
-      // 6/29 14:59: 不管 prefSaved 是什么, 都显式 setState, 避免中间帧 _saved 为默认值 false 闪空心
       if (mounted) setState(() => _saved = shouldBeSaved);
       _loaded = true;
     } catch (_) {
@@ -1232,22 +1227,30 @@ class _DailyEncouragementBannerState extends State<_DailyEncouragementBanner> {
   }
 
   // 6/24 v6: 收藏鼓励+名言 当一条 ContentItem 到 Tab 2
+  // 7/15: title 改作者, source 字段升级 (description 含完整 text + 作者 + 出处)
   Future<void> _onSave() async {
     if (_saved) return;
     final now = DateTime.now();
-    // 6/29 13:56: 改 id 用 quote text hash — 不同名言不同 id/prefs key
-    final quoteText = widget.quote ?? widget.text;
+    final quote = widget.quote;
+    if (quote == null) return;
+    final quoteText = quote.text;
     final id = 'quote_${quoteText.hashCode}';
-    final title = widget.isEn
-        ? 'AI ${now.month}/${now.day} quote'
-        : 'AI ${now.month}月${now.day}日名言';
-    final desc = quoteText; // 6/26: 只存名言本身, 不拼鼓励+引号
+    // 7/15: title 改作者名 (不是 "AI 7/15 名言")
+    final title = quote.author.isNotEmpty
+        ? quote.author
+        : (widget.isEn ? 'AI Quote' : 'AI 名言');
+    // 7/15: description 放完整 quote + source (后续点击读详情看到)
+    final descParts = <String>[quote.text];
+    if (quote.source != null && quote.source!.isNotEmpty) {
+      descParts.add('《${quote.source}》');
+    }
+    final desc = descParts.join(' — ');
     final item = ContentItem(
       id: id,
       title: title,
       description: desc,
       duration: widget.isEn ? '1 min read' : '1 分钟阅读',
-      source: widget.isEn ? 'AI Companion' : 'AI 私教',
+      source: widget.isEn ? 'Daily Quote' : '每日名言',
       sourceType: ContentSource.rss,
       contentType: ContentType.card,
       lastReadAt: now,
@@ -1255,8 +1258,7 @@ class _DailyEncouragementBannerState extends State<_DailyEncouragementBanner> {
     try {
       await LocalSubscriptionService.instance.subscribe(item);
       if (!mounted) return;
-      // 6/24 v9: 持久化已收藏标记 (重启后保持 ❤️)
-      // 6/29 13:56: key 用 quote hash, 换名言后状态隔离
+      // 6/24 v9: 持久化已收藏标记
       try {
         final prefs = await SharedPreferences.getInstance();
         final key = 'quote_saved_${quoteText.hashCode}';
@@ -1274,7 +1276,6 @@ class _DailyEncouragementBannerState extends State<_DailyEncouragementBanner> {
           action: SnackBarAction(
             label: widget.isEn ? 'View' : '查看',
             onPressed: () {
-              // 6/24 v9: 切到 Tab 2 (收藏)
               navigateToMainTab(2);
             },
           ),
@@ -1288,9 +1289,18 @@ class _DailyEncouragementBannerState extends State<_DailyEncouragementBanner> {
     }
   }
 
+  // 7/15: Avatar 圆中显示作者首字符 (中文首字 / 英文首字母)
+  String _authorInitial() {
+    final a = widget.quote?.author ?? '';
+    if (a.isEmpty) return '✦';
+    return a.characters.first;
+  }
+
   @override
   Widget build(BuildContext context) {
     final scale = widget.isElderlyMode ? 1.3 : 1.0;
+    final q = widget.quote;
+    final hasQuote = q != null && q.text.isNotEmpty;
     return GestureDetector(
       // 6/24 v13: 点 banner → 弹相关推荐 sheet
       onTap: widget.onTapDetail,
@@ -1313,68 +1323,138 @@ class _DailyEncouragementBannerState extends State<_DailyEncouragementBanner> {
             ),
           ],
         ),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            // 6/26 Brien 反馈: banner 只放名言, 不显示鼓励 / 推荐内容
-            Row(
-              children: [
-                const Icon(Icons.format_quote, color: Colors.white, size: 18),
-                const SizedBox(width: 8),
-                Expanded(
-                  child: Text(
-                    widget.quote ?? widget.text, // 6/26: 优先 quote, 没 quote 时兑底用鼓励
-                    maxLines: 1, // 6/26 Brien 反馈: LLM 1.5b 推 250 字 → 强制 1 行省略
-                    overflow: TextOverflow.ellipsis,
-                    style: TextStyle(
-                      color: Colors.white.withOpacity(0.95),
-                      fontSize: 13 * scale,
-                      fontWeight: FontWeight.w500,
-                      fontStyle: FontStyle.italic,
+        // 7/15: banner 顶部 avatar (作者首字) + 1-2 行 quote + 小字作者/出处
+        child: hasQuote
+            ? Row(
+                crossAxisAlignment: CrossAxisAlignment.center,
+                children: [
+                  Container(
+                    width: 44 * scale,
+                    height: 44 * scale,
+                    decoration: BoxDecoration(
+                      color: Colors.white.withOpacity(0.18),
+                      shape: BoxShape.circle,
+                      border: Border.all(color: Colors.white.withOpacity(0.45), width: 1.5),
+                    ),
+                    alignment: Alignment.center,
+                    child: Text(
+                      _authorInitial(),
+                      style: TextStyle(
+                        color: Colors.white,
+                        fontSize: 18 * scale,
+                        fontWeight: FontWeight.w700,
+                      ),
                     ),
                   ),
-                ),
-                // 6/24 v6: ❤️ 收藏按钮
-                GestureDetector(
-                  onTap: _onSave,
-                  child: AnimatedSwitcher(
-                    duration: const Duration(milliseconds: 200),
-                    child: _saved
-                        ? Icon(
-                            Icons.favorite,
-                            key: const ValueKey('saved'),
-                            color: Colors.white,
-                            size: 20 * scale,
+                  SizedBox(width: 10 * scale),
+                  Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      mainAxisAlignment: MainAxisAlignment.center,
+                      children: [
+                        Text(
+                          q.text,
+                          maxLines: 2,
+                          overflow: TextOverflow.ellipsis,
+                          style: TextStyle(
+                            color: Colors.white.withOpacity(0.98),
+                            fontSize: 14 * scale,
+                            fontWeight: FontWeight.w600,
+                            fontStyle: FontStyle.italic,
+                            height: 1.3,
+                          ),
+                        ),
+                        if (q.author.isNotEmpty || (q.source != null && q.source!.isNotEmpty))
+                          Padding(
+                            padding: EdgeInsets.only(top: 4 * scale),
+                            child: Row(
+                              children: [
+                                Expanded(
+                                  child: Text(
+                                    [
+                                      if (q.author.isNotEmpty) '— ${q.author}',
+                                      if (q.source != null && q.source!.isNotEmpty) '《${q.source}》',
+                                    ].join(' '),
+                                    maxLines: 1,
+                                    overflow: TextOverflow.ellipsis,
+                                    style: TextStyle(
+                                      color: Colors.white.withOpacity(0.78),
+                                      fontSize: 11 * scale,
+                                      fontWeight: FontWeight.w500,
+                                    ),
+                                  ),
+                                ),
+                                GestureDetector(
+                                  onTap: _onSave,
+                                  child: AnimatedSwitcher(
+                                    duration: const Duration(milliseconds: 200),
+                                    child: _saved
+                                        ? Icon(Icons.favorite, key: const ValueKey('saved'), color: Colors.white, size: 16 * scale)
+                                        : Row(
+                                            key: const ValueKey('unsaved'),
+                                            mainAxisSize: MainAxisSize.min,
+                                            children: [
+                                              Icon(Icons.favorite_border, color: Colors.white, size: 16 * scale),
+                                              SizedBox(width: 2 * scale),
+                                              Text(widget.isEn ? 'Save' : '收藏',
+                                                style: TextStyle(color: Colors.white, fontSize: 10 * scale, fontWeight: FontWeight.w500)),
+                                            ],
+                                          ),
+                                  ),
+                                ),
+                              ],
+                            ),
                           )
-                        : Row(
-                            key: const ValueKey('unsaved'),
-                            mainAxisSize: MainAxisSize.min,
-                            children: [
-                              Icon(
-                                Icons.favorite_border,
-                                color: Colors.white,
-                                size: 20 * scale,
-                              ),
-                              SizedBox(width: 4 * scale),
-                              Text(
-                                widget.isEn ? 'Save' : '收藏',
-                                style: TextStyle(
-                                  color: Colors.white,
-                                  fontSize: 11 * scale,
-                                  fontWeight: FontWeight.w500,
+                        else
+                          // 没有作者出处时, 把 ❤ 按钮放这里
+                          Padding(
+                            padding: EdgeInsets.only(top: 4 * scale),
+                            child: Align(
+                              alignment: Alignment.centerRight,
+                              child: GestureDetector(
+                                onTap: _onSave,
+                                child: AnimatedSwitcher(
+                                  duration: const Duration(milliseconds: 200),
+                                  child: _saved
+                                      ? Icon(Icons.favorite, key: const ValueKey('saved'), color: Colors.white, size: 16 * scale)
+                                      : Row(
+                                          key: const ValueKey('unsaved'),
+                                          mainAxisSize: MainAxisSize.min,
+                                          children: [
+                                            Icon(Icons.favorite_border, color: Colors.white, size: 16 * scale),
+                                            SizedBox(width: 2 * scale),
+                                            Text(widget.isEn ? 'Save' : '收藏',
+                                              style: TextStyle(color: Colors.white, fontSize: 10 * scale, fontWeight: FontWeight.w500)),
+                                          ],
+                                        ),
                                 ),
                               ),
-                            ],
+                            ),
                           ),
+                      ],
+                    ),
                   ),
-                ),
-                // 6/29 10:49 改为: "下一个名言" 按钮挪到 banner 外, 放 64dp 空白处
-                // (banner 让给 AppBar actions 的 64dp 区域)
-                // 见 main.dart Stack 里的 _NextQuoteFab Positioned
-              ],
-            ),
-          ],
-      ),
+                ],
+              )
+            : Row(
+                children: [
+                  const Icon(Icons.format_quote, color: Colors.white, size: 18),
+                  const SizedBox(width: 8),
+                  Expanded(
+                    child: Text(
+                      widget.text,
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                      style: TextStyle(
+                        color: Colors.white.withOpacity(0.95),
+                        fontSize: 13 * scale,
+                        fontWeight: FontWeight.w500,
+                        fontStyle: FontStyle.italic,
+                      ),
+                    ),
+                  ),
+                ],
+              ),
       ),
     );
   }
@@ -1463,7 +1543,7 @@ String _userTypeNameEn(UserType t) {
 class _QuoteDetailSheet extends StatelessWidget {
   final List<HistoryItem> recent;
   final bool isEn;
-  final String? quote;
+  final Quote? quote; // 7/15: Quote struct (not String)
   final List<String>? llmKeywords;
   final UserType? selectedUserType; // 6/30 10:11: 问 AI 用
   const _QuoteDetailSheet({
@@ -1523,7 +1603,7 @@ class _QuoteDetailSheet extends StatelessWidget {
                         isEn: isEn,
                         isElderlyMode: false, // quote sheet 拿不到 MainHomeScreen isElderlyMode, 兑底 false
                         userTypeName: 'you', // 兑底
-                        contextQuote: quote,
+                        contextQuote: quote?.text, // 7/15: sheet 传 Quote, AI 屏收 text
                         userType: selectedUserType, // 6/30 10:11: 帮推荐/答疑用
                         scene: TimeAwareRecommender.recommendAt(DateTime.now(), currentUserType: selectedUserType).scene, // 7/1 推荐兑底用
 
@@ -1541,19 +1621,40 @@ class _QuoteDetailSheet extends StatelessWidget {
                 ),
             ]),
             const SizedBox(height: 8),
-            // 6/26: 删鼓励文本
+            // 7/15: 显示 Quote struct (主文 italic + 作者/出处小字)
+            // 不用 spread 是 Dart 在 spread 里不传播 null promotion
             if (quote != null)
-              Padding(
-                padding: const EdgeInsets.only(bottom: 16),
-                child: Text(
-                  '“$quote”',
-                  style: TextStyle(
-                    fontSize: 13,
-                    fontStyle: FontStyle.italic,
-                    color: Colors.grey[700],
+              Builder(builder: (ctx) {
+                final q = quote!; // 上面 if (quote != null) 已掊, 这里 bang
+                return Padding(
+                  padding: const EdgeInsets.only(bottom: 16),
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      if (q.author.isNotEmpty)
+                        Padding(
+                          padding: const EdgeInsets.only(bottom: 6),
+                          child: Text(
+                            q.author,
+                            style: const TextStyle(fontSize: 20, fontWeight: FontWeight.w700, color: Color(0xFF333333)),
+                          ),
+                        ),
+                      if (q.source != null && q.source!.isNotEmpty)
+                        Padding(
+                          padding: const EdgeInsets.only(bottom: 10),
+                          child: Text(
+                            '《${q.source}》',
+                            style: TextStyle(fontSize: 13, color: Colors.grey[600]),
+                          ),
+                        ),
+                      Text(
+                        '“${q.text}”',
+                        style: TextStyle(fontSize: 14, fontStyle: FontStyle.italic, color: Colors.grey[800], height: 1.5),
+                      ),
+                    ],
                   ),
-                ),
-              ),
+                );
+              }),
             // 6/24 v16: LLM 提取的 3 个相关关键词
             if (llmKeywords != null && llmKeywords!.isNotEmpty)
               Padding(
@@ -1624,4 +1725,21 @@ class _QuoteDetailSheet extends StatelessWidget {
       ),
     );
   }
+}
+
+// 7/15: main.dart 兑底 pool (如果 _streakService 崩了, 不至于 banner 显示不出来)
+// 注: 完整 27 条 pool 在 motivation_service.dart 里的 _QuotePool, 这是子集兜底
+class _QuotePoolFallback {
+  static final zh = <Quote>[
+    Quote(text: '竹杖芒鞋轻胜马，谁怕？一蓑烟雨任平生。', author: '苏轼', source: '定风波', createdAt: DateTime(2026, 1, 1)),
+    Quote(text: '长风破浪会有时，直挂云帆济沧海。', author: '李白', source: '行路难', createdAt: DateTime(2026, 1, 1)),
+    Quote(text: '采菊东篱下，悠然见南山。', author: '陶渊明', source: '饮酒·其五', createdAt: DateTime(2026, 1, 1)),
+    Quote(text: '行到水穷处，坐看云起时。', author: '王维', source: '终南别业', createdAt: DateTime(2026, 1, 1)),
+    Quote(text: '不畏浮云遮望眼，自缘身在最高层。', author: '王安石', source: '登飞来峰', createdAt: DateTime(2026, 1, 1)),
+  ];
+  static final en = <Quote>[
+    Quote(text: 'The impediment to action advances action.', author: 'Marcus Aurelius', source: 'Meditations', createdAt: DateTime(2026, 1, 1)),
+    Quote(text: 'We suffer more in imagination than in reality.', author: 'Seneca', source: 'Letters from a Stoic', createdAt: DateTime(2026, 1, 1)),
+    Quote(text: 'No man is free who is not master of himself.', author: 'Epictetus', source: 'Discourses', createdAt: DateTime(2026, 1, 1)),
+  ];
 }
