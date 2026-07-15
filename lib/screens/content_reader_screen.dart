@@ -4,6 +4,7 @@ import 'package:url_launcher/url_launcher.dart';
 import 'dart:async';
 import 'dart:ui';
 import '../models/models.dart';
+import '../models/quote.dart';
 import '../theme/app_theme.dart';
 import '../theme/glass_decoration.dart';
 import '../services/tts_service.dart';
@@ -18,6 +19,7 @@ import '../services/llm_service.dart';
 import '../services/news_service.dart';
 import '../widgets/inline_read_view.dart';
 import 'ai_assistant_screen.dart';
+import '../services/quote_related_engine.dart';
 
 class ContentReaderScreen extends StatefulWidget {
   final ContentItem item;
@@ -1643,27 +1645,15 @@ class _QuoteReadLayout extends StatelessWidget {
           _QuoteAiSummarySection(quoteText: text, author: item.title, scale: scale, isEn: isEn),
           SizedBox(height: 16 * scale),
 
-          // 7/15 16:44 修回: 延伸阅读 placeholder (Q2 真接时填充, 现在显示'即将开放')
-          Container(
-            padding: EdgeInsets.all(16 * scale),
-            decoration: BoxDecoration(
-              color: Colors.amber.withOpacity(0.08),
-              borderRadius: BorderRadius.circular(12),
-              border: Border.all(color: Colors.amber.withOpacity(0.3)),
-            ),
-            child: Row(
-              children: [
-                Icon(Icons.rocket_launch, size: 18 * scale, color: Colors.amber.shade700),
-                SizedBox(width: 8 * scale),
-                Expanded(
-                  child: Text(
-                    isEn ? 'Related reading — coming soon (Q2 next)' : '相关延伸阅读 - 即将上线 (Q2 下一波)',
-                    style: TextStyle(fontSize: 12 * scale, color: Colors.brown.shade700),
-                  ),
-                ),
-              ],
-            ),
+          // 7/15 16:56 Q2: 真接关联阅读 (Hero 详情页底部) — 跟 banner sheet 同源算法
+          _QuoteRelatedSection(
+            quoteText: text,
+            author: item.title,
+            source: source,
+            scale: scale,
+            isEn: isEn,
           ),
+          SizedBox(height: 16 * scale),  // 喂内边距到问 AI 按钮
           SizedBox(height: 24 * scale),
 
           // 底部: 问 AI 按钮 (复用 banner 那条)
@@ -1889,6 +1879,201 @@ class _QuoteAiSummarySectionState extends State<_QuoteAiSummarySection> {
               style: TextStyle(fontSize: 12 * widget.scale, color: AppTheme.textLight),
             ),
         ],
+      ),
+    );
+  }
+}
+
+
+// 7/15 16:56 Q2 A: Hero 详情页关联阅读区 (用 QuoteRelatedEngine 桶搜 + LLM 补)
+class _QuoteRelatedSection extends StatefulWidget {
+  final String quoteText;
+  final String author;
+  final String? source;
+  final double scale;
+  final bool isEn;
+
+  const _QuoteRelatedSection({
+    required this.quoteText,
+    required this.author,
+    required this.source,
+    required this.scale,
+    required this.isEn,
+  });
+
+  @override
+  State<_QuoteRelatedSection> createState() => _QuoteRelatedSectionState();
+}
+
+class _QuoteRelatedSectionState extends State<_QuoteRelatedSection> {
+  late Future<List<RelatedHit>> _future;
+
+  @override
+  void initState() {
+    super.initState();
+    _future = _load();
+  }
+
+  Future<List<RelatedHit>> _load() async {
+    final quote = Quote(
+      text: widget.quoteText,
+      author: widget.author,
+      source: widget.source,
+      createdAt: DateTime.now(),
+    );
+    final userType = UserType.officeWorker;  // 7/15: 详情页不知 userType, 兑底
+    final scene = Scene.learn;
+    return QuoteRelatedEngine.findRelated(
+      quote: quote,
+      userType: userType,
+      scene: scene,
+      isEn: widget.isEn,
+      limit: 5,
+    );
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final s = widget.scale;
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Row(
+          children: [
+            Icon(Icons.auto_stories, size: 16 * s, color: AppTheme.primary),
+            SizedBox(width: 6 * s),
+            Text(
+              widget.isEn ? 'Related to this quote' : '跟这句相关的',
+              style: TextStyle(fontSize: 14 * s, fontWeight: FontWeight.w700, color: AppTheme.textDark),
+            ),
+          ],
+        ),
+        SizedBox(height: 10 * s),
+        FutureBuilder<List<RelatedHit>>(
+          future: _future,
+          builder: (context, snapshot) {
+            if (snapshot.connectionState != ConnectionState.done) {
+              return Container(
+                padding: EdgeInsets.all(16 * s),
+                child: Row(
+                  children: [
+                    SizedBox(width: 14 * s, height: 14 * s, child: const CircularProgressIndicator(strokeWidth: 2)),
+                    SizedBox(width: 10 * s),
+                    Text(widget.isEn ? 'Finding related...' : '正在找相关的...', style: TextStyle(fontSize: 12 * s, color: AppTheme.textLight)),
+                  ],
+                ),
+              );
+            }
+            final hits = snapshot.data ?? [];
+            if (hits.isEmpty) {
+              return Container(
+                padding: EdgeInsets.all(16 * s),
+                decoration: BoxDecoration(
+                  color: AppTheme.textLight.withOpacity(0.04),
+                  borderRadius: BorderRadius.circular(12),
+                ),
+                child: Row(
+                  children: [
+                    Icon(Icons.search_off, size: 16 * s, color: AppTheme.textLight),
+                    SizedBox(width: 8 * s),
+                    Expanded(
+                      child: Text(
+                        widget.isEn ? 'No related reading found. Try ↻ to swap quote.'
+                            : '还没找到相关的延伸阅读, 试试 ↻ 换一句。',
+                        style: TextStyle(fontSize: 12 * s, color: AppTheme.textLight),
+                      ),
+                    ),
+                  ],
+                ),
+              );
+            }
+            return Column(
+              children: hits.map((h) => _RelatedHitCard(
+                hit: h,
+                scale: s,
+                isEn: widget.isEn,
+                onTap: h.externalUrl != null
+                    ? () async {
+                        try {
+                          final uri = Uri.parse(h.externalUrl!);
+                          if (await canLaunchUrl(uri)) {
+                            await launchUrl(uri, mode: kIsWeb ? LaunchMode.platformDefault : LaunchMode.externalApplication);
+                          }
+                        } catch (_) {}
+                      }
+                    : null,
+              )).toList(),
+            );
+          },
+        ),
+      ],
+    );
+  }
+}
+
+class _RelatedHitCard extends StatelessWidget {
+  final RelatedHit hit;
+  final double scale;
+  final bool isEn;
+  final VoidCallback? onTap;
+
+  const _RelatedHitCard({
+    required this.hit,
+    required this.scale,
+    required this.isEn,
+    this.onTap,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    final s = scale;
+    return Padding(
+      padding: EdgeInsets.only(bottom: 8 * s),
+      child: Material(
+        color: AppTheme.primary.withOpacity(0.04),
+        borderRadius: BorderRadius.circular(12),
+        child: InkWell(
+          borderRadius: BorderRadius.circular(12),
+          onTap: onTap,
+          child: Padding(
+            padding: EdgeInsets.all(12 * s),
+            child: Row(
+              children: [
+                Container(
+                  width: 8 * s,
+                  height: 8 * s,
+                  decoration: BoxDecoration(
+                    color: hit.fromLlm ? Colors.amber.shade700 : AppTheme.primary,
+                    shape: BoxShape.circle,
+                  ),
+                ),
+                SizedBox(width: 10 * s),
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(
+                        hit.title,
+                        style: TextStyle(fontSize: 14 * s, fontWeight: FontWeight.w600),
+                        maxLines: 2,
+                        overflow: TextOverflow.ellipsis,
+                      ),
+                      SizedBox(height: 2 * s),
+                      Text(
+                        hit.fromLlm
+                            ? (isEn ? 'AI suggest' : 'AI 推荐')
+                            : hit.source,
+                        style: TextStyle(fontSize: 11 * s, color: AppTheme.textLight),
+                      ),
+                    ],
+                  ),
+                ),
+                if (onTap != null)
+                  Icon(Icons.arrow_forward_ios, size: 12 * s, color: AppTheme.textLight),
+              ],
+            ),
+          ),
+        ),
       ),
     );
   }

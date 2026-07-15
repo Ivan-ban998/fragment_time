@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/foundation.dart';
+import 'package:url_launcher/url_launcher.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'dart:async';
 import 'dart:ui';
@@ -34,7 +35,8 @@ import 'screens/search_screen.dart';
 import 'screens/my_subscriptions_screen.dart';
 import 'screens/settings_tab.dart';
 import 'services/news_service.dart';
-import 'services/time_aware_recommender.dart'; // 7/1: quote sheet 弹 AI 时传 scene
+import 'services/time_aware_recommender.dart';
+import 'services/quote_related_engine.dart';
 import 'screens/ai_assistant_screen.dart';
 
 /// 6/14 v4 公开跨屏导航入口:content_screen "去搜索" 按钣直接调
@@ -662,44 +664,51 @@ class _MainHomeScreenState extends State<MainHomeScreen> {
   // 6/24 v12: 设置 Tab "我的身份" — 弹出 6 角色选择
   // 6/24 v13: 点击 banner 名言/鼓励 → 弹底部 Sheet, 显示今天读过的相关推荐
   Future<void> _showQuoteDetailSheet() async {
-    // 拉今天的历史 (推荐相关)
-    final all = await HistoryService.instance.getAll();
-    final now = DateTime.now();
-    final recent = all.where((h) {
-      final t = DateTime.fromMillisecondsSinceEpoch(h.readAt);
-      return now.difference(t).inDays <= 7;
-    }).take(10).toList();
-
-    // 7/15: 用 Quote.text 提词
-    List<String>? llmKeywords;
-    if (_dailyQuote != null && _dailyQuote!.text.isNotEmpty) {
-      try {
-        llmKeywords = await _getLLMKeywordsForQuote(_dailyQuote!.text);
-      } catch (_) {
-        llmKeywords = null;
-      }
-    }
-
-    if (!mounted) return;
-    if (recent.isEmpty) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text(isEn
-            ? 'Read a few items first — then tap this for related content.'
-            : '先看几篇文章/听几个内容，再点这里看相关推荐。')),
+    if (_dailyQuote == null || _dailyQuote!.text.isEmpty) return;
+    // 7/15 16:56 Q2: 跑 QuoteRelatedEngine 真关联, history 作为兜底
+    List<RelatedHit> hits = [];
+    try {
+      hits = await QuoteRelatedEngine.findRelated(
+        quote: _dailyQuote!,
+        userType: _selectedUserType ?? UserType.officeWorker,
+        scene: Scene.learn,
+        isEn: isEn,
+        limit: 6,
       );
-      return;
+    } catch (_) {/* engine 失败就 fallback */}
+
+    // 兜底: history 7 天 抽 6 条
+    List<HistoryItem> historyFallback = [];
+    if (hits.isEmpty) {
+      try {
+        final all = await HistoryService.instance.getAll();
+        final now = DateTime.now();
+        historyFallback = all.where((h) {
+          final t = DateTime.fromMillisecondsSinceEpoch(h.readAt);
+          return now.difference(t).inDays <= 7;
+        }).take(6).toList();
+      } catch (_) {}
     }
+
+    // 关键词 (kg 仍然走 LLM 现算, 显示在 chip)
+    List<String>? llmKeywords;
+    try {
+      llmKeywords = await _getLLMKeywordsForQuote(_dailyQuote!.text);
+    } catch (_) {
+      llmKeywords = null;
+    }
+
     if (!mounted) return;
     showModalBottomSheet(
       context: context,
       backgroundColor: Colors.transparent,
       isScrollControlled: true,
       builder: (ctx) => _QuoteDetailSheet(
-        recent: recent,
+        recent: historyFallback, // 兜底用
+        hits: hits, // 真关联优先
         isEn: isEn,
-        // 6/26: 删鼓励字段, 只传 quote
         quote: _dailyQuote,
-        llmKeywords: llmKeywords, // 6/24 v16
+        llmKeywords: llmKeywords,
       ),
     );
   }
@@ -1543,12 +1552,14 @@ String _userTypeNameEn(UserType t) {
 // 6/26: 删鼓励字段, 只显示 quote
 class _QuoteDetailSheet extends StatelessWidget {
   final List<HistoryItem> recent;
+  final List<RelatedHit> hits; // 7/15 16:56 Q2: 真关联 (hits 优先, recent 兜底)
   final bool isEn;
-  final Quote? quote; // 7/15: Quote struct (not String)
+  final Quote? quote; // 7/15: Quote struct
   final List<String>? llmKeywords;
-  final UserType? selectedUserType; // 6/30 10:11: 问 AI 用
+  final UserType? selectedUserType;
   const _QuoteDetailSheet({
     required this.recent,
+    required this.hits,
     required this.isEn,
     required this.quote,
     this.llmKeywords,
@@ -1683,7 +1694,58 @@ class _QuoteDetailSheet extends StatelessWidget {
                 ),
               ),
             const SizedBox(height: 8),
-            ...recent.map((h) => Padding(
+            // 7/15 16:56 Q2: hits (RelatedHit) 优先, recent (HistoryItem) 兜底
+            if (hits.isNotEmpty)
+              ...hits.map((h) => Padding(
+                  padding: const EdgeInsets.only(bottom: 10),
+                  child: Card(
+                    elevation: 0,
+                    color: h.fromLlm
+                        ? Colors.amber.withOpacity(0.08)
+                        : const Color(0xFF7C5CFC).withOpacity(0.06),
+                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
+                    child: InkWell(
+                      borderRadius: BorderRadius.circular(14),
+                      onTap: h.externalUrl != null
+                          ? () async {
+                              try {
+                                final uri = Uri.parse(h.externalUrl!);
+                                if (await canLaunchUrl(uri)) {
+                                  await launchUrl(uri, mode: kIsWeb ? LaunchMode.platformDefault : LaunchMode.externalApplication);
+                                }
+                              } catch (_) {}
+                            }
+                          : null,
+                      child: Padding(
+                        padding: const EdgeInsets.all(12),
+                        child: Row(
+                          children: [
+                            Container(
+                              width: 6,
+                              height: 6,
+                              decoration: BoxDecoration(
+                                color: h.fromLlm ? Colors.amber.shade700 : const Color(0xFF7C5CFC),
+                                shape: BoxShape.circle,
+                              ),
+                            ),
+                            SizedBox(width: 8),
+                            Expanded(
+                              child: Text(
+                                h.title,
+                                style: const TextStyle(fontSize: 14, fontWeight: FontWeight.w600),
+                                maxLines: 2,
+                                overflow: TextOverflow.ellipsis,
+                              ),
+                            ),
+                            Icon(Icons.arrow_forward_ios, size: 12, color: Colors.grey[600]),
+                          ],
+                        ),
+                      ),
+                    ),
+                  ),
+                ))
+            else
+              ...recent.map((h) => Padding(
                 padding: const EdgeInsets.only(bottom: 10),
                 child: Card(
                   elevation: 0,
