@@ -182,13 +182,13 @@ class _SceneScreenState extends State<SceneScreen> {
                   );
                 },
               ),
-              SizedBox(height: 12 * _scale),
+              SizedBox(height: 16 * _scale),
+              // 6/25 联动昵称
               Text(
-                // 6/25 联动昵称: '上午好, @你' 而不是 '上午好, 上班族'
                 '${DailyMessage.getGreeting(isEn)} $_handle',
                 style: TextStyle(fontSize: 18 * _scale, fontWeight: FontWeight.bold),
               ),
-              SizedBox(height: 12 * _scale),
+              SizedBox(height: 4 * _scale),  // 7/15: title 跟 subtitle 中间 4px (不让紧贴)
               Text(
                 isEn ? 'What would you like to do?' : '选择你现在想干嘛',
                 style: TextStyle(fontSize: 14 * _scale, color: AppTheme.textLight),

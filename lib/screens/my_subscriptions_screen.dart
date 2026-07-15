@@ -242,9 +242,12 @@ class _MySubscriptionsScreenState extends State<MySubscriptionsScreen>
     if (filtered.isEmpty) {
       return _buildEmpty(context, scale, isEn, contentOnly: contentOnly, quotesOnly: quotesOnly);
     }
-    // 7/15: quotesOnly 走新 Quote 专属布局
+    // 7/15 16:44: quotesOnly 走新 Quote 专属布局 — 按 lastReadAt 倒序, 最新置顶
     if (quotesOnly) {
-      return _buildQuotesView(filtered, scale, isEn);
+      final sorted = List<ContentItem>.from(filtered)
+        ..sort((a, b) => (b.lastReadAt ?? DateTime.now())
+            .compareTo(a.lastReadAt ?? DateTime.now()));
+      return _buildQuotesView(sorted, scale, isEn);
     }
     return ListView.separated(
       padding: EdgeInsets.all(16 * scale),
