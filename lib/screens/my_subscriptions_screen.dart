@@ -205,6 +205,7 @@ class _MySubscriptionsScreenState extends State<MySubscriptionsScreen>
   }
 
   // 6/25 A: 收藏 Tab (内容 / 名言)
+  // 7/15: quotesOnly 走 _buildQuotesView (顶部大字 quote + time-grouped 列表)
   Widget _buildSavedTab(double scale, bool isEn, {bool contentOnly = false, bool quotesOnly = false}) {
     // 6/29 14:59 Brien 反馈: 收藏后 Tab 2 看不到新条目 — _items state 不重 load, 显示旧数据
     // 修: ListenableBuilder 每次 rebuild 都在 FutureBuilder 里重拉 service, 不依赖 _items
@@ -241,6 +242,10 @@ class _MySubscriptionsScreenState extends State<MySubscriptionsScreen>
     if (filtered.isEmpty) {
       return _buildEmpty(context, scale, isEn, contentOnly: contentOnly, quotesOnly: quotesOnly);
     }
+    // 7/15: quotesOnly 走新 Quote 专属布局
+    if (quotesOnly) {
+      return _buildQuotesView(filtered, scale, isEn);
+    }
     return ListView.separated(
       padding: EdgeInsets.all(16 * scale),
       itemCount: filtered.length,
@@ -268,6 +273,56 @@ class _MySubscriptionsScreenState extends State<MySubscriptionsScreen>
       },
     );
       },
+    );
+  }
+
+  // 7/15: 名言收藏页 — 顶部大卡 (最新) + 时间线 (按 day 分)
+  Widget _buildQuotesView(List<ContentItem> quotes, double scale, bool isEn) {
+    return CustomScrollView(
+      slivers: [
+        // 顶部大卡 (块 1: 最新一条 quote hero 展示)
+        SliverToBoxAdapter(
+          child: _QuoteHeroCard(
+            latest: quotes.first,
+            totalCount: quotes.length,
+            scale: scale,
+            isEn: isEn,
+            onRemove: () => _unsubscribe(quotes.first),
+          ),
+        ),
+        if (quotes.length > 1) SliverToBoxAdapter(child: SizedBox(height: 24 * scale)),
+        // 块 2: 按天分组的时间线 (lastReadAt 同一天合并)
+        if (quotes.length > 1)
+          SliverPadding(
+            padding: EdgeInsets.symmetric(horizontal: 16 * scale),
+            sliver: SliverList(
+              delegate: SliverChildBuilderDelegate(
+                (context, i) {
+                  final item = quotes[i + 1];
+                  return _QuoteTimelineItem(
+                    item: item,
+                    scale: scale,
+                    isEn: isEn,
+                    onTap: () {
+                      Navigator.push(
+                        context,
+                        MaterialPageRoute(
+                          builder: (_) => ContentReaderScreen(
+                            item: item,
+                            isElderlyMode: widget.isElderlyMode,
+                            isEn: isEn,
+                          ),
+                        ),
+                      );
+                    },
+                    onRemove: () => _unsubscribe(item),
+                  );
+                },
+                childCount: quotes.length - 1,
+              ),
+            ),
+          ),
+      ],
     );
   }
 
@@ -585,6 +640,284 @@ class _SubscribedCard extends StatelessWidget {
               ),
             ],
           ),
+        ),
+      ),
+    );
+  }
+}
+
+
+// 7/15: 名言收藏 - 顶部大字 Hero (本机制仅渲染最新一条)
+// 复用 _DailyEncouragementBanner 同款紫色渐变 + 圆角, 但放大一档
+class _QuoteHeroCard extends StatelessWidget {
+  final ContentItem latest;
+  final int totalCount;
+  final double scale;
+  final bool isEn;
+  final VoidCallback onRemove;
+
+  const _QuoteHeroCard({
+    required this.latest,
+    required this.totalCount,
+    required this.scale,
+    required this.isEn,
+    required this.onRemove,
+  });
+
+  String _authorInit() {
+    final t = latest.title;
+    if (t.isEmpty) return '✦';
+    // 取 author 首字符 (中文首字 / 英文首字母)
+    return t.characters.first;
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final d = latest.lastReadAt ?? DateTime.now();
+    return Padding(
+      padding: EdgeInsets.fromLTRB(16 * scale, 16 * scale, 16 * scale, 8 * scale),
+      child: Container(
+        decoration: BoxDecoration(
+          gradient: const LinearGradient(
+            colors: [Color(0xFF7C5CFC), Color(0xFFA48BFF)],
+            begin: Alignment.topLeft,
+            end: Alignment.bottomRight,
+          ),
+          borderRadius: BorderRadius.circular(24),
+          boxShadow: [
+            BoxShadow(
+              color: const Color(0xFF7C5CFC).withOpacity(0.25),
+              blurRadius: 16,
+              offset: const Offset(0, 4),
+            ),
+          ],
+        ),
+        padding: EdgeInsets.all(20 * scale),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            // 顶部一行: 标签 + 总数 + 删除
+            Row(
+              children: [
+                Icon(Icons.format_quote, color: Colors.white, size: 18 * scale),
+                SizedBox(width: 6 * scale),
+                Text(
+                  isEn ? 'Latest saved quote' : '刚收藏的名言',
+                  style: TextStyle(
+                    color: Colors.white.withOpacity(0.92),
+                    fontSize: 12 * scale,
+                    fontWeight: FontWeight.w600,
+                  ),
+                ),
+                const Spacer(),
+                Container(
+                  padding: EdgeInsets.symmetric(horizontal: 8 * scale, vertical: 2 * scale),
+                  decoration: BoxDecoration(
+                    color: Colors.white.withOpacity(0.18),
+                    borderRadius: BorderRadius.circular(12),
+                  ),
+                  child: Text(
+                    isEn ? '❤ $totalCount' : '❤ $totalCount',
+                    style: TextStyle(color: Colors.white, fontSize: 11 * scale, fontWeight: FontWeight.w600),
+                  ),
+                ),
+                SizedBox(width: 6 * scale),
+                InkWell(
+                  onTap: onRemove,
+                  borderRadius: BorderRadius.circular(16),
+                  child: Padding(
+                    padding: EdgeInsets.all(4 * scale),
+                    child: Icon(Icons.bookmark, color: Colors.white, size: 18 * scale),
+                  ),
+                ),
+              ],
+            ),
+            SizedBox(height: 16 * scale),
+            // 正文 quote
+            Row(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                // 圆形 avatar
+                Container(
+                  width: 56 * scale,
+                  height: 56 * scale,
+                  decoration: BoxDecoration(
+                    color: Colors.white.withOpacity(0.2),
+                    shape: BoxShape.circle,
+                    border: Border.all(color: Colors.white.withOpacity(0.5), width: 2),
+                  ),
+                  alignment: Alignment.center,
+                  child: Text(
+                    _authorInit(),
+                    style: TextStyle(
+                      color: Colors.white,
+                      fontSize: 22 * scale,
+                      fontWeight: FontWeight.w700,
+                    ),
+                  ),
+                ),
+                SizedBox(width: 14 * scale),
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      // title = 作者名
+                      Text(
+                        latest.title,
+                        style: TextStyle(
+                          color: Colors.white,
+                          fontSize: 18 * scale,
+                          fontWeight: FontWeight.w700,
+                        ),
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                      ),
+                      if (latest.description != null && latest.description!.isNotEmpty)
+                        Padding(
+                          padding: EdgeInsets.only(top: 6 * scale),
+                          child: Text(
+                            latest.description!,
+                            style: TextStyle(
+                              color: Colors.white.withOpacity(0.95),
+                              fontSize: 14 * scale,
+                              fontStyle: FontStyle.italic,
+                              height: 1.5,
+                            ),
+                            maxLines: 4,
+                            overflow: TextOverflow.ellipsis,
+                          ),
+                        ),
+                    ],
+                  ),
+                ),
+              ],
+            ),
+            SizedBox(height: 12 * scale),
+            // 底部: 日期 + 阅读时长
+            Row(
+              children: [
+                Icon(Icons.access_time, color: Colors.white.withOpacity(0.7), size: 13 * scale),
+                SizedBox(width: 4 * scale),
+                Text(
+                  '《收藏于 ${d.month}月${d.day}日》',
+                  style: TextStyle(color: Colors.white.withOpacity(0.7), fontSize: 11 * scale),
+                ),
+                const Spacer(),
+                Text(
+                  '“${latest.duration}”',
+                  style: TextStyle(color: Colors.white.withOpacity(0.65), fontSize: 11 * scale),
+                ),
+              ],
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+// 7/15: 名言收藏 - 时间线条目 (单条 quote 紧凑展示, 用于列表)
+class _QuoteTimelineItem extends StatelessWidget {
+  final ContentItem item;
+  final double scale;
+  final bool isEn;
+  final VoidCallback? onTap;
+  final VoidCallback? onRemove;
+
+  const _QuoteTimelineItem({
+    required this.item,
+    required this.scale,
+    required this.isEn,
+    this.onTap,
+    this.onRemove,
+  });
+
+  String _authorInit() {
+    final t = item.title;
+    if (t.isEmpty) return '✦';
+    return t.characters.first;
+  }
+
+  String _dayLabel(DateTime d, bool isEn) {
+    final now = DateTime.now();
+    final diff = now.difference(d).inDays;
+    if (diff == 0) return isEn ? 'Today' : '今天';
+    if (diff == 1) return isEn ? 'Yesterday' : '昨天';
+    return '${d.month}/${d.day}';
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final d = item.lastReadAt ?? DateTime.now();
+    return InkWell(
+      onTap: onTap,
+      borderRadius: BorderRadius.circular(14),
+      child: Padding(
+        padding: EdgeInsets.symmetric(vertical: 10 * scale),
+        child: Row(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            // 左侧小 avatar
+            Container(
+              width: 40 * scale,
+              height: 40 * scale,
+              decoration: BoxDecoration(
+                color: const Color(0xFF7C5CFC).withOpacity(0.12),
+                shape: BoxShape.circle,
+                border: Border.all(color: const Color(0xFF7C5CFC).withOpacity(0.3), width: 1),
+              ),
+              alignment: Alignment.center,
+              child: Text(
+                _authorInit(),
+                style: TextStyle(
+                  color: const Color(0xFF7C5CFC),
+                  fontSize: 16 * scale,
+                  fontWeight: FontWeight.w700,
+                ),
+              ),
+            ),
+            SizedBox(width: 12 * scale),
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  // 作者 (title) + 日期
+                  Row(
+                    children: [
+                      Expanded(
+                        child: Text(
+                          item.title,
+                          style: TextStyle(fontSize: 14 * scale, fontWeight: FontWeight.w700),
+                          maxLines: 1,
+                          overflow: TextOverflow.ellipsis,
+                        ),
+                      ),
+                      Text(
+                        _dayLabel(d, isEn),
+                        style: TextStyle(fontSize: 11 * scale, color: AppTheme.textLight),
+                      ),
+                    ],
+                  ),
+                  SizedBox(height: 4 * scale),
+                  // quote 描述
+                  Text(
+                    item.description ?? '',
+                    style: TextStyle(fontSize: 12 * scale, color: AppTheme.textLight, fontStyle: FontStyle.italic),
+                    maxLines: 2,
+                    overflow: TextOverflow.ellipsis,
+                  ),
+                ],
+              ),
+            ),
+            if (onRemove != null)
+              IconButton(
+                onPressed: onRemove,
+                icon: Icon(Icons.bookmark_outline, size: 16, color: AppTheme.textLight),
+                padding: EdgeInsets.zero,
+                constraints: const BoxConstraints.tightFor(width: 28, height: 28),
+                tooltip: isEn ? 'Remove' : '取消收藏',
+              ),
+          ],
         ),
       ),
     );
