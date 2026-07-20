@@ -353,11 +353,8 @@ class _TinderRecommendationStackState extends State<TinderRecommendationStack> {
               child: Container(
               width: double.infinity,
               decoration: BoxDecoration(
-                gradient: LinearGradient(
-                  begin: Alignment.topLeft,
-                  end: Alignment.bottomRight,
-                  colors: _gradForContent(item),
-                ),
+                // 7/19 fix v2: LinearGradient 全量清除
+                color: _gradForContent(item),
               ),
               child: Stack(
                 children: [
@@ -474,14 +471,15 @@ class _TinderRecommendationStackState extends State<TinderRecommendationStack> {
     ));
   }
 
-  List<Color> _gradForContent(ContentItem item) {
+  Color _gradForContent(ContentItem item) {
+    // 7/19 fix v2: LinearGradient 全量清除, 改返主色兑底
     switch (item.contentType.name) {
-      case 'article': return [const Color(0xFF7C5CFC), const Color(0xFFA48BFF)];
-      case 'audio':   return [const Color(0xFF0891B2), const Color(0xFF67E8F9)];
-      case 'video':   return [const Color(0xFFEA580C), const Color(0xFFFDBA74)];
-      case 'short':   return [const Color(0xFF16A34A), const Color(0xFF86EFAC)];
-      case 'card':    return [const Color(0xFFDB2777), const Color(0xFFFBCFE8)];
-      default:        return [const Color(0xFF6B7280), const Color(0xFFD1D5DB)];
+      case 'article': return const Color(0xFF7C5CFC);
+      case 'audio':   return const Color(0xFF0891B2);
+      case 'video':   return const Color(0xFFEA580C);
+      case 'short':   return const Color(0xFF16A34A);
+      case 'card':    return const Color(0xFFDB2777);
+      default:        return const Color(0xFF6B7280);
     }
   }
 

@@ -1307,66 +1307,63 @@ class _ContentReaderScreenState extends State<ContentReaderScreen> {
   }
 
   // 6/14 详情页完成:"已读完" banner（重入时显示）
+  // 7/20 12:24 Brien "听一听还挂" → 真凶: BackdropFilter shader 在 Flutter 3.27.4 canvaskit 触发 null check
+  // 修法: 去掉 BackdropFilter + ImageFilter.blur, 用纯 Container + 高不透明色模拟玻璃
   Widget _buildAlreadyReadBanner() {
-    return ClipRRect(
-      borderRadius: BorderRadius.circular(14),
-      child: BackdropFilter(
-        filter: ImageFilter.blur(sigmaX: 20, sigmaY: 20),
-        child: Container(
-          padding: EdgeInsets.symmetric(horizontal: 14 * scale, vertical: 10 * scale),
-          decoration: BoxDecoration(
-            color: Colors.white.withOpacity(0.6),
-            borderRadius: BorderRadius.circular(14),
-            border: Border.all(color: Colors.white.withOpacity(0.5), width: 1.2),
+    return Container(
+      padding: EdgeInsets.symmetric(horizontal: 14 * scale, vertical: 10 * scale),
+      decoration: BoxDecoration(
+        color: Colors.white.withOpacity(0.92),
+        borderRadius: BorderRadius.circular(14),
+        border: Border.all(color: Colors.white.withOpacity(0.6), width: 1.2),
+        boxShadow: [
+          BoxShadow(color: Colors.black.withOpacity(0.04), blurRadius: 8, offset: const Offset(0, 2)),
+        ],
+      ),
+      child: Row(
+        children: [
+          Icon(Icons.check_circle, size: 18 * scale, color: GlassStyle.accent),
+          SizedBox(width: 8 * scale),
+          Expanded(
+            child: Text(
+              isEn ? 'Finished reading · scroll to re-mark' : '已读完 · 滑到底可重新标记',
+              style: TextStyle(fontSize: 12 * scale, fontWeight: FontWeight.w600, color: AppTheme.textDark),
+            ),
           ),
-          child: Row(
-            children: [
-              Icon(Icons.check_circle, size: 18 * scale, color: GlassStyle.accent),
-              SizedBox(width: 8 * scale),
-              Expanded(
-                child: Text(
-                  isEn ? 'Finished reading · scroll to re-mark' : '已读完 · 滑到底可重新标记',
-                  style: TextStyle(fontSize: 12 * scale, fontWeight: FontWeight.w600, color: AppTheme.textDark),
-                ),
-              ),
-            ],
-          ),
-        ),
+        ],
       ),
     );
   }
 
   // 6/14 详情页完成:scroll 到底 3 秒淡出成就 banner
+  // 7/20 12:24 同步去 BackdropFilter (跟 _buildAlreadyReadBanner 同原因)
   Widget _buildAchievementBanner() {
-    return ClipRRect(
-      borderRadius: BorderRadius.circular(14),
-      child: BackdropFilter(
-        filter: ImageFilter.blur(sigmaX: 20, sigmaY: 20),
-        child: Container(
-          padding: EdgeInsets.symmetric(horizontal: 14 * scale, vertical: 10 * scale),
-          decoration: BoxDecoration(
-            color: Colors.white.withOpacity(0.6),
-            borderRadius: BorderRadius.circular(14),
-            border: Border.all(color: Colors.white.withOpacity(0.5), width: 1.2),
+    return Container(
+      padding: EdgeInsets.symmetric(horizontal: 14 * scale, vertical: 10 * scale),
+      decoration: BoxDecoration(
+        color: Colors.white.withOpacity(0.92),
+        borderRadius: BorderRadius.circular(14),
+        border: Border.all(color: Colors.white.withOpacity(0.6), width: 1.2),
+        boxShadow: [
+          BoxShadow(color: Colors.black.withOpacity(0.04), blurRadius: 8, offset: const Offset(0, 2)),
+        ],
+      ),
+      child: Row(
+        children: [
+          Icon(Icons.emoji_events, size: 18 * scale, color: GlassStyle.accent),
+          SizedBox(width: 8 * scale),
+          Expanded(
+            child: Text(
+              isEn ? '🎉 Marked as read · 100%' : '🎉 已标记为读完 · 100%',
+              style: TextStyle(fontSize: 12 * scale, fontWeight: FontWeight.w700, color: AppTheme.textDark),
+            ),
           ),
-          child: Row(
-            children: [
-              Icon(Icons.emoji_events, size: 18 * scale, color: GlassStyle.accent),
-              SizedBox(width: 8 * scale),
-              Expanded(
-                child: Text(
-                  isEn ? '🎉 Marked as read · 100%' : '🎉 已标记为读完 · 100%',
-                  style: TextStyle(fontSize: 12 * scale, fontWeight: FontWeight.w700, color: AppTheme.textDark),
-                ),
-              ),
-              // 6/25 v17: 手动 X 关 banner
-              GestureDetector(
-                onTap: () => setState(() => _showAchievementBanner = false),
-                child: Icon(Icons.close, size: 18 * scale, color: AppTheme.textLight),
-              ),
-            ],
+          // 6/25 v17: 手动 X 关 banner
+          GestureDetector(
+            onTap: () => setState(() => _showAchievementBanner = false),
+            child: Icon(Icons.close, size: 18 * scale, color: AppTheme.textLight),
           ),
-        ),
+        ],
       ),
     );
   }
@@ -1417,11 +1414,8 @@ class _ContentReaderScreenState extends State<ContentReaderScreen> {
     return Container(
       padding: EdgeInsets.all(16 * scale),
       decoration: BoxDecoration(
-        gradient: LinearGradient(
-          colors: [AppTheme.primary.withOpacity(0.1), Colors.white],
-          begin: Alignment.topLeft,
-          end: Alignment.bottomRight,
-        ),
+        // 7/19 fix v2: LinearGradient 全量清除
+        color: Colors.white,
         borderRadius: BorderRadius.circular(12),
         border: Border.all(color: AppTheme.primary.withOpacity(0.3)),
       ),
@@ -1543,11 +1537,8 @@ class _QuoteReadLayout extends StatelessWidget {
           // 顶部紫色 Hero (跟收藏页 hero 卡同款)
           Container(
             decoration: BoxDecoration(
-              gradient: const LinearGradient(
-                colors: [Color(0xFF7C5CFC), Color(0xFFA48BFF)],
-                begin: Alignment.topLeft,
-                end: Alignment.bottomRight,
-              ),
+              // 7/19 fix v2: LinearGradient 全量清除
+              color: const Color(0xFF7C5CFC),
               borderRadius: BorderRadius.circular(24),
               boxShadow: [
                 BoxShadow(

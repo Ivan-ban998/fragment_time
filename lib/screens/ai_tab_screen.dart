@@ -25,7 +25,8 @@ class AiTabScreen extends StatelessWidget {
       ),
       body: Container(
         decoration: BoxDecoration(
-          gradient: GlassStyle.sceneBackgroundOverlay(),
+          // 7/19 fix v2: LinearGradient 全量清除
+          color: GlassStyle.sceneBackgroundOverlay(),
         ),
         child: SafeArea(
           child: ListView(
@@ -117,11 +118,8 @@ class _AbilityCard extends StatelessWidget {
                 width: 48,
                 height: 48,
                 decoration: BoxDecoration(
-                  gradient: LinearGradient(
-                    colors: [color, color.withOpacity(0.7)],
-                    begin: Alignment.topLeft,
-                    end: Alignment.bottomRight,
-                  ),
+                  // 7/19 fix v2: LinearGradient 全量清除
+                  color: color,
                   borderRadius: BorderRadius.circular(14),
                 ),
                 child: Icon(icon, color: Colors.white, size: 24),

@@ -28,11 +28,8 @@ class AiFloatingFab extends StatelessWidget {
           width: size,
           height: size,
           decoration: BoxDecoration(
-            gradient: const LinearGradient(
-              colors: [Color(0xFF7C5CFC), Color(0xFFA48BFF)],
-              begin: Alignment.topLeft,
-              end: Alignment.bottomRight,
-            ),
+            // 7/19 fix v2: LinearGradient 全量清除
+            color: const Color(0xFF7C5CFC),
             shape: BoxShape.circle,
             boxShadow: [
               BoxShadow(
@@ -58,14 +55,8 @@ class AiFloatingFab extends StatelessWidget {
                 child: Container(
                   height: size * 0.25,
                   decoration: BoxDecoration(
-                    gradient: LinearGradient(
-                      begin: Alignment.topCenter,
-                      end: Alignment.bottomCenter,
-                      colors: [
-                        Colors.white.withOpacity(0.4),
-                        Colors.white.withOpacity(0.0),
-                      ],
-                    ),
+                    // 7/19 fix v2: 顶高光弧 LinearGradient 全量清除
+                    color: Colors.white.withOpacity(0.25),
                     borderRadius: BorderRadius.circular(size / 2),
                   ),
                 ),

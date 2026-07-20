@@ -1316,11 +1316,8 @@ class _DailyEncouragementBannerState extends State<_DailyEncouragementBanner> {
         margin: const EdgeInsets.fromLTRB(16, 8, 64, 8),
         padding: EdgeInsets.symmetric(horizontal: 14 * scale, vertical: 10 * scale),
         decoration: BoxDecoration(
-          gradient: const LinearGradient(
-            colors: [Color(0xFF7C5CFC), Color(0xFFA48BFF)],
-            begin: Alignment.topLeft,
-            end: Alignment.bottomRight,
-          ),
+          // 7/19 fix v2: LinearGradient 全量清除
+          color: const Color(0xFF7C5CFC),
           borderRadius: BorderRadius.circular(16),
           boxShadow: [
             BoxShadow(

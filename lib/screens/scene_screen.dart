@@ -155,7 +155,8 @@ class _SceneScreenState extends State<SceneScreen> {
       // 6/14 v5.4: 选场景页背景加白叠
       body: Container(
         decoration: BoxDecoration(
-          gradient: GlassStyle.sceneBackgroundOverlay(),
+          // 7/19 fix v2: LinearGradient 全量清除
+          color: GlassStyle.sceneBackgroundOverlay(),
         ),
         child: SafeArea(
         child: Padding(
@@ -184,7 +185,8 @@ class _SceneScreenState extends State<SceneScreen> {
                     if (widget.onNextQuote != null)
                       Positioned(
                         top: 32 * _scale,  // 22:56 banner 中央对齐 (banner 64 px 高, top=32 中部)
-                        right: 8,           // 老 main.dart 老样式 right=8 (跟 banner 边距 8 重合, banner margin-right 16)
+                        // 7/20 18:49: right=0 — banner margin-right=48 给 ↻ 让位, ↻ 贴在 banner 右边缘
+                        right: 0,
                         child: Material(
                           color: Colors.transparent,
                           child: InkWell(
@@ -486,7 +488,8 @@ class _TimeRecommendBanner extends StatelessWidget {
         padding: EdgeInsets.symmetric(horizontal: 14 * scale, vertical: 10 * scale),
         decoration: BoxDecoration(
           color: color.withOpacity(0.08),
-          borderRadius: BorderRadius.circular(12),
+          // 7/20 18:49: 圆角 12 → 20 (跟下面两卡统一)
+          borderRadius: BorderRadius.circular(20),
           border: Border.all(color: color.withOpacity(0.2)),
         ),
         child: Row(children: [
@@ -540,11 +543,8 @@ class _TodayPickCard extends StatelessWidget {
       child: Container(
         padding: EdgeInsets.symmetric(horizontal: 16 * scale, vertical: 14 * scale),
         decoration: BoxDecoration(
-          gradient: const LinearGradient(
-            colors: [Color(0xFF7C5CFC), Color(0xFFA48BFF)],
-            begin: Alignment.topLeft,
-            end: Alignment.bottomRight,
-          ),
+          // 7/19 fix v2: LinearGradient 全量清除
+          color: const Color(0xFF7C5CFC),
           borderRadius: BorderRadius.circular(20),
           boxShadow: [
             BoxShadow(
@@ -766,16 +766,15 @@ class _DailyEncouragementBannerState extends State<DailyEncouragementBanner> {
       // 6/24 v13: 点 banner → 弹相关推荐 sheet
       onTap: widget.onTapDetail,
       child: Container(
-        // 9:53 Brien 反馈: 刷新按钮被 banner 压住 — 修法: right 多 48dp 给 AppBar actions 让位
-        margin: const EdgeInsets.fromLTRB(16, 8, 64, 8),
+        // 7/20 18:49 Brien "名言下面跟逛一逛/现在看什么不对齐"
+        // 修法: margin 改 (0, 8, 48, 8) — 左 0 让 body 20 接管 (跟下面两卡对齐), 右 48 给 ↻ 让位
+        margin: const EdgeInsets.fromLTRB(0, 8, 48, 8),
         padding: EdgeInsets.symmetric(horizontal: 14 * scale, vertical: 10 * scale),
         decoration: BoxDecoration(
-          gradient: const LinearGradient(
-            colors: [Color(0xFF7C5CFC), Color(0xFFA48BFF)],
-            begin: Alignment.topLeft,
-            end: Alignment.bottomRight,
-          ),
-          borderRadius: BorderRadius.circular(16),
+          // 7/19 fix v2: LinearGradient 全量清除
+          color: const Color(0xFF7C5CFC),
+          // 7/20 18:49: 圆角 16 → 20 (跟下面两卡统一)
+          borderRadius: BorderRadius.circular(20),
           boxShadow: [
             BoxShadow(
               color: const Color(0xFF7C5CFC).withOpacity(0.25),

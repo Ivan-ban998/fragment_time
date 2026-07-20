@@ -14,6 +14,10 @@ class AppTheme {
   static ThemeData get lightTheme => light();
   static ThemeData light() => ThemeData(
         useMaterial3: true,
+        // 7/20 13:23 Brien 反馈 "点'听'卡, 没内容加载" → 真凶: Flutter web 默认走 fonts.gstatic.com 拉 Noto Sans SC fallback, 网络连不上
+        // 修法: 硬编码 fontFamily='sans-serif' (web 内置), 不走 gstatic.com
+        // 见 SOUL #80 (草案, 待加)
+        fontFamily: 'sans-serif',
         colorScheme: ColorScheme.fromSeed(
           seedColor: primary,
           brightness: Brightness.light,
@@ -27,6 +31,9 @@ class AppTheme {
   // 6/8 实际 puppeteer 测试反馈
   static ThemeData dark() => ThemeData(
         useMaterial3: true,
+        // 7/20 13:23 Brien 反馈 "点'听'卡, 没内容加载" → 真凶: Flutter web 默认走 fonts.gstatic.com 拉 Noto Sans SC fallback, 网络连不上
+        // 修法: 硬编码 fontFamily='sans-serif' (web 内置), 不走 gstatic.com
+        fontFamily: 'sans-serif',
         colorScheme: ColorScheme.fromSeed(
           seedColor: primary,
           brightness: Brightness.dark,

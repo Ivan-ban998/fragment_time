@@ -491,11 +491,8 @@ class _ContentScreenState extends State<ContentScreen> {
         child: Container(
           padding: EdgeInsets.all(24 * _scale),
           decoration: BoxDecoration(
-            gradient: const LinearGradient(
-              colors: [Color(0xFF7C5CFC), Color(0xFFA48BFF)],
-              begin: Alignment.topLeft,
-              end: Alignment.bottomRight,
-            ),
+            // 7/19 fix v2: LinearGradient 全量清除 (shader pipeline null 真凶)
+            color: const Color(0xFF7C5CFC),
             borderRadius: BorderRadius.circular(20),
           ),
           child: Column(
@@ -607,8 +604,8 @@ class _ContentScreenState extends State<ContentScreen> {
       ),
       body: Container(
         decoration: BoxDecoration(
-          gradient: _sceneBgColor() == null ? _sceneBgGradient : null,
-          color: _sceneBgColor(),
+          // 7/19 fix v2: LinearGradient 全量清除 (shader pipeline null)
+          color: _sceneBgColor() ?? _sceneFallbackColor(),
         ),
         child: SafeArea(
           child: Padding(
@@ -1618,11 +1615,8 @@ class _ContentScreenState extends State<ContentScreen> {
         child: Container(
           padding: EdgeInsets.all(24 * _scale),
           decoration: BoxDecoration(
-            gradient: const LinearGradient(
-              colors: [Color(0xFF7C5CFC), Color(0xFFA48BFF)],
-              begin: Alignment.topLeft,
-              end: Alignment.bottomRight,
-            ),
+            // 7/19 fix v2: 同上, LinearGradient 全量清除
+            color: const Color(0xFF7C5CFC),
             borderRadius: BorderRadius.circular(20),
           ),
           child: Column(
@@ -1702,48 +1696,17 @@ class _ContentScreenState extends State<ContentScreen> {
     return null;
   }
 
-  LinearGradient get _sceneBgGradient {
+  // 7/19 fix v2: LinearGradient 全量清除, 返回兑底单色
+  Color _sceneFallbackColor() {
     final isWarm = EyeProtectionScope.of(context);
     final isDark = Theme.of(context).brightness == Brightness.dark;
-    if (isWarm) {
-      return const LinearGradient(
-        begin: Alignment.topLeft,
-        end: Alignment.bottomRight,
-        colors: [Color(0xFFFFE8C8), Color(0xFFFFD9A0)],
-      );
-    }
-    if (isDark) {
-      return LinearGradient(
-        begin: Alignment.topLeft,
-        end: Alignment.bottomRight,
-        colors: [const Color(0xFF1A1A2E), const Color(0xFF16213E)],
-      );
-    }
+    if (isWarm) return const Color(0xFFFFE8C8);
+    if (isDark) return const Color(0xFF1A1A2E);
     switch (widget.scene) {
-      case Scene.learn:
-        return const LinearGradient(
-          colors: [Color(0xFFE0E7FF), Color(0xFFEEF2FF)],
-          begin: Alignment.topLeft,
-          end: Alignment.bottomRight,
-        );
-      case Scene.listen:
-        return const LinearGradient(
-          colors: [Color(0xFFE0F2FE), Color(0xFFF0F9FF)],
-          begin: Alignment.topLeft,
-          end: Alignment.bottomRight,
-        );
-      case Scene.relax:
-        return const LinearGradient(
-          colors: [Color(0xFFFCE7F3), Color(0xFFFDF2F8)],
-          begin: Alignment.topLeft,
-          end: Alignment.bottomRight,
-        );
-      case Scene.workout:
-        return const LinearGradient(
-          colors: [Color(0xFFD1FAE5), Color(0xFFECFDF5)],
-          begin: Alignment.topLeft,
-          end: Alignment.bottomRight,
-        );
+      case Scene.learn:   return const Color(0xFFEEF2FF);
+      case Scene.listen:  return const Color(0xFFF0F9FF);
+      case Scene.relax:   return const Color(0xFFFDF2F8);
+      case Scene.workout: return const Color(0xFFECFDF5);
     }
   }
 }

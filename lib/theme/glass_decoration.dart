@@ -39,22 +39,17 @@ class GlassStyle {
   };
 
   // 6/13 顺序：护眼 > 暗色 > 白天
-  static LinearGradient sceneBackground(String scene, {bool dark = false, bool warm = false}) {
-    if (warm) {
-      final colors = sceneGradientsWarm[scene] ?? sceneGradientsWarm['learn']!;
-      return LinearGradient(
-        colors: colors,
-        begin: Alignment.topLeft,
-        end: Alignment.bottomRight,
-      );
+  // 7/19 fix v2: LinearGradient 全量清除 — 改返兑底主色 (sceneBackground 无 caller, 保留接口返兑底单色)
+  static Color sceneBackground(String scene, {bool dark = false, bool warm = false}) {
+    if (warm) return const Color(0xFFFFE8C5);
+    if (dark) return const Color(0xFF1A1A2E);
+    switch (scene) {
+      case 'learn':   return const Color(0xFFEEF2FF);
+      case 'listen':  return const Color(0xFFF0F9FF);
+      case 'relax':   return const Color(0xFFFDF2F8);
+      case 'workout': return const Color(0xFFECFDF5);
+      default:        return const Color(0xFFEEF2FF);
     }
-    final map = dark ? sceneGradientsDark : sceneGradients;
-    final colors = map[scene] ?? map['learn']!;
-    return LinearGradient(
-      colors: colors,
-      begin: Alignment.topLeft,
-      end: Alignment.bottomRight,
-    );
   }
 
   // ========== 玻璃面板 ==========
@@ -108,15 +103,7 @@ class GlassStyle {
         color: Colors.white.withOpacity(0.55),
         width: 1.5,
       ),
-      gradient: LinearGradient(
-        // 6/14 玻璃高光：顶部稍亮 → 底部稍暗
-        begin: Alignment.topCenter,
-        end: Alignment.bottomCenter,
-        colors: [
-          Colors.white.withOpacity(opacity + 0.1),
-          Colors.white.withOpacity(opacity - 0.05),
-        ],
-      ),
+      // 7/19 fix v2: LinearGradient 全量清除 (shader null 真凶)
       boxShadow: [
         BoxShadow(
           color: Colors.black.withOpacity(0.1),
@@ -242,14 +229,8 @@ class GlassStyle {
   static BoxDecoration glassLiquidHighlight({double radius = 20, Color? base}) {
     final c = base ?? accent;
     return BoxDecoration(
-      gradient: LinearGradient(
-        begin: Alignment.topLeft,
-        end: Alignment.bottomRight,
-        colors: [
-          c.withOpacity(0.85),
-          c.withOpacity(0.65),
-        ],
-      ),
+      // 7/19 fix v2: LinearGradient 全量清除
+      color: c.withOpacity(0.75),
       borderRadius: BorderRadius.circular(radius),
       border: Border.all(
         color: Colors.white.withOpacity(0.4),
@@ -280,14 +261,8 @@ class GlassStyle {
     double opacity = 0.5,
   }) {
     return BoxDecoration(
-      gradient: LinearGradient(
-        begin: Alignment.topCenter,
-        end: Alignment.bottomCenter,
-        colors: [
-          Colors.white.withOpacity(opacity + 0.15),
-          Colors.white.withOpacity(opacity - 0.05),
-        ],
-      ),
+      // 7/19 fix v2: LinearGradient 全量清除
+      color: Colors.white.withOpacity(opacity + 0.05),
       borderRadius: BorderRadius.circular(radius),
       border: Border.all(
         color: borderColor ?? Colors.white.withOpacity(0.5),
@@ -311,30 +286,14 @@ class GlassStyle {
   }
 
   // 顶部弧形高光（贴 Liquid 玻璃上沿）
-  static LinearGradient liquidTopHighlight({double opacity = 0.5}) {
-    return LinearGradient(
-      begin: Alignment.topCenter,
-      end: Alignment.bottomCenter,
-      colors: [
-        Colors.white.withOpacity(opacity),
-        Colors.white.withOpacity(0),
-      ],
-      stops: const [0, liquidHighlightTopHeight],
-    );
+  // 7/19 fix v2: LinearGradient 全量清除, 改返兑底半透明色
+  static Color liquidTopHighlight({double opacity = 0.5}) {
+    return Colors.white.withOpacity(opacity * 0.6);
   }
 
-  // 6/15 场景背景柔化:叠 18% 白渐变（6/14 是 70% 太厚,闷死）
-  // 玻璃卡本身就是 0.3 透(下面 glassCard 默认值),所以背景透出 82% 即可
-  // 6/12 老人宪法: scene 渐变的方向/色相不动
-  static LinearGradient sceneBackgroundOverlay({double opacity = 0.18}) {
-    return LinearGradient(
-      begin: Alignment.topCenter,
-      end: Alignment.bottomCenter,
-      colors: [
-        Colors.white.withOpacity(opacity),
-        Colors.white.withOpacity(opacity * 0.5),
-      ],
-    );
+  // 6/15 场景背景柔化 (LinearGradient 全量清除 → 改兑底半透明色)
+  static Color sceneBackgroundOverlay({double opacity = 0.18}) {
+    return Colors.white.withOpacity(opacity);
   }
 
   // 6/14 v5: 亮背景下玻璃卡 (暗边框 + 深阴影, 玻璃感靠轮廓不是白度)

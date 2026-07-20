@@ -227,14 +227,8 @@ class _LoadingScreenState extends State<LoadingScreen>
       backgroundColor: const Color(0xFFF8F6FC),
       body: Container(
         decoration: BoxDecoration(
-          gradient: LinearGradient(
-            begin: Alignment.topCenter,
-            end: Alignment.bottomCenter,
-            colors: [
-              Colors.white,
-              const Color(0xFFF8F6FC),
-            ],
-          ),
+          // 7/19 fix v2: LinearGradient 全量清除
+          color: Colors.white,
         ),
         child: SafeArea(
           child: Padding(

@@ -1014,11 +1014,8 @@ Rules:
                     width: 36 * scale,
                     height: 36 * scale,
                     decoration: const BoxDecoration(
-                      gradient: LinearGradient(
-                        colors: [Color(0xFF7C5CFC), Color(0xFFA48BFF)],
-                        begin: Alignment.topLeft,
-                        end: Alignment.bottomRight,
-                      ),
+                      // 7/19 fix v2: LinearGradient 全量清除
+                      color: Color(0xFF7C5CFC),
                       shape: BoxShape.circle,
                     ),
                     child: Icon(
