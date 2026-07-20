@@ -106,7 +106,8 @@ class _UserTypeScreenState extends State<UserTypeScreen> {
     // 6/14 v5.4: 选角色页背景加白叠 (跟 content 一致, 不闷)
     return Container(
       decoration: BoxDecoration(
-        gradient: GlassStyle.sceneBackgroundOverlay(),
+        // 7/19 fix v2: LinearGradient 全量清除
+        color: GlassStyle.sceneBackgroundOverlay(),
       ),
       child: Scaffold(
         backgroundColor: Colors.transparent,
@@ -398,19 +399,10 @@ class _UserTypeCard extends StatelessWidget {
         child: Container(
           decoration: BoxDecoration(
             borderRadius: BorderRadius.circular(20),
-            gradient: LinearGradient(
-              colors: isSelected
-                  ? [
-                      AppTheme.primary.withOpacity(0.25),
-                      AppTheme.secondary.withOpacity(0.15),
-                    ]
-                  : [
-                      AppTheme.primary.withOpacity(0.1),
-                      AppTheme.secondary.withOpacity(0.05),
-                    ],
-              begin: Alignment.topLeft,
-              end: Alignment.bottomRight,
-            ),
+            // 7/19 fix v2: LinearGradient 全量清除 (shader null)
+            color: isSelected
+                ? AppTheme.primary.withOpacity(0.2)
+                : AppTheme.primary.withOpacity(0.08),
           ),
           child: Column(
             mainAxisAlignment: MainAxisAlignment.center,
@@ -492,11 +484,8 @@ class _TodayPickCard extends StatelessWidget {
       child: Container(
         padding: EdgeInsets.symmetric(horizontal: 16 * scale, vertical: 14 * scale),
         decoration: BoxDecoration(
-          gradient: const LinearGradient(
-            colors: [Color(0xFF7C5CFC), Color(0xFFA48BFF)],
-            begin: Alignment.topLeft,
-            end: Alignment.bottomRight,
-          ),
+          // 7/19 fix v2: LinearGradient 全量清除
+          color: const Color(0xFF7C5CFC),
           borderRadius: BorderRadius.circular(20),
           boxShadow: [
             BoxShadow(

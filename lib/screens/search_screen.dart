@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import '../models/models.dart';
 import '../theme/app_theme.dart';
+import '../theme/glass_decoration.dart';
 import '../services/content_aggregator.dart';
 import '../services/local_subscription_service.dart';
 import '../services/analytics_service.dart';
@@ -104,17 +105,23 @@ class _SearchScreenState extends State<SearchScreen> {
     final isEn = widget.languageCode == 'en';
 
     return Scaffold(
+      // 7/20 19:03 Brien "4 个 Tab 顶栏字体/位置/风格统一" → 搜索 Tab 加 AppBar, 跟其他 3 个一致
+      appBar: AppBar(
+        backgroundColor: GlassStyle.glassAppBarBg,
+        foregroundColor: GlassStyle.glassAppBarFg,
+        elevation: GlassStyle.glassAppBarElevation,
+        automaticallyImplyLeading: false,
+        title: Text(
+          isEn ? 'Search' : '搜索',
+          style: TextStyle(fontSize: 18 * scale),
+        ),
+      ),
       body: SafeArea(
         child: Padding(
           padding: EdgeInsets.all(16 * scale),
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              Text(
-                isEn ? 'Search' : '搜索',
-                style: TextStyle(fontSize: 24 * scale, fontWeight: FontWeight.bold),
-              ),
-              SizedBox(height: 4 * scale),
               Text(
                 isEn ? 'Find content across all sources' : '在所有内容源中搜索',
                 style: TextStyle(fontSize: 13 * scale, color: AppTheme.textLight),

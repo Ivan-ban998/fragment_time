@@ -61,13 +61,8 @@ class ShareService {
   void _drawCard(Canvas canvas, Size size, ContentItem item, bool isEn, String handle) {
     final w = size.width, h = size.height;
 
-    // 1. 背景：紫渐变（与主 app 一致）
-    final bg = Paint()
-      ..shader = const LinearGradient(
-        begin: Alignment.topLeft,
-        end: Alignment.bottomRight,
-        colors: [Color(0xFF6750A4), Color(0xFF8B5CF6)],
-      ).createShader(Rect.fromLTWH(0, 0, w, h));
+    // 1. 背景：紫兑底色 (7/19 fix v2: LinearGradient 全量清除)
+    final bg = Paint()..color = const Color(0xFF6750A4);
     canvas.drawRect(Rect.fromLTWH(0, 0, w, h), bg);
 
     // 2. 顶部留白

@@ -42,6 +42,9 @@ class _MySubscriptionsScreenState extends State<MySubscriptionsScreen>
   int _followingCategories = 0;
   String _handle = '@你'; // 6/25 昵称扩展: 顶部显示
   late TabController _tabController; // 6/25 A: 子 Tab 切换 (内容/名言/关注)
+  // 7/20 16:48 Brien 反馈 "收藏内容多了, 让用户搜搜" → 加搜索框, 跨 3 个子 Tab 共享
+  final TextEditingController _searchCtrl = TextEditingController();
+  String _searchQuery = '';
 
   // 6/24 v8: 公开方法, main.dart 切 tab 时调用
   void reload() {
@@ -52,6 +55,10 @@ class _MySubscriptionsScreenState extends State<MySubscriptionsScreen>
   void initState() {
     super.initState();
     _tabController = TabController(length: 3, vsync: this);
+    // 7/20 18:42 Brien "每个子 Tab 该有专属 hint" → 切 Tab 时 setState 重 build 换 hint
+    _tabController.addListener(() {
+      if (mounted) setState(() {});
+    });
     WidgetsBinding.instance.addObserver(this);
     _load();
   }
@@ -79,6 +86,7 @@ class _MySubscriptionsScreenState extends State<MySubscriptionsScreen>
   @override
   void dispose() {
     _tabController.dispose();
+    _searchCtrl.dispose();
     WidgetsBinding.instance.removeObserver(this);
     super.dispose();
   }
@@ -194,16 +202,80 @@ class _MySubscriptionsScreenState extends State<MySubscriptionsScreen>
           ],
         ),
       ),
-      body: TabBarView(
-          controller: _tabController,
-          children: [
-            // Tab 1: 内容收藏
-            _buildSavedTab(scale, isEn, contentOnly: true),
-            // Tab 2: 名言收藏
-            _buildSavedTab(scale, isEn, quotesOnly: true),
-            // Tab 3: 关注管理 (跳转)
-            _buildFollowingTab(scale, isEn),
-          ],
+      body: Column(
+        children: [
+          // 7/20 16:48 Brien 反馈 "收藏内容多了, 让用户搜搜" → 加搜索框 (跨 3 个子 Tab 共享)
+          _buildSearchBar(scale, isEn),
+          Expanded(
+            child: TabBarView(
+              controller: _tabController,
+              children: [
+                // Tab 1: 内容收藏
+                _buildSavedTab(scale, isEn, contentOnly: true),
+                // Tab 2: 名言收藏
+                _buildSavedTab(scale, isEn, quotesOnly: true),
+                // Tab 3: 关注管理 (跳转)
+                _buildFollowingTab(scale, isEn),
+              ],
+            ),
+          ),
+        ],
+      ),
+    ),
+  );
+  }
+
+  // 7/20 16:48 Brien 反馈 "收藏内容多了, 让用户搜搜" → 加搜索框
+  // 7/20 18:42 Brien "每个子 Tab 有专属 hint" → 根据 _tabController.index 切 hint
+  String _hintForCurrentTab(bool isEn) {
+    // _tabController.index: 0=内容 1=名言 2=关注
+    switch (_tabController.index) {
+      case 0:
+        return isEn ? 'Search saved articles...' : '搜收藏的内容...';
+      case 1:
+        return isEn ? 'Search saved quotes...' : '搜收藏的名言...';
+      case 2:
+        return isEn ? 'Search following platforms or categories...' : '搜关注的平台或类目...';
+      default:
+        return isEn ? 'Search...' : '搜索...';
+    }
+  }
+
+  Widget _buildSearchBar(double scale, bool isEn) {
+    final hint = _hintForCurrentTab(isEn);
+    return Container(
+      padding: EdgeInsets.fromLTRB(16 * scale, 8 * scale, 16 * scale, 8 * scale),
+      decoration: BoxDecoration(
+        color: Colors.white.withOpacity(0.85),
+        border: Border(bottom: BorderSide(color: AppTheme.textLight.withOpacity(0.15), width: 0.5)),
+      ),
+      child: TextField(
+        controller: _searchCtrl,
+        onChanged: (v) {
+          setState(() => _searchQuery = v.trim().toLowerCase());
+        },
+        style: TextStyle(fontSize: 14 * scale, color: AppTheme.textDark),
+        decoration: InputDecoration(
+          hintText: hint,
+          hintStyle: TextStyle(fontSize: 13 * scale, color: AppTheme.textLight),
+          prefixIcon: Icon(Icons.search, size: 18 * scale, color: AppTheme.textLight),
+          suffixIcon: _searchQuery.isNotEmpty
+              ? GestureDetector(
+                  onTap: () {
+                    _searchCtrl.clear();
+                    setState(() => _searchQuery = '');
+                  },
+                  child: Icon(Icons.close, size: 18 * scale, color: AppTheme.textLight),
+                )
+              : null,
+          isDense: true,
+          contentPadding: EdgeInsets.symmetric(horizontal: 12 * scale, vertical: 8 * scale),
+          filled: true,
+          fillColor: AppTheme.textLight.withOpacity(0.06),
+          border: OutlineInputBorder(
+            borderRadius: BorderRadius.circular(20),
+            borderSide: BorderSide.none,
+          ),
         ),
       ),
     );
@@ -211,6 +283,7 @@ class _MySubscriptionsScreenState extends State<MySubscriptionsScreen>
 
   // 6/25 A: 收藏 Tab (内容 / 名言)
   // 7/15: quotesOnly 走 _buildQuotesView (顶部大字 quote + time-grouped 列表)
+  // 7/20 16:48: _searchQuery 跨 3 个子 Tab 共享, 内容/名言子 Tab 过滤
   Widget _buildSavedTab(double scale, bool isEn, {bool contentOnly = false, bool quotesOnly = false}) {
     // 6/29 14:59 Brien 反馈: 收藏后 Tab 2 看不到新条目 — _items state 不重 load, 显示旧数据
     // 修: ListenableBuilder 每次 rebuild 都在 FutureBuilder 里重拉 service, 不依赖 _items
@@ -228,11 +301,17 @@ class _MySubscriptionsScreenState extends State<MySubscriptionsScreen>
           );
         }
         final items = snapshot.data!;
-        final filtered = contentOnly
-            ? items.where((it) => !it.id.startsWith('quote_')).toList()
-            : quotesOnly
-                ? items.where((it) => it.id.startsWith('quote_')).toList()
-                : items;
+        final filtered = items.where((it) {
+          // 7/20 加: 按子 Tab 分类型
+          if (contentOnly && it.id.startsWith('quote_')) return false;
+          if (quotesOnly && !it.id.startsWith('quote_')) return false;
+          // 7/20 加: 按 _searchQuery 搜 title + description + source
+          if (_searchQuery.isEmpty) return true;
+          final q = _searchQuery;
+          return it.title.toLowerCase().contains(q) ||
+              it.description.toLowerCase().contains(q) ||
+              it.source.toLowerCase().contains(q);
+        }).toList();
 
     if (_loading) {
       return ListView.builder(
@@ -245,6 +324,10 @@ class _MySubscriptionsScreenState extends State<MySubscriptionsScreen>
       );
     }
     if (filtered.isEmpty) {
+      // 7/20: 搜不到东西时显示不同的提示 (跟空收藏区别)
+      if (_searchQuery.isNotEmpty) {
+        return _buildNoSearchResult(scale, isEn);
+      }
       return _buildEmpty(context, scale, isEn, contentOnly: contentOnly, quotesOnly: quotesOnly);
     }
     // 7/15 16:44: quotesOnly 走新 Quote 专属布局 — 按 lastReadAt 倒序, 最新置顶
@@ -420,6 +503,7 @@ class _MySubscriptionsScreenState extends State<MySubscriptionsScreen>
   }
 
   // 6/25 A: 关注 Tab (显示完整关注列表 + 管理按钮)
+  // 7/20 18:39 Brien 反馈 "3 个 Tab 都能用搜索" → 加 _searchQuery 过滤 platform/category
   Widget _buildFollowingTab(double scale, bool isEn) {
     return FutureBuilder<List<dynamic>>(
       future: () async {
@@ -431,10 +515,21 @@ class _MySubscriptionsScreenState extends State<MySubscriptionsScreen>
             if (!snap.hasData) {
               return const Center(child: CircularProgressIndicator());
             }
-            final sources = (snap.data![0] as Set).cast<dynamic>().toList();
-            final categories = (snap.data![1] as Set).cast<String>().toList();
-            if (sources.isEmpty && categories.isEmpty) {
+            final rawSources = (snap.data![0] as Set).cast<dynamic>().toList();
+            final rawCategories = (snap.data![1] as Set).cast<String>().toList();
+            // 7/20 加: 按 _searchQuery 过滤 platform/category name (大小写不敏感)
+            final sources = _searchQuery.isEmpty
+                ? rawSources
+                : rawSources.where((s) => s.toString().toLowerCase().contains(_searchQuery)).toList();
+            final categories = _searchQuery.isEmpty
+                ? rawCategories
+                : rawCategories.where((c) => c.toLowerCase().contains(_searchQuery)).toList();
+            if (sources.isEmpty && categories.isEmpty && _searchQuery.isEmpty) {
               return _buildFollowingEmpty(context, scale, isEn);
+            }
+            // 7/20 加: 搜不到时显示 no search result
+            if (sources.isEmpty && categories.isEmpty) {
+              return _buildNoSearchResult(scale, isEn);
             }
             return ListView(
               padding: EdgeInsets.fromLTRB(16 * scale, 16 * scale, 16 * scale, 32 * scale),
@@ -512,11 +607,8 @@ class _MySubscriptionsScreenState extends State<MySubscriptionsScreen>
     final s = scale;
     return Container(
       decoration: BoxDecoration(
-        gradient: const LinearGradient(
-          colors: [Color(0xFF7C5CFC), Color(0xFFA48BFF)],
-          begin: Alignment.topLeft,
-          end: Alignment.bottomRight,
-        ),
+        // 7/19 fix v2: LinearGradient 全量清除
+        color: const Color(0xFF7C5CFC),
         borderRadius: BorderRadius.circular(24),
         boxShadow: [
           BoxShadow(
@@ -821,6 +913,27 @@ class _MySubscriptionsScreenState extends State<MySubscriptionsScreen>
 
   // 6/25 筛选 helper 删了 (用 TabBar 替代, 不需要计数)
 
+  // 7/20 16:48 Brien "收藏内容多了, 让用户搜搜" → 搜不到时提示
+  Widget _buildNoSearchResult(double scale, bool isEn) {
+    return Center(
+      child: Padding(
+        padding: EdgeInsets.all(32 * scale),
+        child: Column(
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: [
+            Icon(Icons.search_off, size: 48 * scale, color: AppTheme.textLight.withOpacity(0.5)),
+            SizedBox(height: 12 * scale),
+            Text(
+              isEn ? 'No matches for "${_searchQuery}"' : '没找到包含 "${_searchQuery}" 的收藏',
+              style: TextStyle(fontSize: 14 * scale, color: AppTheme.textLight),
+              textAlign: TextAlign.center,
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
   Widget _buildEmpty(BuildContext context, double scale, bool isEn, {bool contentOnly = false, bool quotesOnly = false}) {
     final msg = quotesOnly
         ? (isEn ? 'No quotes saved' : '还没有名言收藏')
@@ -1004,11 +1117,8 @@ class _QuoteHeroCard extends StatelessWidget {
         borderRadius: BorderRadius.circular(24),
         child: Container(
         decoration: BoxDecoration(
-          gradient: const LinearGradient(
-            colors: [Color(0xFF7C5CFC), Color(0xFFA48BFF)],
-            begin: Alignment.topLeft,
-            end: Alignment.bottomRight,
-          ),
+          // 7/19 fix v2: LinearGradient 全量清除
+          color: const Color(0xFF7C5CFC),
           borderRadius: BorderRadius.circular(24),
           boxShadow: [
             BoxShadow(
@@ -1309,11 +1419,8 @@ class _ContentHeroCard extends StatelessWidget {
         borderRadius: BorderRadius.circular(24),
         child: Container(
           decoration: BoxDecoration(
-            gradient: const LinearGradient(
-              colors: [Color(0xFF7C5CFC), Color(0xFFA48BFF)],
-              begin: Alignment.topLeft,
-              end: Alignment.bottomRight,
-            ),
+            // 7/19 fix v2: LinearGradient 全量清除
+            color: const Color(0xFF7C5CFC),
             borderRadius: BorderRadius.circular(24),
             boxShadow: [
               BoxShadow(

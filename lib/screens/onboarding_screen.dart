@@ -53,11 +53,8 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
       color: Colors.transparent,
       child: Container(
         decoration: const BoxDecoration(
-          gradient: LinearGradient(
-            begin: Alignment.topLeft,
-            end: Alignment.bottomRight,
-            colors: [Color(0xFFFCE7F3), Color(0xFFE0E7FF)], // 玻璃下幕: 薄粉→淑紫
-          ),
+          // 7/19 fix v2: LinearGradient 全量清除
+          color: Color(0xFFFCE7F3),
         ),
         child: Stack(
           children: [
@@ -66,7 +63,8 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
               child: IgnorePointer(
                 child: Container(
                   decoration: BoxDecoration(
-                    gradient: GlassStyle.sceneBackgroundOverlay(opacity: 0.3),
+                    // 7/19 fix v2: LinearGradient 全量清除
+                    color: GlassStyle.sceneBackgroundOverlay(opacity: 0.3),
                   ),
                 ),
               ),
@@ -119,10 +117,8 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
                                 width: sel ? 22 : 8,
                                 height: 8,
                                 decoration: BoxDecoration(
-                                  gradient: sel
-                                      ? LinearGradient(colors: [GlassStyle.accent, GlassStyle.accent.withOpacity(0.6)])
-                                      : null,
-                                  color: sel ? null : Colors.white.withOpacity(0.5),
+                                  // 7/19 fix v2: LinearGradient 全量清除
+                                  color: sel ? GlassStyle.accent : Colors.white.withOpacity(0.5),
                                   borderRadius: BorderRadius.circular(4),
                                 ),
                               );
@@ -144,11 +140,8 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
                           filter: ImageFilter.blur(sigmaX: 25, sigmaY: 25),
                           child: Container(
                             decoration: BoxDecoration(
-                              gradient: LinearGradient(
-                                begin: Alignment.topLeft,
-                                end: Alignment.bottomRight,
-                                colors: [GlassStyle.accent, GlassStyle.accent.withOpacity(0.7)],
-                              ),
+                              // 7/19 fix v2: LinearGradient 全量清除 (shader null 真凶)
+                              color: GlassStyle.accent.withOpacity(0.85),
                               borderRadius: BorderRadius.circular(20),
                               border: Border.all(color: Colors.white.withOpacity(0.4), width: 1.2),
                               boxShadow: [
@@ -268,14 +261,8 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
                           child: Container(
                             height: 45,
                             decoration: BoxDecoration(
-                              gradient: LinearGradient(
-                                begin: Alignment.topCenter,
-                                end: Alignment.bottomCenter,
-                                colors: [
-                                  Colors.white.withOpacity(0.4),
-                                  Colors.white.withOpacity(0),
-                                ],
-                              ),
+                              // 7/19 fix v2: LinearGradient 全量清除
+                              color: Colors.white.withOpacity(0.2),
                             ),
                           ),
                         ),

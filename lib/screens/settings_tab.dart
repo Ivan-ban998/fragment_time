@@ -284,7 +284,8 @@ class SettingsTab extends StatelessWidget {
             toolbarHeight: 56 * scale,
             title: Text(
               isEn ? 'Settings' : '设置',
-              style: TextStyle(fontSize: 24 * scale, fontWeight: FontWeight.bold),
+              // 7/20 19:03 Brien "4 个 Tab 顶栏字体/位置/风格统一" → 字号 24→18, 字重 bold→默认 (跟首页/收藏一致)
+              style: TextStyle(fontSize: 18 * scale),
             ),
             automaticallyImplyLeading: false,
           ),
@@ -781,11 +782,8 @@ class _WeeklyRecapCard extends StatelessWidget {
         return Container(
           padding: EdgeInsets.all(16 * scale),
           decoration: BoxDecoration(
-            gradient: LinearGradient(
-              colors: [AppTheme.primary.withOpacity(0.08), Colors.transparent],
-              begin: Alignment.topLeft,
-              end: Alignment.bottomRight,
-            ),
+            // 7/19 fix v2: LinearGradient 全量清除
+            color: AppTheme.primary.withOpacity(0.05),
             borderRadius: BorderRadius.circular(16),
             border: Border.all(color: AppTheme.primary.withOpacity(0.2)),
           ),
