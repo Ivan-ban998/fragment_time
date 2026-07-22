@@ -39,6 +39,22 @@ else
   echo "  WARNING: service-worker.js copy failed"
 fi
 
+# 2.6) 复制本地字体 web/fonts/ -> build/web/fonts/ (7/22 fontFallback 本地化)
+# 真凶: Flutter web 引擎 hardcoded fontFallbackBaseUrl='https://fonts.gstatic.com/s/' (engine/configuration.dart:333)
+# NAS 国内网络 fonts.gstatic.com 拉不到 (Connection reset, 10s timeout) → Roboto + NotoSansSC 全炸 → widget tree 阻塞 → 白屏
+# 修法: web/index.html 加 <script>window.flutterConfiguration = { fontFallbackBaseUrl: '/fonts/' }</script>
+#       本地 web/fonts/roboto/v20/KFOmCnqEu92Fr1Me5WZLCzYlKw.ttf (168KB Roboto)
+#       本地 web/fonts/notosanssc/v36/k3k...HE.ttf (17.7MB NotoSansSC VF 全字符)
+# Flutter 引擎期望路径: ${fontFallbackBaseUrl}roboto/v20/KFOmCnqEu92Fr1Me5WZLCzYlKw.ttf
+#                          ${fontFallbackBaseUrl}notosanssc/v36/k3k...HE.ttf
+if [ -d "$PROJECT_DIR/web/fonts" ]; then
+  rm -rf "$PROJECT_DIR/build/web/fonts"
+  cp -r "$PROJECT_DIR/web/fonts" "$PROJECT_DIR/build/web/fonts"
+  echo "  web/fonts/ copied to build/web/fonts/ ($(du -sh "$PROJECT_DIR/build/web/fonts" | cut -f1))"
+else
+  echo "  WARNING: web/fonts/ not found, Flutter will fetch fonts from gstatic (可能炸)"
+fi
+
 # 3) patch service worker (HTTP-only context: SW registration fails)
 python3 - <<'PYEOF'
 import re

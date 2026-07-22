@@ -45,6 +45,14 @@
   </script>
 </head>
 <body>
+  <!-- 7/22 14:26 Brien 反馈 console GET fonts.gstatic.com Roboto net::ERR_CONNECTION_RESET -->
+  <!-- 真凶: Flutter web 引擎 hardcoded fontFallbackBaseUrl='https://fonts.gstatic.com/s/' -->
+  <!-- 修法: 设 window.flutterConfiguration.fontFallbackBaseUrl='/fonts/' 让 Flutter 走本地 /fonts/Roboto/ 路径 -->
+  <script>
+    window.flutterConfiguration = {
+      fontFallbackBaseUrl: '/fonts/',
+    };
+  </script>
   <script src="flutter_bootstrap.js" async></script>
 </body>
 </html>
