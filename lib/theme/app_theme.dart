@@ -14,10 +14,13 @@ class AppTheme {
   static ThemeData get lightTheme => light();
   static ThemeData light() => ThemeData(
         useMaterial3: true,
-        // 7/20 13:23 Brien 反馈 "点'听'卡, 没内容加载" → 真凶: Flutter web 默认走 fonts.gstatic.com 拉 Noto Sans SC fallback, 网络连不上
-        // 修法: 硬编码 fontFamily='sans-serif' (web 内置), 不走 gstatic.com
-        // 见 SOUL #80 (草案, 待加)
-        fontFamily: 'sans-serif',
+        // 7/22 18:22 Brien 反馈 "字体太细" → NotoSansSC VF (17.7MB) 被 CanvasKit 解析后走 wght=100 默认
+        // 真修: 不下 VF, fontFamilyFallback 让 Flutter 引擎接 Roboto (本地) + 浏览器系统字体 (PingFang/Microsoft YaHei) 渲染中文
+        fontFamily: 'Roboto',
+        fontFamilyFallback: const [
+          'PingFang SC', 'Microsoft YaHei', 'Hiragino Sans GB', 'Source Han Sans SC',
+          '-apple-system', 'BlinkMacSystemFont', 'Helvetica Neue', 'sans-serif',
+        ],
         colorScheme: ColorScheme.fromSeed(
           seedColor: primary,
           brightness: Brightness.light,
@@ -31,9 +34,12 @@ class AppTheme {
   // 6/8 实际 puppeteer 测试反馈
   static ThemeData dark() => ThemeData(
         useMaterial3: true,
-        // 7/20 13:23 Brien 反馈 "点'听'卡, 没内容加载" → 真凶: Flutter web 默认走 fonts.gstatic.com 拉 Noto Sans SC fallback, 网络连不上
-        // 修法: 硬编码 fontFamily='sans-serif' (web 内置), 不走 gstatic.com
-        fontFamily: 'sans-serif',
+        // 7/22 18:22 Brien 反馈 "字体太细" → fontFamilyFallback 让中文走系统字体
+        fontFamily: 'Roboto',
+        fontFamilyFallback: const [
+          'PingFang SC', 'Microsoft YaHei', 'Hiragino Sans GB', 'Source Han Sans SC',
+          '-apple-system', 'BlinkMacSystemFont', 'Helvetica Neue', 'sans-serif',
+        ],
         colorScheme: ColorScheme.fromSeed(
           seedColor: primary,
           brightness: Brightness.dark,
