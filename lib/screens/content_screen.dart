@@ -212,19 +212,33 @@ class _ContentScreenState extends State<ContentScreen> {
   }
 
   // 6/26 Brien 00:22 '要真实数据': 从 NewsService 24 桶加载第 1 条作为 aiContentItem
+  String _loadFromBucketErr = '';
   Future<void> _loadFromBucket() async {
     try {
       final items = await NewsService().getRecommendations(widget.userType, widget.scene);
-      if (!mounted || items.isEmpty) return;
+      if (!mounted) return;
+      if (items.isEmpty) {
+        setState(() {
+          _loadFromBucketErr = '桶数据为空: ${widget.userType.bucketKey}_${widget.scene.bucketKey}';
+          _loading = false;
+        });
+        return;
+      }
       final first = items.first;
       setState(() {
         _aiContentItem = first;
         _buf = '${first.title}\n\n${first.description ?? "".trim()}';
         _llmGotFirstChunk = true;
         _loading = false;
+        _loadFromBucketErr = '';
       });
     } catch (e) {
-      debugPrint('_loadFromBucket error: $e');
+      if (mounted) {
+        setState(() {
+          _loadFromBucketErr = '加载失败: $e';
+          _loading = false;
+        });
+      }
     }
   }
 
@@ -410,28 +424,16 @@ class _ContentScreenState extends State<ContentScreen> {
         }
       }
       if (candidates.isEmpty) return;
-      debugPrint('[bili-pre] ${candidates.length} video items to search');
       final futures = candidates.take(6).map((c) async {
         try {
-          debugPrint('[bili-pre] query: "${c.title}" (id=${c.id}, videoId=${c.videoId}, platform=${c.videoPlatform})');
           final vids = await BilibiliService.instance.searchVideos(c.title, limit: 1);
-          debugPrint('[bili-pre] got ${vids.length} results for "${c.title}"');
           if (vids.isNotEmpty && mounted) {
             setState(() => _biliCache[c.id] = vids.first);
-            debugPrint('[bili-pre] ${c.title} → ${vids.first.bvid} (${vids.first.play}播放)');
-          } else {
-            debugPrint('[bili-pre] ${c.title} → 无结果');
           }
-        } catch (e, st) {
-          debugPrint('[bili-pre] ${c.title} err: $e');
-          debugPrint('[bili-pre] stack: $st');
-        }
+        } catch (_) {}
       });
       await Future.wait(futures);
-    } catch (e, st) {
-      debugPrint('[bili-pre] outer err: $e');
-      debugPrint('[bili-pre] outer stack: $st');
-    }
+    } catch (_) {}
   }
 
   // 续读: 拉订阅里 progress 0-100 的
@@ -561,13 +563,19 @@ class _ContentScreenState extends State<ContentScreen> {
         backgroundColor: GlassStyle.glassAppBarBg,
         foregroundColor: GlassStyle.glassAppBarFg,
         elevation: GlassStyle.glassAppBarElevation,
-        title: Text(
-          title,
-          style: TextStyle(
-            fontSize: 16 * _scale,
-            fontWeight: FontWeight.w600,
-            color: AppTheme.primary,
-          ),
+        title: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.center,
+          children: [
+            Text(
+              title,
+              style: TextStyle(
+                fontSize: 16 * _scale,
+                fontWeight: FontWeight.w600,
+                color: AppTheme.primary,
+              ),
+            ),
+          ],
         ),
         leading: Material(
           color: Colors.white.withOpacity(0.6),
@@ -613,6 +621,16 @@ class _ContentScreenState extends State<ContentScreen> {
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
+                // 7/20 终极诊断: 必显示大红块, 看 body 渲没渲染
+                Container(
+                  width: double.infinity,
+                  padding: EdgeInsets.all(20 * _scale),
+                  color: Colors.red,
+                  child: Text(
+                    'BODY OK hasC=$_hasContent loading=$_loading chunk=$_llmGotFirstChunk bufLen=${_buf.length} title=${_aiContentItem?.title ?? "(null)"} err=$_loadFromBucketErr',
+                    style: TextStyle(color: Colors.white, fontSize: 11 * _scale),
+                  ),
+                ),
                 // 6/7 儿童安全: child userType 顶部绿色盾牌
                 if (widget.userType == UserType.child) _buildChildShield(),
                 // 6/9 TL;DR 精要 banner (拿上次同 userType+scene 总结)
@@ -1300,6 +1318,15 @@ class _ContentScreenState extends State<ContentScreen> {
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
+                // 7/20 诊断: 临时 banner 让你能看到 state
+                Container(
+                  padding: EdgeInsets.all(8 * _scale),
+                  color: Colors.yellow.withOpacity(0.3),
+                  child: Text(
+                    'DEBUG: hasContent=$_hasContent loading=$_loading chunk=$_llmGotFirstChunk bufLen=${_buf.length} err=$_loadFromBucketErr',
+                    style: TextStyle(fontSize: 10 * _scale),
+                  ),
+                ),
                 if (_loading && !_llmGotFirstChunk) _buildLoadingSkeleton(isDark: isDark, isWarm: isWarm),
                 if (_hasContent)
                   Text(
