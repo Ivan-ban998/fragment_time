@@ -242,6 +242,23 @@ _这是 FragmentTime 项目独立开发日志。每次代码改动、Brien 反�
 - SOUL #72-#80 草案
 - fragment_time_good 改 fragment_time (品牌改名)
 
+#### 19:03-19:06 4 Tab 顶栏统一 + 19:33 push ✅
+- 19:03 Brien "4 个 Tab 顶栏字体/位置/风格不一样, 调整下"
+- 调查: search 没 AppBar (用 Text widget), settings 24*scale bold, 其他 18*scale
+- 修:
+  - search_screen 加 AppBar (import GlassStyle 补上)
+  - settings_tab 字号 24→18, 字重 bold→默认
+  - 4 个 Tab 都 18*scale 默认字重
+- build 19:06, md5 90caa045
+- Brien 19:33 "好了, push"
+- 走 SOUL #52/#72/#74:
+  - ls-remote 远端 origin/dev = e28fce6 (本地 HEAD 一致)
+  - .gitignore 排除了 APK + build_outputs
+  - commit 1c2146f: 18 files changed, +577/-331, message 详述 4 项
+  - git push origin fix/linear-gradient-full-cleanup → exit 0, 26 objects 推完 27.21 KiB 5.44 MiB/s
+  - 远端是新分支 fix/linear-gradient-full-cleanup (不是 dev)
+  - ls-remote 验证 SHA 一致 1c2146f6f724896b94aab1c65208e1c44ea8df79 ✅
+
 ### 12:46-12:48 Brien 问要不要取消 _good 后缀
 - **背景**: 6/5 立项时老 fragment_time 有问题, 小O 重写后加 _good 后缀区分
   - 小O 记不起确切原因 (6/5 memory 被 truncate 过, 不可考)
