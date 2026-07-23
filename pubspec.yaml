@@ -24,3 +24,13 @@ dev_dependencies:
 
 flutter:
   uses-material-design: true
+  # 7/23 字体 ttf 移到 assets/ 根, Flutter pubspec asset: 拼 assets/ 前缀
+  # asset: Roboto-Regular.ttf → URL assets/Roboto-Regular.ttf (不再双前缀 404)
+  fonts:
+    - family: Roboto
+      fonts:
+        - asset: assets/fonts/Roboto-Regular.ttf
+        - asset: assets/fonts/Roboto-Medium.ttf
+          weight: 500
+        - asset: assets/fonts/Roboto-Bold.ttf
+          weight: 700

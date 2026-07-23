@@ -17,6 +17,8 @@ class AppTheme {
         // 7/22 18:22 Brien 反馈 "字体太细" → NotoSansSC VF (17.7MB) 被 CanvasKit 解析后走 wght=100 默认
         // 真修: 不下 VF, fontFamilyFallback 让 Flutter 引擎接 Roboto (本地) + 浏览器系统字体 (PingFang/Microsoft YaHei) 渲染中文
         fontFamily: 'Roboto',
+        // 7/22 21:30 NotoSansSC 在 fallback 链 → Flutter 引擎拼 /fonts/notosanssc/v36/<hash>.ttf 404
+        // 撤 NotoSansSC, 只留系统字体 (macOS PingFang / Windows YaHei / Linux sans-serif)
         fontFamilyFallback: const [
           'PingFang SC', 'Microsoft YaHei', 'Hiragino Sans GB', 'Source Han Sans SC',
           '-apple-system', 'BlinkMacSystemFont', 'Helvetica Neue', 'sans-serif',

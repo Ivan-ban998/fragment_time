@@ -621,16 +621,6 @@ class _ContentScreenState extends State<ContentScreen> {
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                // 7/20 终极诊断: 必显示大红块, 看 body 渲没渲染
-                Container(
-                  width: double.infinity,
-                  padding: EdgeInsets.all(20 * _scale),
-                  color: Colors.red,
-                  child: Text(
-                    'BODY OK hasC=$_hasContent loading=$_loading chunk=$_llmGotFirstChunk bufLen=${_buf.length} title=${_aiContentItem?.title ?? "(null)"} err=$_loadFromBucketErr',
-                    style: TextStyle(color: Colors.white, fontSize: 11 * _scale),
-                  ),
-                ),
                 // 6/7 儿童安全: child userType 顶部绿色盾牌
                 if (widget.userType == UserType.child) _buildChildShield(),
                 // 6/9 TL;DR 精要 banner (拿上次同 userType+scene 总结)
@@ -1318,15 +1308,6 @@ class _ContentScreenState extends State<ContentScreen> {
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                // 7/20 诊断: 临时 banner 让你能看到 state
-                Container(
-                  padding: EdgeInsets.all(8 * _scale),
-                  color: Colors.yellow.withOpacity(0.3),
-                  child: Text(
-                    'DEBUG: hasContent=$_hasContent loading=$_loading chunk=$_llmGotFirstChunk bufLen=${_buf.length} err=$_loadFromBucketErr',
-                    style: TextStyle(fontSize: 10 * _scale),
-                  ),
-                ),
                 if (_loading && !_llmGotFirstChunk) _buildLoadingSkeleton(isDark: isDark, isWarm: isWarm),
                 if (_hasContent)
                   Text(
