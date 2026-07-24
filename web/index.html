@@ -45,14 +45,10 @@
   </script>
 </head>
 <body>
-  <!-- 7/22 14:26 Brien 反馈 console GET fonts.gstatic.com Roboto net::ERR_CONNECTION_RESET -->
-  <!-- 真凶: Flutter web 引擎 hardcoded fontFallbackBaseUrl='https://fonts.gstatic.com/s/' -->
-  <!-- 修法: 设 window.flutterConfiguration.fontFallbackBaseUrl='/fonts/' 让 Flutter 走本地 /fonts/Roboto/ 路径 -->
-  <script>
-    window.flutterConfiguration = {
-      fontFallbackBaseUrl: '/fonts/',
-    };
-  </script>
+  <!-- 7/24 14:52 Brien 反馈 console: GET /fonts/notosanssc/v36/<hash>.ttf 404 + GET /fonts/notoemoji/v47/<hash>.ttf 404 -->
+  <!-- 真凶链: fontFallbackBaseUrl='/fonts/' 让 Flutter 引擎拼本地路径, 但引擎内部仍期望 notosanssc/v36/ + notoemoji/v47/ Google Fonts 子目录结构 -->
+  <!-- 真修: 删 fontFallbackBaseUrl, 让 Flutter 走默认 Google Fonts CDN (网络不通 → 引擎 fallback 不 fetch → 不报 404) -->
+  <!-- 中文走 Theme fontFamilyFallback 系统字体链 (PingFang / YaHei / Hiragino / Noto Sans CJK SC) -->
   <script src="flutter_bootstrap.js" async></script>
 </body>
 </html>
