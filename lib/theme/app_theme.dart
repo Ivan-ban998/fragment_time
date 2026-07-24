@@ -17,12 +17,15 @@ class AppTheme {
         // 7/22 18:22 Brien 反馈 "字体太细" → NotoSansSC VF (17.7MB) 被 CanvasKit 解析后走 wght=100 默认
         // 真修: 不下 VF, fontFamilyFallback 让 Flutter 引擎接 Roboto (本地) + 浏览器系统字体 (PingFang/Microsoft YaHei) 渲染中文
         fontFamily: 'Roboto',
-        // 7/23 22:45 听一声 8h bug 真凶: Windows YaHei 在 Flutter web fallback 链没绑, 中文 tofu
-        // 修: web/fonts/notosanssc/v36/<hash>.ttf 下真 Noto Sans SC (2.8MB, OpenType)
-        // Theme fallback chain 加 'Noto Sans SC' 首位, Flutter web 引擎 fetch 本地真字体 (200)
+        // 7/24 12:35 听一声 8h bug **真凶** (SOUL #97 升级):
+        //   web/fonts/notosanssc/v36/<hash>.ttf 是 **OpenType** (magic 'OTTO'), 引擎按 TTF parse fail.
+        //   fonts.gstatic.com / GitHub raw / jsdelivr 外部全不通 (国内网络层).
+        //   修法: 删 web/fonts/notosanssc + notoemoji 整个目录 (引擎不再 parse fail),
+        //   fallback 链直接走系统字体 (PingFang / YaHei / Hiragino / SimSun / Noto Sans CJK SC).
+        //   'Noto Sans SC' 字符串从 fallback 链首位移除 (未注册的 family 触发 parse fail 警告).
         fontFamilyFallback: const [
-          'Noto Sans SC', 'Noto Sans CJK SC',
-          'PingFang SC', 'Microsoft YaHei', 'Hiragino Sans GB', 'Source Han Sans SC',
+          'PingFang SC', 'Microsoft YaHei', 'Hiragino Sans GB',
+          'Noto Sans CJK SC', 'Microsoft JhengHei', 'SimSun',
           '-apple-system', 'BlinkMacSystemFont', 'Helvetica Neue', 'sans-serif',
         ],
         colorScheme: ColorScheme.fromSeed(

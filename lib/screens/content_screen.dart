@@ -1317,15 +1317,15 @@ class _ContentScreenState extends State<ContentScreen> {
                       fontSize: 15 * _scale,
                       height: 1.55,
                       // 7/23 22:45 听一声 8h bug 真凶链最终修复:
-                      // 1) web/fonts/notosanssc/v36/ 下真 Noto Sans SC 2.8MB (覆盖占位 12B)
-                      // 2) Theme fontFamilyFallback 加 'Noto Sans SC' 首位
-                      // 3) Hero widget 用 'Noto Sans SC' 主字体 (Roboto 是拉丁字体不支持 CJK)
-                      // 4) fallback 加系统字体兜底
-                      fontFamily: 'Noto Sans SC',
+                      // 7/24 12:35 听一声 8h bug **真凶** (SOUL #97 升级):
+                      //   web/fonts/notosanssc/v36/<hash>.ttf 是 **OpenType** (magic 'OTTO'), 引擎按 TTF parse fail.
+                      //   修法: 删 web/fonts/notosanssc + notoemoji (引擎不再 parse), fallback 链走系统字体.
+                      //   这里不写 fontFamily: 'Noto Sans SC' (会再次触发 parse fail), 让 Theme fontFamily 主字体走 Roboto + fallback 系统字体.
+                      fontFamily: 'Roboto',
                       fontFamilyFallback: const [
                         'PingFang SC', 'Microsoft YaHei', 'Hiragino Sans GB',
                         'Noto Sans CJK SC', 'Microsoft JhengHei', 'SimSun',
-                        '-apple-system', 'BlinkMacSystemFont', 'sans-serif',
+                        '-apple-system', 'BlinkMacSystemFont', 'Helvetica Neue', 'sans-serif',
                       ],
                       color: isWarm
                           ? GlassStyle.onGlassPrimaryWarm
