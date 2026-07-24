@@ -621,7 +621,17 @@ class _ContentScreenState extends State<ContentScreen> {
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                
+
+                // 7/24 23:00 Brien 听一声 16:27 '啥也没有' → DEBUG v4 (字体已修, 红字能显示)
+                Container(
+                  width: double.infinity,
+                  padding: EdgeInsets.all(4 * _scale),
+                  color: const Color(0x10FF0000),
+                  child: Text(
+                    'DEBUG v4: ut=${widget.userType.name} sc=${widget.scene.name} _loading=$_loading _llm1stChunk=$_llmGotFirstChunk _buf.len=${_buf.length} _aiItem=${_aiContentItem?.title ?? "(null)"} _err=${_loadFromBucketErr.isNotEmpty ? _loadFromBucketErr : "(none)"}',
+                    style: const TextStyle(color: Color(0xFFFF0000), fontSize: 8),
+                  ),
+                ),
                 // 6/7 儿童安全: child userType 顶部绿色盾牌
                 if (widget.userType == UserType.child) _buildChildShield(),
                 // 6/9 TL;DR 精要 banner (拿上次同 userType+scene 总结)
@@ -1297,7 +1307,10 @@ class _ContentScreenState extends State<ContentScreen> {
   // ============== Hero (AI 内容主体) ==============
 
   Widget _buildHero({required bool isDark, required bool isWarm}) {
-    return Expanded(
+    // 7/24 23:00 最小修: Expanded 在 body Column (没 wrap SCV) 下拿 0dp → 改 Flexible(fit: loose)
+    // Flexible 在 mainAxisSize.max 也合法 + 不强制拿满空间 = 听一声 hero 至少能拿到内容高度
+    return Flexible(
+      fit: FlexFit.loose,
       child: Container(
         margin: EdgeInsets.only(bottom: 12 * _scale),
         decoration: GlassStyle.glassFrosted(opacity: isWarm ? 0.4 : 0.55, radius: 20),
