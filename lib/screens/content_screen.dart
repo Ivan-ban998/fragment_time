@@ -621,6 +621,7 @@ class _ContentScreenState extends State<ContentScreen> {
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
+                
                 // 6/7 儿童安全: child userType 顶部绿色盾牌
                 if (widget.userType == UserType.child) _buildChildShield(),
                 // 6/9 TL;DR 精要 banner (拿上次同 userType+scene 总结)
@@ -1315,6 +1316,17 @@ class _ContentScreenState extends State<ContentScreen> {
                     style: TextStyle(
                       fontSize: 15 * _scale,
                       height: 1.55,
+                      // 7/23 22:45 听一声 8h bug 真凶链最终修复:
+                      // 1) web/fonts/notosanssc/v36/ 下真 Noto Sans SC 2.8MB (覆盖占位 12B)
+                      // 2) Theme fontFamilyFallback 加 'Noto Sans SC' 首位
+                      // 3) Hero widget 用 'Noto Sans SC' 主字体 (Roboto 是拉丁字体不支持 CJK)
+                      // 4) fallback 加系统字体兜底
+                      fontFamily: 'Noto Sans SC',
+                      fontFamilyFallback: const [
+                        'PingFang SC', 'Microsoft YaHei', 'Hiragino Sans GB',
+                        'Noto Sans CJK SC', 'Microsoft JhengHei', 'SimSun',
+                        '-apple-system', 'BlinkMacSystemFont', 'sans-serif',
+                      ],
                       color: isWarm
                           ? GlassStyle.onGlassPrimaryWarm
                           : isDark
