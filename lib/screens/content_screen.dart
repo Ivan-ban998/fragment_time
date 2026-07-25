@@ -616,22 +616,14 @@ class _ContentScreenState extends State<ContentScreen> {
           color: _sceneBgColor() ?? _sceneFallbackColor(),
         ),
         child: SafeArea(
-          child: Padding(
+          child: SingleChildScrollView(
             padding: EdgeInsets.fromLTRB(16 * _scale, 8 * _scale, 16 * _scale, 8 * _scale),
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
+              mainAxisSize: MainAxisSize.min,
               children: [
 
-                // 7/24 23:00 Brien 听一声 16:27 '啥也没有' → DEBUG v4 (字体已修, 红字能显示)
-                Container(
-                  width: double.infinity,
-                  padding: EdgeInsets.all(4 * _scale),
-                  color: const Color(0x10FF0000),
-                  child: Text(
-                    'DEBUG v4: ut=${widget.userType.name} sc=${widget.scene.name} _loading=$_loading _llm1stChunk=$_llmGotFirstChunk _buf.len=${_buf.length} _aiItem=${_aiContentItem?.title ?? "(null)"} _err=${_loadFromBucketErr.isNotEmpty ? _loadFromBucketErr : "(none)"}',
-                    style: const TextStyle(color: Color(0xFFFF0000), fontSize: 8),
-                  ),
-                ),
+                // 7/25 14:05 DEBUG v4 清除 (真凶已锁 = 透明玻璃 + 浅文字色)
                 // 6/7 儿童安全: child userType 顶部绿色盾牌
                 if (widget.userType == UserType.child) _buildChildShield(),
                 // 6/9 TL;DR 精要 banner (拿上次同 userType+scene 总结)
@@ -1307,52 +1299,43 @@ class _ContentScreenState extends State<ContentScreen> {
   // ============== Hero (AI 内容主体) ==============
 
   Widget _buildHero({required bool isDark, required bool isWarm}) {
-    // 7/24 23:00 最小修: Expanded 在 body Column (没 wrap SCV) 下拿 0dp → 改 Flexible(fit: loose)
-    // Flexible 在 mainAxisSize.max 也合法 + 不强制拿满空间 = 听一声 hero 至少能拿到内容高度
-    return Flexible(
-      fit: FlexFit.loose,
-      child: Container(
-        margin: EdgeInsets.only(bottom: 12 * _scale),
-        decoration: GlassStyle.glassFrosted(opacity: isWarm ? 0.4 : 0.55, radius: 20),
-        child: ClipRRect(
-          borderRadius: BorderRadius.circular(20),
-          child: SingleChildScrollView(
-            controller: _bodyScroll,
-            padding: EdgeInsets.all(16 * _scale),
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                if (_loading && !_llmGotFirstChunk) _buildLoadingSkeleton(isDark: isDark, isWarm: isWarm),
-                if (_hasContent)
-                  Text(
-                    _buf,
-                    style: TextStyle(
-                      fontSize: 15 * _scale,
-                      height: 1.55,
-                      // 7/23 22:45 听一声 8h bug 真凶链最终修复:
-                      // 7/24 12:35 听一声 8h bug **真凶** (SOUL #97 升级):
-                      //   web/fonts/notosanssc/v36/<hash>.ttf 是 **OpenType** (magic 'OTTO'), 引擎按 TTF parse fail.
-                      //   修法: 删 web/fonts/notosanssc + notoemoji (引擎不再 parse), fallback 链走系统字体.
-                      //   这里不写 fontFamily: 'Noto Sans SC' (会再次触发 parse fail), 让 Theme fontFamily 主字体走 Roboto + fallback 系统字体.
-                      fontFamily: 'Roboto',
-                      fontFamilyFallback: const [
-                        'PingFang SC', 'Microsoft YaHei', 'Hiragino Sans GB',
-                        'Noto Sans CJK SC', 'Microsoft JhengHei', 'SimSun',
-                        '-apple-system', 'BlinkMacSystemFont', 'Helvetica Neue', 'sans-serif',
-                      ],
-                      color: isWarm
-                          ? GlassStyle.onGlassPrimaryWarm
-                          : isDark
-                              ? GlassStyle.onGlassPrimaryDark
-                              : GlassStyle.onGlassPrimary,
-                    ),
+    // 7/25 14:05 v10 真凶修: Scene.listen 背景 0xFFF0F9FF (浅蓝) + glassFrosted 0.45 白 = 透明看不上
+    // 修法: opacity 提到 0.92 + 文字色强制深色 (防止 onGlassPrimary 在浅背景也是浅)
+    return Container(
+      margin: EdgeInsets.only(bottom: 12 * _scale),
+      decoration: GlassStyle.glassFrosted(opacity: isWarm ? 0.92 : 0.95, radius: 20),
+      child: ClipRRect(
+        borderRadius: BorderRadius.circular(20),
+        child: Padding(
+          padding: EdgeInsets.all(16 * _scale),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              if (_loading && !_llmGotFirstChunk) _buildLoadingSkeleton(isDark: isDark, isWarm: isWarm),
+              if (_hasContent)
+                Text(
+                  _buf,
+                  style: TextStyle(
+                    fontSize: 15 * _scale,
+                    height: 1.55,
+                    fontFamily: 'Roboto',
+                    fontFamilyFallback: const [
+                      'PingFang SC', 'Microsoft YaHei', 'Hiragino Sans GB',
+                      'Noto Sans CJK SC', 'Microsoft JhengHei', 'SimSun',
+                      '-apple-system', 'BlinkMacSystemFont', 'Helvetica Neue', 'sans-serif',
+                    ],
+                    // 7/25 14:05 强制深色 (listen scene 背景浅, onGlassPrimary 也是浅)
+                    color: isWarm
+                        ? const Color(0xFF3D2A14)  // 深棕 (warm 背景)
+                        : const Color(0xFF1A1A2E),  // 深蓝黑 (其他背景)
                   ),
-                if (_showCompletionBanner && _progress >= 100) ...[
-                  SizedBox(height: 16 * _scale),
-                  _buildCompletionBanner(),
-                ],
+                ),
+              if (_showCompletionBanner && _progress >= 100) ...[
+                const SizedBox(height: 16),
+                _buildCompletionBanner(),
               ],
-            ),
+            ],
           ),
         ),
       ),
