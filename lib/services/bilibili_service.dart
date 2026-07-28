@@ -65,13 +65,11 @@ class BilibiliService {
       ).timeout(const Duration(seconds: 10));
 
       if (resp.statusCode != 200) {
-        debugPrint('[bili] search http ${resp.statusCode}: ${keyword}');
         return _fallback(keyword);
       }
 
       final data = jsonDecode(utf8.decode(resp.bodyBytes)) as Map<String, dynamic>;
       if (data['code'] != 0) {
-        debugPrint('[bili] search api err ${data['code']}: ${data['message']}');
         return _fallback(keyword);
       }
 
@@ -105,7 +103,6 @@ class BilibiliService {
 
       _cache[cacheKey] = videos;
       _cacheTime[cacheKey] = DateTime.now();
-      debugPrint('[bili] search "${keyword}" → ${videos.length} videos, top: ${videos.first.title} (${videos.first.play}播放)');
       return videos;
     } catch (e) {
       debugPrint('[bili] search exception: $e');
@@ -133,9 +130,8 @@ class BilibiliService {
         .replaceAll('&#39;', "'");
   }
 
-  /// API 失败兜底: 返回空 (让 UI 显示搜索页链接, 不卡住)
+  /// API 失败兑底: 返回空 (让 UI 显示搜索页链接, 不卡住)
   List<BilibiliVideoResult> _fallback(String keyword) {
-    debugPrint('[bili] fallback to empty for: $keyword');
     return [];
   }
 }
