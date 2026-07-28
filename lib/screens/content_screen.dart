@@ -634,7 +634,11 @@ class _ContentScreenState extends State<ContentScreen> {
                   _buildVideoIfNeeded(_aiContentItem!),
                   SizedBox(height: 8 * _scale),
                 ],
-                if (_aiContentItem != null && _aiContentItem!.contentType == ContentType.audio) ...[
+                // 7/28 12:16 Brien '为何其他三个可以' → 听一声真凶疑点:
+                //   4 场景唯一物理差别 = 听一声有 _buildAudioEntry (ContentType.audio)
+                //   其它 3 场景 (article/video/card) 走 _buildVideoIfNeeded / _buildQuizEntry
+                //   试: 听一声跳过 _buildAudioEntry, 不嵌 hero 上面那个专属 widget
+                if (_aiContentItem != null && _aiContentItem!.contentType == ContentType.audio && widget.scene != Scene.listen) ...[
                   _buildAudioEntry(_aiContentItem!),
                   SizedBox(height: 8 * _scale),
                 ],
