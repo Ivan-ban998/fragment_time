@@ -14,9 +14,11 @@ class AppTheme {
   static ThemeData get lightTheme => light();
   static ThemeData light() => ThemeData(
         useMaterial3: true,
-        // 7/22 18:22 Brien 反馈 "字体太细" → NotoSansSC VF (17.7MB) 被 CanvasKit 解析后走 wght=100 默认
-        // 真修: 不下 VF, fontFamilyFallback 让 Flutter 引擎接 Roboto (本地) + 浏览器系统字体 (PingFang/Microsoft YaHei) 渲染中文
-        fontFamily: 'Roboto',
+        // 7/28 Brien 10:32 "为何就听一听有问题?" → 真凶:
+        //   fontFamily: 'Roboto' (Latin 字体) 强制走 Roboto, 中文字符 tofu 不可见
+        //   学/放松/动一动 24 桶也有中文, 但你只盯着听一声看 = 觉得只听一声坏
+        //   真修: fontFamily=null (不强制), fontFamilyFallback 走系统字体
+        fontFamily: null,
         // 7/24 12:35 听一声 8h bug **真凶** (SOUL #97 升级):
         //   web/fonts/notosanssc/v36/<hash>.ttf 是 **OpenType** (magic 'OTTO'), 引擎按 TTF parse fail.
         //   fonts.gstatic.com / GitHub raw / jsdelivr 外部全不通 (国内网络层).
@@ -41,8 +43,8 @@ class AppTheme {
   // 6/8 实际 puppeteer 测试反馈
   static ThemeData dark() => ThemeData(
         useMaterial3: true,
-        // 7/22 18:22 Brien 反馈 "字体太细" → fontFamilyFallback 让中文走系统字体
-        fontFamily: 'Roboto',
+        // 7/28 跟 light() 同步: fontFamily=null 不强制 Latin 字体, 避免中文 tofu
+        fontFamily: null,
         fontFamilyFallback: const [
           'PingFang SC', 'Microsoft YaHei', 'Hiragino Sans GB', 'Source Han Sans SC',
           '-apple-system', 'BlinkMacSystemFont', 'Helvetica Neue', 'sans-serif',
