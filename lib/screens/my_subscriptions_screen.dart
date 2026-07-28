@@ -551,8 +551,8 @@ class _MySubscriptionsScreenState extends State<MySubscriptionsScreen>
                 if (sources.isNotEmpty) ...[
                   _FollowingSectionHeader(
                     label: isEn
-                        ? 'PLATFORMS (\${sources.length})'
-                        : '关注平台 (\${sources.length})',
+                        ? 'PLATFORMS'
+                        : '关注平台',
                     icon: Icons.subscriptions,
                     scale: scale,
                   ),
@@ -573,8 +573,8 @@ class _MySubscriptionsScreenState extends State<MySubscriptionsScreen>
                 if (categories.isNotEmpty) ...[
                   _FollowingSectionHeader(
                     label: isEn
-                        ? 'CATEGORIES (\${categories.length})'
-                        : '关注类目 (\${categories.length})',
+                        ? 'CATEGORIES'
+                        : '关注类目',
                     icon: Icons.category_outlined,
                     scale: scale,
                   ),
