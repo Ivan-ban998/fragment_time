@@ -1319,12 +1319,7 @@ class _ContentScreenState extends State<ContentScreen> {
                   style: TextStyle(
                     fontSize: 15 * _scale,
                     height: 1.55,
-                    // 7/28 10:47 Brien 10:32 "为何就听一听有问题?" 真凶 (经 8 天 11 次盲改定位):
-                    //   fontFamily: 'Roboto' 强约束 → Flutter 找到 Roboto (本地 ttf 有) → 不会触发 fontFamilyFallback
-                    //   中文字符 Roboto 没有 → tofu 不可见 → "白屏"
-                    //   4 场景都走这一行, Brien 只盯听一声验 = 觉得只听一声坏
-                    //   真修: fontFamily=null 不指定 family, 引擎走 fontFamilyFallback 链 (PingFang/YaHei 渲染中文)
-                    fontFamily: null,
+                    fontFamily: 'Roboto',
                     fontFamilyFallback: const [
                       'PingFang SC', 'Microsoft YaHei', 'Hiragino Sans GB',
                       'Noto Sans CJK SC', 'Microsoft JhengHei', 'SimSun',
