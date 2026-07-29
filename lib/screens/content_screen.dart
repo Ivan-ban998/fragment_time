@@ -287,6 +287,7 @@ class _ContentScreenState extends State<ContentScreen> {
   }
 
   // 加载推荐 6 条 (用 ContentAggregator 6 张看完换 6 张)
+  // 7/29 重构: 拉空就空, 不再 fallback NewsService.getRecommendations (那是假数据)
   Future<void> _loadRecommendations() async {
     if (_recLoading) return;
     setState(() => _recLoading = true);
@@ -302,20 +303,13 @@ class _ContentScreenState extends State<ContentScreen> {
         _recLoading = false;
       });
     } catch (e) {
-      // 7/1: ContentAggregator 失败 → fallback NewsService 24 桶 (避免 _recItems 永远空 → Tinder 卡不显示)
-      debugPrint('[recommend] ContentAggregator error: $e, fallback to NewsService 24 buckets');
-      try {
-        final fallback = await NewsService().getRecommendations(widget.userType, widget.scene);
-        if (!mounted) return;
-        setState(() {
-          _recItems = fallback;
-          _recLoading = false;
-        });
-      } catch (e2) {
-        debugPrint('[recommend] fallback NewsService also failed: $e2');
-        if (!mounted) return;
-        setState(() => _recLoading = false);
-      }
+      // 7/29: RSS 异常 → 返空 (不返假数据, 不欺骗访客)
+      debugPrint('[recommend] ContentAggregator error: $e — 返空状态');
+      if (!mounted) return;
+      setState(() {
+        _recItems = [];
+        _recLoading = false;
+      });
     }
   }
 
@@ -653,6 +647,9 @@ class _ContentScreenState extends State<ContentScreen> {
                   _buildActions(),
                   SizedBox(height: 8 * _scale),
                 ],
+                SizedBox(height: 8 * _scale),
+                // 7/29 加: 空状态 — RSS 拉空时不再返假数据, 显示 "今日暂无新内容"
+                if (_recItems.isEmpty && !_recLoading) _buildEmptyState(),
                 SizedBox(height: 8 * _scale),
                 if (_recItems.isNotEmpty) ...[
                   _buildRecommendationHeader(),
@@ -1301,6 +1298,44 @@ class _ContentScreenState extends State<ContentScreen> {
   }
 
   // ============== Hero (AI 内容主体) ==============
+
+  // 7/29 加: RSS 拉空时空状态. 访客看到"今日暂无新内容" + 下拉重试
+  Widget _buildEmptyState() {
+    final sourceLabel = widget.isInternational ? 'The Verge' : '36氪 / 少数派';
+    return Container(
+      margin: EdgeInsets.only(bottom: 8 * _scale),
+      padding: EdgeInsets.all(16 * _scale),
+      decoration: BoxDecoration(
+        color: AppTheme.primary.withOpacity(0.05),
+        borderRadius: BorderRadius.circular(12),
+        border: Border.all(color: AppTheme.primary.withOpacity(0.15)),
+      ),
+      child: Row(
+        children: [
+          Icon(Icons.refresh_outlined, size: 20 * _scale, color: AppTheme.primary),
+          SizedBox(width: 12 * _scale),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  isEn ? 'No new content today' : '今日暂无新内容',
+                  style: TextStyle(fontSize: 14 * _scale, fontWeight: FontWeight.w600, color: AppTheme.primary),
+                ),
+                SizedBox(height: 4 * _scale),
+                Text(
+                  isEn
+                      ? 'Live from $sourceLabel · pull to refresh'
+                      : '正在拉 $sourceLabel 的最新内容 · 下拉刷新',
+                  style: TextStyle(fontSize: 12 * _scale, color: AppTheme.hintColor(context)),
+                ),
+              ],
+            ),
+          ),
+        ],
+      ),
+    );
+  }
 
   Widget _buildHero({required bool isDark, required bool isWarm}) {
     // 7/25 14:05 v10 真凶修: Scene.listen 背景 0xFFF0F9FF (浅蓝) + glassFrosted 0.45 白 = 透明看不上

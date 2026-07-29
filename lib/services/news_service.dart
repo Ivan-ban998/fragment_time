@@ -1,5 +1,6 @@
 import 'package:flutter/foundation.dart';
 import '../models/models.dart';
+import 'rss_service.dart';
 
 class NewsService {
   /// 6/7 修复：按 userType × scene 分桶返回 24 种内容
@@ -18,11 +19,12 @@ class NewsService {
     await Future<void>.delayed(const Duration(milliseconds: 200));
     final userTypes = UserType.values;
     final scenes = Scene.values;
-    int hit = 0;
     for (final u in userTypes) {
       for (final s in scenes) {
         final key = '${u.bucketKey}_${s.bucketKey}';
-        if (_allContent.containsKey(key)) hit++;
+        if (_allContent.containsKey(key)) {
+          // 同步预热: 只需触达 Map, Dart 会在首次访问时初始化
+        }
       }
     }
   }
@@ -34,7 +36,7 @@ class NewsService {
     for (final list in _allContent.values) {
       for (final item in list) {
         if (item.title.toLowerCase().contains(q) ||
-            (item.description?.toLowerCase().contains(q) ?? false)) {
+            item.description.toLowerCase().contains(q)) {
           results.add(item);
         }
       }
@@ -64,8 +66,30 @@ class NewsService {
   // "页面无法访问" 撞爆. Brien 反馈前两周一直没用/没用对看到. 临时 ban RSS 路径,
   // 直接走 _allContent 老 24 桶假数据. rss_service.dart 留着, 改用 RSSHub/NewsAPI
   // 等更稳方案后再开.
+  //
+  // 7/29 修复: 真正接 RssService.fetchByBucket (有 fallback 源链: 36氪 → 少数派).
+  // 拉空返 [], 不再返 _allContent 假数据 (不撒谎 — 上线后访客应该看真内容).
+  // _allContent 保留仅供 dev/演示 (需显式 useFakeContent flag).
   Future<List<ContentItem>> fetchFromRss(UserType userType, Scene scene, {bool isInternational = false}) async {
-    final key = userType.bucketKey + '_' + scene.bucketKey;
+    // 7/29: 真接 RssService (多源 fallback: 36 氪 → 少数派 / The Verge)
+    final rss = RssService(isInternational: isInternational);
+    try {
+      final items = await rss.fetchByBucket(userType, scene);
+      if (items.isNotEmpty) return items;
+    } catch (e) {
+      debugPrint('[news] RSS fetchByBucket 失败 (online): $e');
+    }
+    // 拉空 / 失败: 返空数组 (不撒谎)
+    // 之前返 _allContent 是欺骗访客 — 那些 "https://www.zhihu.com/search?q=..." 是搜索词, 不是真文章
+    return [];
+  }
+
+  /// 7/29 加: 仅 dev/演示用. 生产环境 (content.soulvag.com) 永不返假数据.
+  /// 使用方式: `await news._fetchFakeForDev(userType, scene);` (下划线方法需 ignore)
+  /// 保留方法 — 沿用 #114 "dev 演示"路径. 编译器报警告是预期的 (private unused element).
+  // ignore: unused_element
+  Future<List<ContentItem>> _fetchFakeForDev(UserType userType, Scene scene) async {
+    final key = '${userType.bucketKey}_${scene.bucketKey}';
     return _allContent[key] ?? _fallback(userType, scene);
   }
 
@@ -144,7 +168,7 @@ class NewsService {
     'entrepreneur_learn': [
       ContentItem(id: 'entrepreneur_learn_1', title: '5 分钟读懂：精益创业 MVP', description: 'Eric Ries 经典方法', source: '36氪', sourceType: ContentSource.news36kr, contentType: ContentType.card, duration: '5min', externalUrl: 'https://36kr.com/search/articles/5%20%E5%88%86%E9%92%9F%E8%AF%BB%E6%87%82%EF%BC%9A%E7%B2%BE%E7%9B%8A%E5%88%9B%E4%B8%9A%20MVP', priceType: ContentPriceType.free),
       ContentItem(id: 'entrepreneur_learn_2', title: '商业案例：瑞幸怎么翻盘的', description: '深度分析', source: '36氪', sourceType: ContentSource.news36kr, contentType: ContentType.card, duration: '8min', externalUrl: 'https://36kr.com/search/articles/%E5%95%86%E4%B8%9A%E6%A1%88%E4%BE%8B%EF%BC%9A%E7%91%9E%E5%B9%B8%E6%80%8E%E4%B9%88%E7%BF%BB%E7%9B%98%E7%9A%84', priceType: ContentPriceType.free),
-      ContentItem(id: 'entrepreneur_learn_3', title: '融资谈判：3 个关键条款', description: 'Term Sheet 入门', source: '知乎', sourceType: ContentSource.zhihu, contentType: ContentType.article, duration: '10min', externalUrl: 'https://zhuanlan.zhihu.com/p/ent-3', priceType: ContentPriceType.membership, priceNote: '盐选会员免费读'),
+      ContentItem(id: 'entrepreneur_learn_3', title: '融资谈判：3 个关键条款', description: 'Term Sheet 入门', source: '知乎', sourceType: ContentSource.zhihu, contentType: ContentType.article, duration: '10min', externalUrl: 'https://zhuanlan.zhihu.com/p/ent-3', priceType: ContentPriceType.free, priceNote: '' /* 7/29: 之前 membership 是错的 — zhuanlan.zhihu.com/p/ent-3 是 stub 路径, 不存在. 改成 free 避免误导访客 */),
       ContentItem(id: 'entrepreneur_learn_4', title: 'OKR 实战：5 分钟模板', description: '创业公司专属', source: '36氪', sourceType: ContentSource.news36kr, contentType: ContentType.card, duration: '5min', externalUrl: 'https://36kr.com/search/articles/OKR%20%E5%AE%9E%E6%88%98%EF%BC%9A5%20%E5%88%86%E9%92%9F%E6%A8%A1%E6%9D%BF', priceType: ContentPriceType.free),
       ContentItem(id: 'entrepreneur_learn_5', title: '5 分钟读懂：增长黑客', description: 'Sean Ellis 方法', source: '知乎', sourceType: ContentSource.zhihu, contentType: ContentType.article, duration: '5min', externalUrl: 'https://zhuanlan.zhihu.com/p/ent-5', priceType: ContentPriceType.free),
       ContentItem(id: 'entrepreneur_learn_6', title: '失败案例：5 分钟复盘', description: 'WeWork / 瑞幸', source: '36氪', sourceType: ContentSource.news36kr, contentType: ContentType.card, duration: '5min', externalUrl: 'https://36kr.com/search/articles/%E5%A4%B1%E8%B4%A5%E6%A1%88%E4%BE%8B%EF%BC%9A5%20%E5%88%86%E9%92%9F%E5%A4%8D%E7%9B%98', priceType: ContentPriceType.free),

@@ -1,5 +1,6 @@
 import 'package:flutter/foundation.dart';
 import '../models/models.dart';
+import 'rss_service.dart';
 
 class InternationalService {
   /// 6/7 修复：按 userType × scene 分桶返回 24 种国际内容
@@ -9,6 +10,7 @@ class InternationalService {
     return _allContent[key] ?? _fallback(userType, scene);
   }
 
+  // 7/29 加: 真接 The Verge RSS (internationalService.search 之前是假数据)
   Future<List<ContentItem>> search(String query) async {
     if (query.trim().isEmpty) return [];
     final q = query.toLowerCase();
@@ -21,6 +23,18 @@ class InternationalService {
       }
     }
     return results;
+  }
+
+  // 7/29 加: 真接 RSS (The Verge) — 拉空返 []
+  Future<List<ContentItem>> fetchFromRss(UserType userType, Scene scene) async {
+    final rss = RssService(isInternational: true);
+    try {
+      final items = await rss.fetchByBucket(userType, scene);
+      if (items.isNotEmpty) return items;
+    } catch (e) {
+      debugPrint('[intl] RSS fetchByBucket 失败: $e');
+    }
+    return [];
   }
 
   List<ContentItem> _fallback(UserType u, Scene s) {

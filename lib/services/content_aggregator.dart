@@ -23,19 +23,16 @@ class ContentAggregator {
     bool isInternational = false,
   }) async {
     try {
-      // 7/14 加: 优先 RSS (国内 36 氪 / 国际 The Verge), 失败 fallback 假数据
-      // 走宪法 §1.1: 只接 metadata, 不存原片
+      // 7/29 重构: 只走真 RSS (36 氪 / 少数派 / The Verge), 拉空返 []
+      // 之前的 fallback _allContent 假数据已移除 — 上线后访客应看真内容
+      // _allContent 保留仅供 dev 演示 (news._fetchFakeForDev)
       final rssResults = await news.fetchFromRss(userType, scene, isInternational: isInternational);
       if (rssResults.isNotEmpty) {
         return rssResults;
       }
-      // RSS 拉空 -> 老逻辑 (硬编码假数据)
-      if (isInternational) {
-        return await international.getRecommendations(userType, scene);
-      } else {
-        final newsResults = await news.getRecommendations(userType, scene);
-        return newsResults;
-      }
+      // RSS 拉空 -> 返 [] (UI 走空状态)
+      debugPrint('[aggregator] RSS 拉空 (${userType.bucketKey}_${scene.bucketKey}, intl=$isInternational) — 返空状态');
+      return [];
     } catch (e) {
       debugPrint('ContentAggregator error: $e');
       return [];

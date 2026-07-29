@@ -23,8 +23,10 @@ class RssItem {
 }
 
 class RssService {
-  // 国内版: 36 氪
+  // 国内版: 36 氪 (主源)
   static const String _kr36Feed = 'https://36kr.com/feed';
+  // 国内备用: 少数派 (7/29 实测 226ms 极快, 36 氪 10s 慢)
+  static const String _sspaiFeed = 'https://sspai.com/feed';
   // 国际版: The Verge
   static const String _vergeFeed = 'https://www.theverge.com/rss/index.xml';
 
@@ -33,57 +35,76 @@ class RssService {
 
   RssService({this.isInternational = false});
 
-  String get _feedUrl => isInternational ? _vergeFeed : _kr36Feed;
+  /// 7/29 加: 多 RSS 源 fallback 链
+  List<String> get _feedUrls => isInternational
+      ? [_vergeFeed]
+      : [_kr36Feed, _sspaiFeed]; // 国内主 36 氪, 慢则 fallback 少数派
 
   String get _sourceName => isInternational ? 'The Verge' : '36氪';
 
   /// 7/14 加: 拉 RSS feed + 解析 (3 retries, 5s timeout each)
+  /// 7/29 改: 多源 fallback + 单次 timeout 拉到 8s (36 氪实测 10s 慢)
   Future<List<RssItem>> fetchTop({int limit = 20}) async {
-    // 7/14 SOUL #76: 重试 3 次防 CF edge transient RST
-    for (var attempt = 1; attempt <= 3; attempt++) {
-      try {
-        final resp = await http
-            .get(
-              Uri.parse(_feedUrl),
-              headers: const {
-                'User-Agent': 'fragment_time/1.0 (NAS)',
-                'Accept': 'application/rss+xml, application/xml;q=0.9, */*;q=0.8',
-              },
-            )
-            .timeout(const Duration(seconds: 5));
+    // 7/29: 按 _feedUrls 顺序试, 任一源拿到就返 (不聚合 — 避免重复)
+    for (final feedUrl in _feedUrls) {
+      for (var attempt = 1; attempt <= 2; attempt++) {
+        try {
+          final resp = await http
+              .get(
+                Uri.parse(feedUrl),
+                headers: const {
+                  'User-Agent': 'fragment_time/1.0 (NAS)',
+                  'Accept': 'application/rss+xml, application/xml;q=0.9, */*;q=0.8',
+                },
+              )
+              .timeout(const Duration(seconds: 8));
 
-        if (resp.statusCode != 200) {
-          // 5xx 才重试, 4xx (rate limit/404) 直接放弃
-          if (resp.statusCode >= 500 && attempt < 3) {
-            await Future.delayed(Duration(milliseconds: 500 * attempt));
+          if (resp.statusCode == 200) {
+            final items = _parse(resp.body, limit);
+            if (items.isNotEmpty) return items;
+            // 解析空 -> 试下一个源
+            break;
+          }
+          // 5xx 才重试, 4xx 直接试下一个源
+          if (resp.statusCode < 500) break;
+        } catch (e) {
+          // timeout/network -> 重试一次
+          if (attempt < 2) {
+            await Future.delayed(Duration(milliseconds: 300));
             continue;
           }
-          return [];
+          // 该源失败 -> 试下一个
+          break;
         }
-        return _parse(resp.body, limit);
-      } catch (e) {
-        // timeout/network -> 重试
-        if (attempt < 3) {
-          await Future.delayed(Duration(milliseconds: 500 * attempt));
-          continue;
-        }
-        // 3 次都失败 -> 返回 [], news.fetchFromRss 会 fallback 假数据
-        return [];
       }
     }
+    // 所有源都失败 -> 返回 [] (UI 走空状态)
     return [];
   }
 
   List<RssItem> _parse(String body, int limit) {
     try {
       final doc = xml.XmlDocument.parse(body);
-      final items = doc.findAllElements('item');
+      // RSS 2.0 用 <item>, Atom 用 <entry>, 7/29 加 Atom fallback (少数派是 Atom)
+      final rssItems = doc.findAllElements('item');
+      final atomItems = doc.findAllElements('entry');
+      final items = rssItems.isNotEmpty ? rssItems : atomItems;
       final result = <RssItem>[];
       for (final item in items.take(limit)) {
+        // Atom 用 <title> 直系子, RSS 2.0 也是; link 在 Atom 是 href 属性
         final title = _textOf(item, 'title');
-        final url = _textOf(item, 'link');
-        final desc = _stripHtml(_textOf(item, 'description'));
-        final pubDateStr = _textOf(item, 'pubDate');
+        String url = _textOf(item, 'link');
+        if (url.isEmpty) {
+          // Atom: <link href="..."/>
+          final linkEl = item.findElements('link').firstOrNull;
+          if (linkEl != null) url = linkEl.getAttribute('href') ?? '';
+        }
+        final desc = _stripHtml(_textOf(item, 'description').isNotEmpty
+            ? _textOf(item, 'description')
+            : _textOf(item, 'summary'));
+        final pubDateStr = _textOf(item, 'pubDate').isNotEmpty
+            ? _textOf(item, 'pubDate')
+            : _textOf(item, 'updated');
         DateTime? dt;
         if (pubDateStr.isNotEmpty) {
           try {
@@ -120,22 +141,11 @@ class RssService {
   String _stripHtml(String html) {
     if (html.isEmpty) return '';
     // 7/14 简化: 拿前 160 chars (移除 HTML 标签)
-    return html
-            .replaceAll(RegExp(r'<[^>]+>'), '')
-            .replaceAll(RegExp(r'\s+'), ' ')
-            .trim()
-            .length >
-        160
-        ? html
-            .replaceAll(RegExp(r'<[^>]+>'), '')
-            .replaceAll(RegExp(r'\s+'), ' ')
-            .trim()
-            .substring(0, 160) +
-            '…'
-        : html
-            .replaceAll(RegExp(r'<[^>]+>'), '')
-            .replaceAll(RegExp(r'\s+'), ' ')
-            .trim();
+    final stripped = html
+        .replaceAll(RegExp(r'<[^>]+>'), '')
+        .replaceAll(RegExp(r'\s+'), ' ')
+        .trim();
+    return stripped.length > 160 ? '${stripped.substring(0, 160)}…' : stripped;
   }
 
   /// 简易 RFC 822 解析: "Mon, 14 Jul 2026 19:21:42 +0800" → DateTime
@@ -193,5 +203,25 @@ class RssService {
       picked.add(toContentItem(items[idx], contentType: defaultKind));
     }
     return picked;
+  }
+
+  /// 7/29 加: 搜索 RSS 关键词 (按 userType×scene 主题词筛)
+  /// 简单 substring 匹配 title/description, 返回前 N 条真 RSS
+  Future<List<ContentItem>> searchInRss(String query, {int limit = 10}) async {
+    if (query.trim().isEmpty) return [];
+    final items = await fetchTop(limit: 30);
+    if (items.isEmpty) return [];
+    final q = query.toLowerCase();
+    final matched = <RssItem>[];
+    for (final item in items) {
+      if (item.title.toLowerCase().contains(q) ||
+          item.description.toLowerCase().contains(q)) {
+        matched.add(item);
+      }
+    }
+    return matched
+        .take(limit)
+        .map((r) => toContentItem(r, contentType: 'article'))
+        .toList();
   }
 }
