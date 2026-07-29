@@ -647,6 +647,11 @@ class _ContentScreenState extends State<ContentScreen> {
                   _buildActions(),
                   SizedBox(height: 8 * _scale),
                 ],
+                // 7/29 加: 跳原站读全文提示 (沿用宪法 §1.1 不能存原片, 明确告知访客点 Read 进阅读器再点“在原站读全文”)
+                if (_aiContentItem != null &&
+                    _aiContentItem!.externalUrl != null &&
+                    _aiContentItem!.externalUrl!.isNotEmpty)
+                  _buildReadFullHint(),
                 SizedBox(height: 8 * _scale),
                 // 7/29 加: 空状态 — RSS 拉空时不再返假数据, 显示 "今日暂无新内容"
                 if (_recItems.isEmpty && !_recLoading) _buildEmptyState(),
@@ -901,7 +906,7 @@ class _ContentScreenState extends State<ContentScreen> {
     );
   }
 
-  // 6/9 TL;DR 精要 banner
+  // 6/9 TL;DR 精要 banner — 7/29 修正文案: 明确标"是历史偏好, 不是当前文章摘要"
   Widget _buildTlDrBanner() {
     return Container(
       margin: EdgeInsets.only(bottom: 8 * _scale),
@@ -916,11 +921,13 @@ class _ContentScreenState extends State<ContentScreen> {
         children: [
           Row(
             children: [
-              Icon(Icons.bolt, size: 14 * _scale, color: AppTheme.primary),
+              Icon(Icons.history, size: 14 * _scale, color: AppTheme.primary),
               SizedBox(width: 4 * _scale),
               Expanded(
                 child: Text(
-                  isEn ? 'TL;DR · from last time' : 'TL;DR · 上次总结',
+                  isEn
+                      ? 'Last seen summary (not this article)'
+                      : '上次看到的总结（不是当前文章摘要）',
                   style: TextStyle(fontSize: 11 * _scale, color: AppTheme.primary, fontWeight: FontWeight.w700),
                 ),
               ),
@@ -1298,6 +1305,33 @@ class _ContentScreenState extends State<ContentScreen> {
   }
 
   // ============== Hero (AI 内容主体) ==============
+
+  // 7/29 加: 跳原站读全文提示 (沿用宪法 §1.1 不存原片, 明确告知访客如何读全文)
+  Widget _buildReadFullHint() {
+    return Container(
+      margin: EdgeInsets.only(bottom: 8 * _scale),
+      padding: EdgeInsets.all(10 * _scale),
+      decoration: BoxDecoration(
+        color: AppTheme.primary.withOpacity(0.04),
+        borderRadius: BorderRadius.circular(10),
+        border: Border.all(color: AppTheme.primary.withOpacity(0.15)),
+      ),
+      child: Row(
+        children: [
+          Icon(Icons.open_in_new, size: 14 * _scale, color: AppTheme.primary),
+          SizedBox(width: 6 * _scale),
+          Expanded(
+            child: Text(
+              isEn
+                  ? 'Tap Read → "Read full at source" for the complete article'
+                  : '点 Read → "在原站读全文" 看完整内容',
+              style: TextStyle(fontSize: 11 * _scale, color: AppTheme.hintColor(context)),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
 
   // 7/29 加: RSS 拉空时空状态. 访客看到"今日暂无新内容" + 下拉重试
   Widget _buildEmptyState() {
