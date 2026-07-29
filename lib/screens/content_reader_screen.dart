@@ -20,6 +20,7 @@ import '../services/news_service.dart';
 import '../widgets/inline_read_view.dart';
 import 'ai_assistant_screen.dart';
 import '../services/quote_related_engine.dart';
+import 'in_app_webview_screen.dart';
 
 class ContentReaderScreen extends StatefulWidget {
   final ContentItem item;
@@ -561,11 +562,11 @@ class _ContentReaderScreenState extends State<ContentReaderScreen> {
               constraints: BoxConstraints.tightFor(width: 48 * scale, height: 48 * scale),
               tooltip: isEn ? 'Open original' : '打开原文',
               onPressed: () async {
-                final uri = Uri.parse(item.externalUrl!);
-                if (await canLaunchUrl(uri)) {
-                  // 6/10 修: web 走 platformDefault (浏览器 tab 跳), mobile 走 externalApplication
-                  await launchUrl(uri, mode: kIsWeb ? LaunchMode.platformDefault : LaunchMode.externalApplication);
-                }
+                // 7/29 改: 从 url_launcher 外部浏览器 → in-app webview (沿用宪法 §1.1 不存原片)
+                // 留住用户, 不跳出 app. 沿用 #103 #113: webview 失败有 fallback 提示用户
+                await Navigator.of(context).push(MaterialPageRoute(
+                  builder: (_) => InAppWebViewScreen(url: item.externalUrl!, title: item.title),
+                ));
               },
             ),
         ],
