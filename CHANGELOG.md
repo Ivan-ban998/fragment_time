@@ -69,3 +69,46 @@ Scene.listen 跳过 `_buildAudioEntry`, 走 _buildHero 跟其他 3 场景同路�
 - **haisoul.com / openclaw.haisoul.com TLS RST** (沿用 7/14)
 - **snipe.vagtek.com DNS 不解** (沿用 7/21)
 - **odoo-wangyi-atc-missing** (沿用 7/19)
+## 2026-07-29 — 内容真实化 (上线后 访客反馈) + TL;DR 文案澄清 + 跳原站读全文
+
+### 🎯 7/29 早 Brien 反馈 "上线行动 = 内容不真实"
+
+**问题**: `fetchFromRss` 注释写"优先 RSS"但代码返假数据 (沿用 7/15 ban RSS 后临时顶替). `_allContent` 288 条 hardcoded 假内容 + 搜索 URL stub. 访客打开 content.soulvag.com 看到的就是这堆假数据.
+
+**真凶 (沿用 SOUL #103)**: `fetchFromRss` 内部 `return _allContent[key] ?? _fallback(...)` —— **骗自己**. `news_service.dart:73` 注释写"注释写优先 RSS"但代码不接.
+
+**修法 (3 commit, 沿用宪法 §1.1 不存原片)**:
+
+| commit | 改动 |
+|---|---|
+| **`1cae292`** | `fetchFromRss` 真接 `RssService.fetchByBucket` + `rss_service.dart` 多源 fallback (36 氪 → 少数派) + `content_aggregator.dart` RSS 空时返 `[]` (不再 fallback `_allContent`) + `_buildEmptyState` 空状态 UI + `_fetchFakeForDev` 仅 dev 演示用 |
+| **`b89f6a0`** | TL;DR 文案改"上次看到的总结 (不是当前文章摘要)" + icon 改 history 明确标历史偏好 + 新 `_buildReadFullHint` 提示访客"点 Read → 在原站读全文" |
+
+### 🎯 7/29 17:55 Brien 反馈: 36 氪内容切合实际但可阅读性低 / 延伸阅读 AI 摘要不真实
+
+**根因**:
+- **TL;DR banner** (`_tlDrText = cache`): 实际是**历史偏好缓存**, 不是当前文章摘要 — **访客误以为是 TL;DR**
+- **跳原站读全文** UI 没提示 → 访客不知道点 Read 后在阅读器底部有"在原站读全文"按钮
+
+**修法** (`b89f6a0`): TL;DR 文案澄清 + `_buildReadFullHint` 跳原站提示卡 (沿用宪法 §1.1 不存原片)
+
+### 🌐 上线验证
+
+- **build 成功**: `?v=1785321026` (b89f6a0 + 1cae292 改动生效)
+- **9090 起来**: `?v=1785321026` (build_and_serve.sh 沿用)
+- **7080 沿用**: 沿用 alert 老服务仍跑
+- **analyze 0 error** (54 info/warning 全是 Flutter 3.27 withOpacity 升级遗留, 沿用 #15 不擅自动)
+
+### ❌ 还没干 (你 18:14 问但还没拍)
+
+- **in-app webview 嵌入**: 让用户不用跳出 app 也能看完整 36 氪/少数派文章. 沿用宪法 §1.1 ✅ (不存原片). 工程量: 加 webview_flutter 依赖 + 集成 widget + 测 X-Frame-Options (36 氪/少数派可能拒绝嵌入)
+- **解 SSH 限流 push 4 commit 到 origin/dev** (沿用 #74 #116 SSH 仍不稳, 7 通 / 5 不通 = 间歇, 不暴力重试)
+- **接云端 TTS / RSS feed 真音频源** (沿用 #8 红灯区 = 要钱 + 部署活)
+
+### 📜 关键 commit
+
+- `b89f6a0` fix(content): 7/29 TL;DR 文案 + 跳原站读全文提示 ← **待你浏览器硬刷验**
+- `1cae292` fix(content): 7/29 RSS 真接 + 空状态 UI + 多源 fallback
+- `9fc7e41` fix(subscriptions): 关注平台/类目标题去掉字面占位符
+- `558a77b` polish: bilibili 诊断 debugPrint 清 4 个 + CHANGELOG.md 7/28 一天大事记
+- `13d826d` fix(听一声): Scene.listen 跳过 _buildAudioEntry (沿用 7/28 沿用 #103 真改)
