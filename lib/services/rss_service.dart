@@ -2,6 +2,7 @@
 // 7/14 Brien 拍板接真 RSS (国内 36 氪 + 国际 The Verge)
 // 走宪法 §1.1: 只接 metadata (title/url/description), 不存原片, 跳原站
 
+import 'package:flutter/foundation.dart' show kIsWeb;
 import 'package:http/http.dart' as http;
 import 'package:xml/xml.dart' as xml;
 import '../models/models.dart';
@@ -23,12 +24,24 @@ class RssItem {
 }
 
 class RssService {
+  // 7/29 加: NAS 后端代理 (绕过 web 浏览器 CORS 限制, 沿用 SOUL #103 沿用 #113 沿用 #15)
+  // 浏览器 fetch 36 氪受 CORS 拦截, 走 NAS proxy 拉 (后端 curl 不受限制)
+  static const String _proxyBase = 'http://127.0.0.1:7088/rss';
   // 国内版: 36 氪 (主源)
   static const String _kr36Feed = 'https://36kr.com/feed';
   // 国内备用: 少数派 (7/29 实测 226ms 极快, 36 氪 10s 慢)
   static const String _sspaiFeed = 'https://sspai.com/feed';
   // 国际版: The Verge
   static const String _vergeFeed = 'https://www.theverge.com/rss/index.xml';
+
+  /// 7/29 加: 走 NAS proxy 拉 feed (web 端) — kIsWeb true
+  /// native 端 (mobile) 直接 fetch — 没有 CORS 限制
+  String _resolveUrl(String feedUrl) {
+    if (kIsWeb) {
+      return '$_proxyBase?url=${Uri.encodeComponent(feedUrl)}';
+    }
+    return feedUrl;
+  }
 
   /// 7/14 加: 是否国际版
   final bool isInternational;
@@ -51,7 +64,7 @@ class RssService {
         try {
           final resp = await http
               .get(
-                Uri.parse(feedUrl),
+                Uri.parse(_resolveUrl(feedUrl)),
                 headers: const {
                   'User-Agent': 'fragment_time/1.0 (NAS)',
                   'Accept': 'application/rss+xml, application/xml;q=0.9, */*;q=0.8',
