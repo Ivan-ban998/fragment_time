@@ -112,3 +112,37 @@ Scene.listen 跳过 `_buildAudioEntry`, 走 _buildHero 跟其他 3 场景同路�
 - `9fc7e41` fix(subscriptions): 关注平台/类目标题去掉字面占位符
 - `558a77b` polish: bilibili 诊断 debugPrint 清 4 个 + CHANGELOG.md 7/28 一天大事记
 - `13d826d` fix(听一声): Scene.listen 跳过 _buildAudioEntry (沿用 7/28 沿用 #103 真改)
+
+### 🔧 7/29 18:30-20:10 沿用 #103 "改了 ≠ 修了" — CORS 修复 + in-app webview
+
+**问题 1 (CORS)**: 你 18:36 浏览器硬刷 9090 发现 `Access to fetch at 'https://36kr.com/feed' from origin 'http://100.89.204.123:7080' has been blocked by CORS policy`. **沿用 #103**: fetchFromRss 真接 RSS 但 web 平台浏览器 fetch 受 CORS 拦截, 改完跟没改一样
+
+**修法 (1 commit)**:
+- 新 `/home/Brien/.openclaw/bin/rss_proxy.py` (7088 端口): 后端 curl 拉 RSS, 加 `Access-Control-Allow-Origin: *` 让浏览器放行
+  - 安全白名单: 36kr.com / sspai.com / theverge.com (防止 SSRF)
+  - `/health` 监控
+- `rss_service.dart`: `kIsWeb` 判定 web 端走 NAS proxy, native 端 (mobile) 直接 fetch
+- 启动: `nohup python3 /home/Brien/.openclaw/bin/rss_proxy.py 7088 > /tmp/rss_proxy.stdout 2>&1 &`
+
+**问题 2 (webview)**: in-app webview 嵌入 36 氪/少数派完整文章 (留住用户在 app 内, 不跳外部浏览器)
+- 修法 (3f0cf2c): webview_flutter 4.13.0 + 新 `lib/screens/in_app_webview_screen.dart`
+- 错误 fallback: X-Frame 拒绝时显示 URL 让用户改用浏览器
+- 宪法 §1.1 沿用: webview 本身不存原片, 只渲染
+
+### 📜 关键 commit
+
+- `0ca3084` fix(content): 7/29 NAS proxy 绕 CORS ← **待你浏览器硬刷验**
+- `3f0cf2c` feat(content): 7/29 in-app webview 嵌入
+- `c132f00` docs(CHANGELOG): 7/29 内容真实化 + TL;DR 文案 + 跳原站读全文
+- `b89f6a0` fix(content): 7/29 TL;DR 文案 + 跳原站读全文提示
+- `1cae292` fix(content): 7/29 RSS 真接 + 空状态 UI + 多源 fallback
+- `9fc7e41` fix(subscriptions): 关注平台/类目标题去掉字面占位符
+- `558a77b` polish: bilibili 诊断 debugPrint 清 4 个 + CHANGELOG.md 7/28 一天大事记
+- `13d826d` fix(听一声): Scene.listen 跳过 _buildAudioEntry
+
+### ❌ 还没干 (待 Brien 拍)
+
+- **rss_proxy 自启**: 沿用 #113 NAS reboot 后 rss_proxy 不跑. 加 systemd user unit 或 keepalive script (沿用 SOUL #13 沿用 #15)
+- **解 SSH 限流 push 7 commit 到 origin/dev** (沿用 #74 #116 SSH 仍不稳)
+- **接云端 TTS / RSS feed 真音频源** (沿用 #8 红灯区)
+- **CF Access + 自定义域正式上线** (content.soulvag.com 沿用 alert)
