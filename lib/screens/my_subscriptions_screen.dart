@@ -207,8 +207,7 @@ class _MySubscriptionsScreenState extends State<MySubscriptionsScreen>
         children: [
           // 7/20 16:48 Brien 反馈 "收藏内容多了, 让用户搜搜" → 加搜索框 (跨 3 个子 Tab 共享)
           _buildSearchBar(scale, isEn),
-          // 7/30 Brien "顶部汇总栏不要随滚动溜走" → 拆出来不滚动 (仍显示在搜索框下方, TabBarView 自身滚动)
-          _buildStickySummary(scale, isEn),
+          // 7/30: 顶部汇总栏已移到 _buildFollowingTab 内部 pinned SliverPersistentHeader (统一风格)
           Expanded(
             child: TabBarView(
               controller: _tabController,
@@ -284,87 +283,8 @@ class _MySubscriptionsScreenState extends State<MySubscriptionsScreen>
     );
   }
 
-  // 7/30 Brien 反馈 "顶部汇总不要随滚动溜走" → 这里在搜索框下加一个轻量 compact 汇总 (3 个子 Tab 共享)
-  // 不动 SliverPersistentHeader (考虑搜索框 + Tab 切换 是 fixed 原因, 只需 _buildFollowingTab 顶部加 pinned 容器.
-  // 这里为简化: 仅在 “关注” 子 Tab 顶部加一个 _buildStickySummary (其他 2 个子 Tab 原本就无关注计数, 不需总计 0/0) ).
-  // 这背后: 主设计是 "搜索框 + sticky summary 仅在 Tab 3 才显示, 但 Tab 1/2 默认隐藏" — 走 _buildStickySummary(isFollowing:true) 控制可见.
-  Widget _buildStickySummary(double scale, bool isEn) {
-    // 7/30 简化: 为了避免 Tab 1/2 出现 “0 平台 / 0 类目” 语义误导 (默认隐藏), 仅在 Tab 3 (关注) 时可见.
-    // 用 AnimatedSwitcher + ListenableBuilder 听订阅变化
-    return ListenableBuilder(
-      listenable: LocalSubscriptionService.instance,
-      builder: (context, _) {
-        return AnimatedSwitcher(
-          duration: const Duration(milliseconds: 200),
-          child: _tabController.index == 2 ? _buildSummaryBar(scale, isEn) : const SizedBox.shrink(key: ValueKey('hidden')),
-        );
-      },
-    );
-  }
-
-  Widget _buildSummaryBar(double scale, bool isEn) {
-    return FutureBuilder<List<dynamic>>(
-      future: () async {
-        final sources = await SubscriptionService.instance.getSubscribedSources();
-        final categories = await SubscriptionService.instance.getSubscribedCategories();
-        return [sources.length, categories.length];
-      }(),
-      builder: (context, snap) {
-        final p = snap.data?[0] ?? 0;
-        final c = snap.data?[1] ?? 0;
-        return Container(
-          key: const ValueKey('shown'),
-          margin: EdgeInsets.symmetric(horizontal: 16 * scale),
-          padding: EdgeInsets.symmetric(horizontal: 14 * scale, vertical: 10 * scale),
-          decoration: BoxDecoration(
-            color: AppTheme.primary.withOpacity(0.08),
-            borderRadius: BorderRadius.circular(12),
-            border: Border.all(color: AppTheme.primary.withOpacity(0.2)),
-          ),
-          child: Row(
-            children: [
-              Icon(Icons.subscriptions, size: 16 * scale, color: AppTheme.primary),
-              SizedBox(width: 8 * scale),
-              Expanded(
-                child: Text(
-                  isEn
-                      ? 'Following $p platforms · $c categories'
-                      : '我关注了 $p 个平台 · $c 个类目',
-                  style: TextStyle(
-                    fontSize: 13 * scale,
-                    color: AppTheme.primary,
-                    fontWeight: FontWeight.w500,
-                  ),
-                ),
-              ),
-              GestureDetector(
-                onTap: () {
-                  Navigator.push(
-                    context,
-                    MaterialPageRoute(builder: (_) => const SubscriptionScreen()),
-                  );
-                },
-                child: Row(
-                  mainAxisSize: MainAxisSize.min,
-                  children: [
-                    Text(
-                      isEn ? 'Manage' : '管理',
-                      style: TextStyle(
-                        fontSize: 12 * scale,
-                        color: AppTheme.primary,
-                        fontWeight: FontWeight.w600,
-                      ),
-                    ),
-                    Icon(Icons.chevron_right, size: 14 * scale, color: AppTheme.primary),
-                  ],
-                ),
-              ),
-            ],
-          ),
-        );
-      },
-    );
-  }
+  // 7/30: 顶部汇总已升级为 _FollowingHeroCard (紫色 hero), 在 _buildFollowingTab 内 pinned 展示
+  // (旧 _buildStickySummary / _buildSummaryBar 轻量浅紫条已删, 统一 hero 风格)
 
   // 6/25 A: 收藏 Tab (内容 / 名言)
   // 7/15: quotesOnly 走 _buildQuotesView (顶部大字 quote + time-grouped 列表)
@@ -461,34 +381,42 @@ class _MySubscriptionsScreenState extends State<MySubscriptionsScreen>
   }
 
   // 7/15: 名言收藏页 — 顶部大卡 (最新) + 时间线 (按 day 分)
+  // 7/30 B 修: hero 改为 SliverPersistentHeader(pinned: true) → 最新收藏名言不随滚动溜走
   Widget _buildQuotesView(List<ContentItem> quotes, double scale, bool isEn) {
+    final heroCard = _QuoteHeroCard(
+      latest: quotes.first,
+      totalCount: quotes.length,
+      scale: scale,
+      isEn: isEn,
+      onTap: () {
+        Navigator.push(
+          context,
+          MaterialPageRoute(
+            builder: (_) => ContentReaderScreen(
+              item: quotes.first,
+              isElderlyMode: widget.isElderlyMode,
+              isEn: isEn,
+              userType: widget.userType,
+              scene: widget.scene,
+            ),
+          ),
+        );
+      },
+      onRemove: () => _unsubscribe(quotes.first),
+    );
     return CustomScrollView(
       slivers: [
-        // 顶部大卡 (块 1: 最新一条 quote hero 展示)
-        SliverToBoxAdapter(
-          child: _QuoteHeroCard(
-            latest: quotes.first,
-            totalCount: quotes.length,
-            scale: scale,
-            isEn: isEn,
-            onTap: () {
-              Navigator.push(
-                context,
-                MaterialPageRoute(
-                  builder: (_) => ContentReaderScreen(
-                    item: quotes.first,
-                    isElderlyMode: widget.isElderlyMode,
-                    isEn: isEn,
-                    userType: widget.userType,
-                    scene: widget.scene,
-                  ),
-                ),
-              );
-            },
-            onRemove: () => _unsubscribe(quotes.first),
+        // pinned hero — 不随滚
+        SliverPersistentHeader(
+          pinned: true,
+          delegate: _PinnedHeroDelegate(
+            child: Padding(
+              padding: EdgeInsets.symmetric(horizontal: 16 * scale, vertical: 8 * scale),
+              child: heroCard,
+            ),
           ),
         ),
-        if (quotes.length > 1) SliverToBoxAdapter(child: SizedBox(height: 24 * scale)),
+        if (quotes.length > 1) SliverToBoxAdapter(child: SizedBox(height: 16 * scale)),
         // 块 2: 按天分组的时间线 (lastReadAt 同一天合并)
         if (quotes.length > 1)
           SliverPadding(
@@ -527,33 +455,42 @@ class _MySubscriptionsScreenState extends State<MySubscriptionsScreen>
   }
 
   // 17:28: 内容 Tab Hero+Timeline 视图 (跟名言 tab 风格统一)
+  // 7/30 B 修: hero 改为 SliverPersistentHeader(pinned: true) → 最新收藏不随滚动溜走
   Widget _buildContentView(List<ContentItem> items, double scale, bool isEn) {
+    final heroCard = _ContentHeroCard(
+      latest: items.first,
+      totalCount: items.length,
+      scale: scale,
+      isEn: isEn,
+      onTap: () {
+        Navigator.push(
+          context,
+          MaterialPageRoute(
+            builder: (_) => ContentReaderScreen(
+              item: items.first,
+              isElderlyMode: widget.isElderlyMode,
+              isEn: isEn,
+              userType: widget.userType,
+              scene: widget.scene,
+            ),
+          ),
+        );
+      },
+      onRemove: () => _unsubscribe(items.first),
+    );
     return CustomScrollView(
       slivers: [
-        SliverToBoxAdapter(
-          child: _ContentHeroCard(
-            latest: items.first,
-            totalCount: items.length,
-            scale: scale,
-            isEn: isEn,
-            onTap: () {
-              Navigator.push(
-                context,
-                MaterialPageRoute(
-                  builder: (_) => ContentReaderScreen(
-                    item: items.first,
-                    isElderlyMode: widget.isElderlyMode,
-                    isEn: isEn,
-                    userType: widget.userType,
-                    scene: widget.scene,
-                  ),
-                ),
-              );
-            },
-            onRemove: () => _unsubscribe(items.first),
+        // pinned hero — 不随滚
+        SliverPersistentHeader(
+          pinned: true,
+          delegate: _PinnedHeroDelegate(
+            child: Padding(
+              padding: EdgeInsets.symmetric(horizontal: 16 * scale, vertical: 8 * scale),
+              child: heroCard,
+            ),
           ),
         ),
-        if (items.length > 1) SliverToBoxAdapter(child: SizedBox(height: 24 * scale)),
+        if (items.length > 1) SliverToBoxAdapter(child: SizedBox(height: 16 * scale)),
         if (items.length > 1)
           SliverPadding(
             padding: EdgeInsets.symmetric(horizontal: 16 * scale),
@@ -616,88 +553,111 @@ class _MySubscriptionsScreenState extends State<MySubscriptionsScreen>
             if (sources.isEmpty && categories.isEmpty) {
               return _buildNoSearchResult(scale, isEn);
             }
-            return ListView(
-              padding: EdgeInsets.fromLTRB(16 * scale, 16 * scale, 16 * scale, 32 * scale),
-              children: [
-                // 7/30 去掉原先的 _FollowingHeroCard (移到顶部 _buildStickySummary 作 pinned 汇总)
-                SizedBox(height: 12 * scale),
-                // 7/30 Brien "点关注平台/类别 → 看推荐最新热门" → 加横向 chip 跳转 SourceDetailScreen
-                // 多关注也不需竖翻 (总在一屏内)
-                if (sources.isNotEmpty) ...[
-                  _FollowingSectionHeader(
-                    label: isEn ? 'PLATFORMS' : '关注平台',
-                    icon: Icons.subscriptions,
-                    scale: scale,
-                  ),
-                  SizedBox(height: 12 * scale),
-                  SizedBox(
-                    height: 48 * scale,
-                    child: ListView.separated(
-                      scrollDirection: Axis.horizontal,
-                      itemCount: sources.length,
-                      separatorBuilder: (_, __) => SizedBox(width: 8 * scale),
-                      itemBuilder: (context, i) {
-                        final s = sources[i];
-                        return _FollowingSourceChip(
-                          source: s,
-                          isEn: isEn,
-                          scale: scale,
-                          onTap: () {
-                            Navigator.push(
-                              context,
-                              MaterialPageRoute(
-                                builder: (_) => SourceDetailScreen(
-                                  source: s,
-                                  isElderlyMode: widget.isElderlyMode,
-                                  isEn: widget.isEn,
-                                ),
-                              ),
-                            );
-                          },
-                        );
-                      },
+            // 7/30: 紫色 hero pinned 在顶部 (跟 Tab 1/2 hero 风格统一)
+            final heroCard = _FollowingHeroCard(
+              platformCount: sources.length,
+              categoryCount: categories.length,
+              scale: scale,
+              isEn: isEn,
+              onManage: () {
+                Navigator.push(
+                  context,
+                  MaterialPageRoute(builder: (_) => const SubscriptionScreen()),
+                );
+              },
+            );
+            return CustomScrollView(
+              slivers: [
+                SliverPersistentHeader(
+                  pinned: true,
+                  delegate: _PinnedHeroDelegate(
+                    child: Padding(
+                      padding: EdgeInsets.fromLTRB(16 * scale, 12 * scale, 16 * scale, 8 * scale),
+                      child: heroCard,
                     ),
                   ),
-                  SizedBox(height: 20 * scale),
-                ],
-                if (categories.isNotEmpty) ...[
-                  _FollowingSectionHeader(
-                    label: isEn
-                        ? 'CATEGORIES'
-                        : '关注类目',
-                    icon: Icons.category_outlined,
-                    scale: scale,
-                  ),
-                  SizedBox(height: 12 * scale),
-                  SizedBox(
-                    height: 48 * scale,
-                    child: ListView.separated(
-                      scrollDirection: Axis.horizontal,
-                      itemCount: categories.length,
-                      separatorBuilder: (_, __) => SizedBox(width: 8 * scale),
-                      itemBuilder: (context, i) {
-                        final c = categories[i];
-                        return _FollowingCategoryChip(
-                          categoryName: c,
-                          isEn: isEn,
+                ),
+                SliverPadding(
+                  padding: EdgeInsets.fromLTRB(16 * scale, 12 * scale, 16 * scale, 32 * scale),
+                  sliver: SliverList(
+                    delegate: SliverChildListDelegate([
+                      // 7/30 Brien "点关注平台/类别 → 看推荐最新热门" → 加横向 chip 跳转 SourceDetailScreen
+                      // 多关注也不需竖翻 (总在一屏内)
+                      if (sources.isNotEmpty) ...[
+                        _FollowingSectionHeader(
+                          label: isEn ? 'PLATFORMS' : '关注平台',
+                          icon: Icons.subscriptions,
                           scale: scale,
-                          onTap: () {
-                            // 7/30: 类目 → 暂时推同样的 SourceDetailScreen 仅以 name 区分 (后续可加 CategoryDetailScreen)
-                            ScaffoldMessenger.of(context).showSnackBar(
-                              SnackBar(
-                                content: Text(
-                                  isEn
-                                      ? '"$c" category detail coming soon'
-                                      : '"$c" 类目详情即将上线',
-                                ),
-                              ),
-                            );
-                          },
-                        );
-                      },
-                    ),
+                        ),
+                        SizedBox(height: 12 * scale),
+                        SizedBox(
+                          height: 48 * scale,
+                          child: ListView.separated(
+                            scrollDirection: Axis.horizontal,
+                            itemCount: sources.length,
+                            separatorBuilder: (_, __) => SizedBox(width: 8 * scale),
+                            itemBuilder: (context, i) {
+                              final s = sources[i];
+                              return _FollowingSourceChip(
+                                source: s,
+                                isEn: isEn,
+                                scale: scale,
+                                onTap: () {
+                                  Navigator.push(
+                                    context,
+                                    MaterialPageRoute(
+                                      builder: (_) => SourceDetailScreen(
+                                        source: s,
+                                        isElderlyMode: widget.isElderlyMode,
+                                        isEn: widget.isEn,
+                                      ),
+                                    ),
+                                  );
+                                },
+                              );
+                            },
+                          ),
+                        ),
+                        SizedBox(height: 20 * scale),
+                      ],
+                      if (categories.isNotEmpty) ...[
+                        _FollowingSectionHeader(
+                          label: isEn ? 'CATEGORIES' : '关注类目',
+                          icon: Icons.category_outlined,
+                          scale: scale,
+                        ),
+                        SizedBox(height: 12 * scale),
+                        SizedBox(
+                          height: 48 * scale,
+                          child: ListView.separated(
+                            scrollDirection: Axis.horizontal,
+                            itemCount: categories.length,
+                            separatorBuilder: (_, __) => SizedBox(width: 8 * scale),
+                            itemBuilder: (context, i) {
+                              final c = categories[i];
+                              return _FollowingCategoryChip(
+                                categoryName: c,
+                                isEn: isEn,
+                                scale: scale,
+                                onTap: () {
+                                  ScaffoldMessenger.of(context).showSnackBar(
+                                    SnackBar(
+                                      content: Text(
+                                        isEn
+                                            ? '"$c" category detail coming soon'
+                                            : '"$c" 类目详情即将上线',
+                                      ),
+                                    ),
+                                  );
+                                },
+                              );
+                            },
+                          ),
+                        ),
+                      ],
+                    ]),
                   ),
-                ],
+                ),
               ],
             );
           },
@@ -1264,6 +1224,30 @@ class _SubscribedCard extends StatelessWidget {
 
 // 7/15: 名言收藏 - 顶部大字 Hero (本机制仅渲染最新一条)
 // 复用 _DailyEncouragementBanner 同款紫色渐变 + 圆角, 但放大一档
+// 7/30 B: SliverPersistentHeader(pinned: true) 必需的 delegate
+// 不 wrap Material 避免双层 inkWell 问题, 仅为 hero 提供一个不滚动的位置
+class _PinnedHeroDelegate extends SliverPersistentHeaderDelegate {
+  final Widget child;
+
+  _PinnedHeroDelegate({required this.child});
+
+  @override
+  double get minExtent => 0; // 允许 fully retract, 但 pinned=true 时保持可见
+  @override
+  double get maxExtent => 240; // 足够容纳 hero 卡 (按需调)
+
+  @override
+  Widget build(BuildContext context, double shrinkOffset, bool overlapsContent) {
+    return Material(
+      color: const Color(0xFFF8F6FF), // 跟 Scaffold 背景一致, 滚动时续上
+      child: child,
+    );
+  }
+
+  @override
+  bool shouldRebuild(_PinnedHeroDelegate oldDelegate) => false;
+}
+
 class _QuoteHeroCard extends StatelessWidget {
   final ContentItem latest;
   final int totalCount;
