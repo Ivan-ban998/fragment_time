@@ -79,6 +79,8 @@ class _ContentScreenState extends State<ContentScreen> {
   // 7/2 B 站真 BV 缓存: itemId → 首条结果 (避免重复 API 调用, 嵌 iframe 用)
   final Map<String, BilibiliVideoResult> _biliCache = {};
   bool _recLoading = false;
+  // 7/30 B: 推荐重试计数器 (避免 _recItems 一直空时无限重试)
+  int _recRetryCount = 0;
   bool _showCompletionBanner = false;
   bool _aiOfferShown = false; // 6/30 12:23: 读完弹 AI sheet 防重复
   bool _hasScrolled = false; // 6/26: 滚到过文章中部才显"读完啦"按钮
@@ -289,9 +291,15 @@ class _ContentScreenState extends State<ContentScreen> {
   // 加载推荐 6 条 (用 ContentAggregator 6 张看完换 6 张)
   // 7/30 还原 7/1 fallback: RSS 拉空 → fallback NewsService 24 桶 (避免 _recItems 永远空 → Tinder 卡不显示)
   // 沿用 SOUL #103 教训: 7/29 删 fallback 后浏览器实测 → Tinder 卡整个消失 + 下面一片白
+  // 7/30 B 修: 加重试上限 3 次, 全失败时 _recItems 留空 + 父层走 Tinder 占位卡
   Future<void> _loadRecommendations() async {
     if (_recLoading) return;
+    if (_recRetryCount >= 3) {
+      debugPrint('[recommend] 已重试 3 次仍为空, 不再重试 (交占位卡显示)');
+      return;
+    }
     setState(() => _recLoading = true);
+    _recRetryCount++;
     try {
       final rec = await ContentAggregator().fetchRecommendContent(
         userType: widget.userType,
@@ -304,8 +312,17 @@ class _ContentScreenState extends State<ContentScreen> {
         debugPrint('[recommend] RSS 拉空, fallback NewsService 24 桶');
         final fallback = await NewsService().getRecommendations(widget.userType, widget.scene);
         if (!mounted) return;
+        if (fallback.isNotEmpty) {
+          setState(() {
+            _recItems = fallback;
+            _recLoading = false;
+            _recRetryCount = 0; // 成功 → 重置计数
+          });
+          return;
+        }
+        // fallback 也空 → _recItems 留空, 交占位卡显示
+        debugPrint('[recommend] NewsService 24 桶也空 (可能是 _bucketKey 不匹配), 走占位卡');
         setState(() {
-          _recItems = fallback;
           _recLoading = false;
         });
         return;
@@ -313,6 +330,7 @@ class _ContentScreenState extends State<ContentScreen> {
       setState(() {
         _recItems = rec;
         _recLoading = false;
+        _recRetryCount = 0; // 成功 → 重置计数
       });
     } catch (e) {
       // 异常 → fallback NewsService 24 桶 (兜底保 Tinder 卡)
@@ -320,10 +338,15 @@ class _ContentScreenState extends State<ContentScreen> {
       try {
         final fallback = await NewsService().getRecommendations(widget.userType, widget.scene);
         if (!mounted) return;
-        setState(() {
-          _recItems = fallback;
-          _recLoading = false;
-        });
+        if (fallback.isNotEmpty) {
+          setState(() {
+            _recItems = fallback;
+            _recLoading = false;
+            _recRetryCount = 0;
+          });
+          return;
+        }
+        setState(() => _recLoading = false);
       } catch (e2) {
         debugPrint('[recommend] fallback NewsService also failed: $e2');
         if (!mounted) return;
@@ -498,6 +521,7 @@ class _ContentScreenState extends State<ContentScreen> {
       _showAllDoneDialog = true;
       _recOffset += 6;
       _recItems = [];
+      _recRetryCount = 0; // 7/30 B: 重置重试计数, 下一轮重新计
     });
     await showDialog(
       context: context,
@@ -672,39 +696,42 @@ class _ContentScreenState extends State<ContentScreen> {
                     _aiContentItem!.externalUrl!.isNotEmpty)
                   _buildReadFullHint(),
                 SizedBox(height: 8 * _scale),
-                // 7/29 加: 空状态 — RSS 拉空时不再返假数据, 显示 "今日暂无新内容"
-                if (_recItems.isEmpty && !_recLoading) _buildEmptyState(),
+                // 7/30 A: 不再在父层 _buildEmptyState 替代整块 tinder 卡
+                // (会导致 items.isEmpty 时 tinder widget 消失 + 下面一片白)
+                // 改为: tinder widget 永远渲染, 空时走内部占位卡
+                _buildRecommendationHeader(),
                 SizedBox(height: 8 * _scale),
-                if (_recItems.isNotEmpty) ...[
-                  _buildRecommendationHeader(),
-                  SizedBox(height: 8 * _scale),
-                  // 底部入口行: 学习小组 + 周回顾 + 隐私政策
-                  _buildEntryRow(),
-                  // 6/22 修复: tinder 3 卡叠 + IgnorePointer + 36Kr 卡内视觉
-                  TinderRecommendationStack(
-                    items: _recItems,
-                    userType: widget.userType,
-                    scene: widget.scene,
-                    isEn: isEn,
-                    isElderlyMode: widget.isElderlyMode,
-                    onTapItem: (it) async {
-                      // 6/23 修: 之前 push ContentScreen(prefillItem: it) — 会递归起同一个 screen,LLM/进度/timer 二次跑,崩或回到角色选择
-                      // 现在 push ContentReaderScreen (专门 detail 屏,接管 item)
-                      await Navigator.push(
-                        context,
-                        MaterialPageRoute(
-                          builder: (_) => ContentReaderScreen(
-                            item: it,
-                            isElderlyMode: widget.isElderlyMode,
-                            isEn: isEn,
-                          ),
+                // 底部入口行: 学习小组 + 周回顾 + 隐私政策
+                _buildEntryRow(),
+                // 6/22 修复: tinder 3 卡叠 + IgnorePointer + 36Kr 卡内视觉
+                TinderRecommendationStack(
+                  items: _recItems,
+                  userType: widget.userType,
+                  scene: widget.scene,
+                  isEn: isEn,
+                  isElderlyMode: widget.isElderlyMode,
+                  onTapItem: (it) async {
+                    // 6/23 修: 之前 push ContentScreen(prefillItem: it) — 会递归起同一个 screen,LLM/进度/timer 二次跑,崩或回到角色选择
+                    // 现在 push ContentReaderScreen (专门 detail 屏,接管 item)
+                    await Navigator.push(
+                      context,
+                      MaterialPageRoute(
+                        builder: (_) => ContentReaderScreen(
+                          item: it,
+                          isElderlyMode: widget.isElderlyMode,
+                          isEn: isEn,
                         ),
-                      );
-                      if (mounted) _writeProgress(50);
-                    },
-                    onAllDismissed: _onAllRecDismissed,
-                  ),
-                ],
+                      ),
+                    );
+                    if (mounted) _writeProgress(50);
+                  },
+                  onAllDismissed: _onAllRecDismissed,
+                  // 7/30 A: 占位卡上的 “重试” 按钮 → 重置计数器 + 重 load
+                  onRetry: () {
+                    setState(() => _recRetryCount = 0);
+                    _loadRecommendations();
+                  },
+                ),
               ],
             ),
           ),
