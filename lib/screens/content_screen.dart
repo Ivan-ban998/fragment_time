@@ -287,7 +287,8 @@ class _ContentScreenState extends State<ContentScreen> {
   }
 
   // 加载推荐 6 条 (用 ContentAggregator 6 张看完换 6 张)
-  // 7/29 重构: 拉空就空, 不再 fallback NewsService.getRecommendations (那是假数据)
+  // 7/30 还原 7/1 fallback: RSS 拉空 → fallback NewsService 24 桶 (避免 _recItems 永远空 → Tinder 卡不显示)
+  // 沿用 SOUL #103 教训: 7/29 删 fallback 后浏览器实测 → Tinder 卡整个消失 + 下面一片白
   Future<void> _loadRecommendations() async {
     if (_recLoading) return;
     setState(() => _recLoading = true);
@@ -298,18 +299,36 @@ class _ContentScreenState extends State<ContentScreen> {
         isInternational: widget.isInternational,
       );
       if (!mounted) return;
+      if (rec.isEmpty) {
+        // RSS 拉空 → fallback NewsService 24 桶 (保 Tinder 卡永远有内容)
+        debugPrint('[recommend] RSS 拉空, fallback NewsService 24 桶');
+        final fallback = await NewsService().getRecommendations(widget.userType, widget.scene);
+        if (!mounted) return;
+        setState(() {
+          _recItems = fallback;
+          _recLoading = false;
+        });
+        return;
+      }
       setState(() {
         _recItems = rec;
         _recLoading = false;
       });
     } catch (e) {
-      // 7/29: RSS 异常 → 返空 (不返假数据, 不欺骗访客)
-      debugPrint('[recommend] ContentAggregator error: $e — 返空状态');
-      if (!mounted) return;
-      setState(() {
-        _recItems = [];
-        _recLoading = false;
-      });
+      // 异常 → fallback NewsService 24 桶 (兜底保 Tinder 卡)
+      debugPrint('[recommend] ContentAggregator error: $e, fallback NewsService 24 buckets');
+      try {
+        final fallback = await NewsService().getRecommendations(widget.userType, widget.scene);
+        if (!mounted) return;
+        setState(() {
+          _recItems = fallback;
+          _recLoading = false;
+        });
+      } catch (e2) {
+        debugPrint('[recommend] fallback NewsService also failed: $e2');
+        if (!mounted) return;
+        setState(() => _recLoading = false);
+      }
     }
   }
 
