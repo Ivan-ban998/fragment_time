@@ -381,7 +381,7 @@ class _MySubscriptionsScreenState extends State<MySubscriptionsScreen>
   }
 
   // 7/15: 名言收藏页 — 顶部大卡 (最新) + 时间线 (按 day 分)
-  // 7/30 B 修: hero 改为 SliverPersistentHeader(pinned: true) → 最新收藏名言不随滚动溜走
+  // 7/30 B 修: 改成 Column[hero + Expanded(ListView)] 模式 — hero 不随滚动溜走 (SliverPersistentHeader 写法不稳)
   Widget _buildQuotesView(List<ContentItem> quotes, double scale, bool isEn) {
     final heroCard = _QuoteHeroCard(
       latest: quotes.first,
@@ -404,58 +404,49 @@ class _MySubscriptionsScreenState extends State<MySubscriptionsScreen>
       },
       onRemove: () => _unsubscribe(quotes.first),
     );
-    return CustomScrollView(
-      slivers: [
-        // pinned hero — 不随滚
-        SliverPersistentHeader(
-          pinned: true,
-          delegate: _PinnedHeroDelegate(
-            child: Padding(
-              padding: EdgeInsets.symmetric(horizontal: 16 * scale, vertical: 8 * scale),
-              child: heroCard,
-            ),
-          ),
+    return Column(
+      children: [
+        // hero 不滚 (不放在 slivers 里)
+        Padding(
+          padding: EdgeInsets.fromLTRB(16 * scale, 8 * scale, 16 * scale, 8 * scale),
+          child: heroCard,
         ),
-        if (quotes.length > 1) SliverToBoxAdapter(child: SizedBox(height: 16 * scale)),
-        // 块 2: 按天分组的时间线 (lastReadAt 同一天合并)
-        if (quotes.length > 1)
-          SliverPadding(
-            padding: EdgeInsets.symmetric(horizontal: 16 * scale),
-            sliver: SliverList(
-              delegate: SliverChildBuilderDelegate(
-                (context, i) {
-                  final item = quotes[i + 1];
-                  return _QuoteTimelineItem(
-                    item: item,
-                    scale: scale,
-                    isEn: isEn,
-                    onTap: () {
-                      Navigator.push(
-                        context,
-                        MaterialPageRoute(
-                          builder: (_) => ContentReaderScreen(
-                            item: item,
-                            isElderlyMode: widget.isElderlyMode,
-                            isEn: isEn,
-                            userType: widget.userType,
-                            scene: widget.scene,
-                          ),
-                        ),
-                      );
-                    },
-                    onRemove: () => _unsubscribe(item),
+        // 列表可滚
+        Expanded(
+          child: ListView.builder(
+            padding: EdgeInsets.fromLTRB(16 * scale, 8 * scale, 16 * scale, 32 * scale),
+            itemCount: quotes.length - 1,
+            itemBuilder: (context, i) {
+              final item = quotes[i + 1];
+              return _QuoteTimelineItem(
+                item: item,
+                scale: scale,
+                isEn: isEn,
+                onTap: () {
+                  Navigator.push(
+                    context,
+                    MaterialPageRoute(
+                      builder: (_) => ContentReaderScreen(
+                        item: item,
+                        isElderlyMode: widget.isElderlyMode,
+                        isEn: isEn,
+                        userType: widget.userType,
+                        scene: widget.scene,
+                      ),
+                    ),
                   );
                 },
-                childCount: quotes.length - 1,
-              ),
-            ),
+                onRemove: () => _unsubscribe(item),
+              );
+            },
           ),
+        ),
       ],
     );
   }
 
   // 17:28: 内容 Tab Hero+Timeline 视图 (跟名言 tab 风格统一)
-  // 7/30 B 修: hero 改为 SliverPersistentHeader(pinned: true) → 最新收藏不随滚动溜走
+  // 7/30 B 修: 改成 Column[hero + Expanded(ListView)] 模式 — hero 不随滚动溜走
   Widget _buildContentView(List<ContentItem> items, double scale, bool isEn) {
     final heroCard = _ContentHeroCard(
       latest: items.first,
@@ -478,48 +469,38 @@ class _MySubscriptionsScreenState extends State<MySubscriptionsScreen>
       },
       onRemove: () => _unsubscribe(items.first),
     );
-    return CustomScrollView(
-      slivers: [
-        // pinned hero — 不随滚
-        SliverPersistentHeader(
-          pinned: true,
-          delegate: _PinnedHeroDelegate(
-            child: Padding(
-              padding: EdgeInsets.symmetric(horizontal: 16 * scale, vertical: 8 * scale),
-              child: heroCard,
+    return Column(
+      children: [
+        Padding(
+          padding: EdgeInsets.fromLTRB(16 * scale, 8 * scale, 16 * scale, 8 * scale),
+          child: heroCard,
+        ),
+        Expanded(
+          child: ListView.builder(
+            padding: EdgeInsets.fromLTRB(16 * scale, 8 * scale, 16 * scale, 32 * scale),
+            itemCount: items.length - 1,
+            itemBuilder: (context, i) => _ContentTimelineItem(
+              item: items[i + 1],
+              scale: scale,
+              isEn: isEn,
+              onTap: () {
+                Navigator.push(
+                  context,
+                  MaterialPageRoute(
+                    builder: (_) => ContentReaderScreen(
+                      item: items[i + 1],
+                      isElderlyMode: widget.isElderlyMode,
+                      isEn: isEn,
+                      userType: widget.userType,
+                      scene: widget.scene,
+                    ),
+                  ),
+                );
+              },
+              onRemove: () => _unsubscribe(items[i + 1]),
             ),
           ),
         ),
-        if (items.length > 1) SliverToBoxAdapter(child: SizedBox(height: 16 * scale)),
-        if (items.length > 1)
-          SliverPadding(
-            padding: EdgeInsets.symmetric(horizontal: 16 * scale),
-            sliver: SliverList(
-              delegate: SliverChildBuilderDelegate(
-                (context, i) => _ContentTimelineItem(
-                  item: items[i + 1],
-                  scale: scale,
-                  isEn: isEn,
-                  onTap: () {
-                    Navigator.push(
-                      context,
-                      MaterialPageRoute(
-                        builder: (_) => ContentReaderScreen(
-                          item: items[i + 1],
-                          isElderlyMode: widget.isElderlyMode,
-                          isEn: isEn,
-                          userType: widget.userType,
-                          scene: widget.scene,
-                        ),
-                      ),
-                    );
-                  },
-                  onRemove: () => _unsubscribe(items[i + 1]),
-                ),
-                childCount: items.length - 1,
-              ),
-            ),
-          ),
       ],
     );
   }
@@ -566,21 +547,16 @@ class _MySubscriptionsScreenState extends State<MySubscriptionsScreen>
                 );
               },
             );
-            return CustomScrollView(
-              slivers: [
-                SliverPersistentHeader(
-                  pinned: true,
-                  delegate: _PinnedHeroDelegate(
-                    child: Padding(
-                      padding: EdgeInsets.fromLTRB(16 * scale, 12 * scale, 16 * scale, 8 * scale),
-                      child: heroCard,
-                    ),
-                  ),
+            return Column(
+              children: [
+                Padding(
+                  padding: EdgeInsets.fromLTRB(16 * scale, 12 * scale, 16 * scale, 8 * scale),
+                  child: heroCard,
                 ),
-                SliverPadding(
-                  padding: EdgeInsets.fromLTRB(16 * scale, 12 * scale, 16 * scale, 32 * scale),
-                  sliver: SliverList(
-                    delegate: SliverChildListDelegate([
+                Expanded(
+                  child: ListView(
+                    padding: EdgeInsets.fromLTRB(16 * scale, 12 * scale, 16 * scale, 32 * scale),
+                    children: [
                       // 7/30 Brien "点关注平台/类别 → 看推荐最新热门" → 加横向 chip 跳转 SourceDetailScreen
                       // 多关注也不需竖翻 (总在一屏内)
                       if (sources.isNotEmpty) ...[
@@ -655,7 +631,7 @@ class _MySubscriptionsScreenState extends State<MySubscriptionsScreen>
                           ),
                         ),
                       ],
-                    ]),
+                    ],
                   ),
                 ),
               ],
@@ -665,31 +641,48 @@ class _MySubscriptionsScreenState extends State<MySubscriptionsScreen>
   }
 
   // 7/30: 平台横滑 chip — 点击跳 SourceDetailScreen
+  // 7/30 美化: 复用 _FollowingSourceRow 的 sourceColor (bilibili 粉 / zhihu 蓝 / 36 氪 etc.)
+  // chip 底色 = sourceColor 12% + 边框 = sourceColor 40% + 图标 = sourceColor 实色
   Widget _FollowingSourceChip({
     required ContentSource source,
     required bool isEn,
     required double scale,
     required VoidCallback onTap,
   }) {
+    final c = _sourceColor(source);
     return Material(
-      color: AppTheme.primary.withOpacity(0.1),
-      borderRadius: BorderRadius.circular(24),
+      color: c.withOpacity(0.12),
+      borderRadius: BorderRadius.circular(20),
       child: InkWell(
-        borderRadius: BorderRadius.circular(24),
+        borderRadius: BorderRadius.circular(20),
         onTap: onTap,
-        child: Padding(
-          padding: EdgeInsets.symmetric(horizontal: 14 * scale, vertical: 8 * scale),
+        child: Container(
+          padding: EdgeInsets.symmetric(horizontal: 12 * scale, vertical: 7 * scale),
+          decoration: BoxDecoration(
+            borderRadius: BorderRadius.circular(20),
+            border: Border.all(color: c.withOpacity(0.35), width: 1),
+          ),
           child: Row(
             mainAxisSize: MainAxisSize.min,
             children: [
-              Icon(source.icon, size: 16 * scale, color: AppTheme.primary),
-              SizedBox(width: 6 * scale),
+              Container(
+                width: 22 * scale,
+                height: 22 * scale,
+                decoration: BoxDecoration(
+                  color: Colors.white,
+                  shape: BoxShape.circle,
+                  border: Border.all(color: c, width: 1.5),
+                ),
+                alignment: Alignment.center,
+                child: Icon(source.icon, size: 12 * scale, color: c),
+              ),
+              SizedBox(width: 8 * scale),
               Text(
                 source.name,
                 style: TextStyle(
                   fontSize: 13 * scale,
-                  color: AppTheme.primary,
-                  fontWeight: FontWeight.w500,
+                  color: c,
+                  fontWeight: FontWeight.w600,
                 ),
               ),
             ],
@@ -700,35 +693,47 @@ class _MySubscriptionsScreenState extends State<MySubscriptionsScreen>
   }
 
   // 7/30: 类目横滑 chip — 点击推 placeholder (CategoryDetailScreen 后续加)
+  // 7/30: 类目横滑 chip — 复用 AppTheme.secondary (紫色) 跟 Tab 1/2 hero 风格一致
   Widget _FollowingCategoryChip({
     required String categoryName,
     required bool isEn,
     required double scale,
     required VoidCallback onTap,
   }) {
+    const c = AppTheme.secondary;
     return Material(
-      color: Colors.white.withOpacity(0.85),
-      borderRadius: BorderRadius.circular(24),
+      color: c.withOpacity(0.10),
+      borderRadius: BorderRadius.circular(20),
       child: InkWell(
-        borderRadius: BorderRadius.circular(24),
+        borderRadius: BorderRadius.circular(20),
         onTap: onTap,
         child: Container(
-          padding: EdgeInsets.symmetric(horizontal: 14 * scale, vertical: 8 * scale),
+          padding: EdgeInsets.symmetric(horizontal: 12 * scale, vertical: 7 * scale),
           decoration: BoxDecoration(
-            borderRadius: BorderRadius.circular(24),
-            border: Border.all(color: Colors.black12),
+            borderRadius: BorderRadius.circular(20),
+            border: Border.all(color: c.withOpacity(0.35), width: 1),
           ),
           child: Row(
             mainAxisSize: MainAxisSize.min,
             children: [
-              Icon(Icons.local_offer_outlined, size: 14 * scale, color: Colors.black54),
-              SizedBox(width: 6 * scale),
+              Container(
+                width: 22 * scale,
+                height: 22 * scale,
+                decoration: BoxDecoration(
+                  color: Colors.white,
+                  shape: BoxShape.circle,
+                  border: Border.all(color: c, width: 1.5),
+                ),
+                alignment: Alignment.center,
+                child: Icon(Icons.local_offer_outlined, size: 12 * scale, color: c),
+              ),
+              SizedBox(width: 8 * scale),
               Text(
                 categoryName,
                 style: TextStyle(
                   fontSize: 13 * scale,
-                  color: Colors.black87,
-                  fontWeight: FontWeight.w500,
+                  color: c,
+                  fontWeight: FontWeight.w600,
                 ),
               ),
             ],
@@ -869,6 +874,18 @@ class _MySubscriptionsScreenState extends State<MySubscriptionsScreen>
     );
   }
 
+  // 7/30: 源色映射 — bilibili 粉 / zhihu 蓝 / 喜马拉雅橙 / 默认紫
+  // 复用给 _FollowingSourceRow + _FollowingSourceChip, 跨 widget 保持一致
+  Color _sourceColor(ContentSource s) {
+    if (s == ContentSource.bilibili) return const Color(0xFFFB7299);
+    if (s == ContentSource.zhihu) return const Color(0xFF0084FF);
+    if (s == ContentSource.ximalaya) return const Color(0xFFFF6E0E);
+    if (s == ContentSource.news36kr) return const Color(0xFF4285F4);
+    if (s == ContentSource.youtube) return const Color(0xFFFF0000);
+    if (s == ContentSource.spotify) return const Color(0xFF1DB954);
+    return AppTheme.primary;
+  }
+
   // 17:45: 关注 Tab 平台行 (跟内容 Timeline 同款 紫 4% 底 + 12% 边框)
   Widget _FollowingSourceRow({
     required dynamic source,
@@ -879,13 +896,7 @@ class _MySubscriptionsScreenState extends State<MySubscriptionsScreen>
     final s = scale;
     final sourceObj = source as ContentSource;
     final name = isEn ? sourceObj.name : _sourceNameZh(sourceObj);
-    final sourceColor = sourceObj == ContentSource.bilibili
-        ? const Color(0xFFFB7299)
-        : sourceObj == ContentSource.zhihu
-            ? const Color(0xFF0084FF)
-            : sourceObj == ContentSource.ximalaya
-                ? const Color(0xFFFF6E0E)
-                : AppTheme.primary;
+    final sourceColor = _sourceColor(sourceObj);
 
     return Container(
       margin: EdgeInsets.only(bottom: 8 * s),
@@ -1224,29 +1235,7 @@ class _SubscribedCard extends StatelessWidget {
 
 // 7/15: 名言收藏 - 顶部大字 Hero (本机制仅渲染最新一条)
 // 复用 _DailyEncouragementBanner 同款紫色渐变 + 圆角, 但放大一档
-// 7/30 B: SliverPersistentHeader(pinned: true) 必需的 delegate
-// 不 wrap Material 避免双层 inkWell 问题, 仅为 hero 提供一个不滚动的位置
-class _PinnedHeroDelegate extends SliverPersistentHeaderDelegate {
-  final Widget child;
-
-  _PinnedHeroDelegate({required this.child});
-
-  @override
-  double get minExtent => 0; // 允许 fully retract, 但 pinned=true 时保持可见
-  @override
-  double get maxExtent => 240; // 足够容纳 hero 卡 (按需调)
-
-  @override
-  Widget build(BuildContext context, double shrinkOffset, bool overlapsContent) {
-    return Material(
-      color: const Color(0xFFF8F6FF), // 跟 Scaffold 背景一致, 滚动时续上
-      child: child,
-    );
-  }
-
-  @override
-  bool shouldRebuild(_PinnedHeroDelegate oldDelegate) => false;
-}
+// 7/30: _PinnedHeroDelegate 已删 (不用 SliverPersistentHeader, 改用 Column[hero + Expanded(ListView)] 模式)
 
 class _QuoteHeroCard extends StatelessWidget {
   final ContentItem latest;
@@ -1294,20 +1283,21 @@ class _QuoteHeroCard extends StatelessWidget {
             ),
           ],
         ),
-        padding: EdgeInsets.all(20 * scale),
+        padding: EdgeInsets.all(14 * scale),
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
+          mainAxisSize: MainAxisSize.min, // 7/30: 自适应高度 — 内容多则高, 内容少则矮
           children: [
             // 顶部一行: 标签 + 总数 + 删除
             Row(
               children: [
-                Icon(Icons.format_quote, color: Colors.white, size: 18 * scale),
+                Icon(Icons.format_quote, color: Colors.white, size: 16 * scale),
                 SizedBox(width: 6 * scale),
                 Text(
                   isEn ? 'Latest saved quote' : '刚收藏的名言',
                   style: TextStyle(
                     color: Colors.white.withOpacity(0.92),
-                    fontSize: 12 * scale,
+                    fontSize: 11 * scale,
                     fontWeight: FontWeight.w600,
                   ),
                 ),
@@ -1334,15 +1324,15 @@ class _QuoteHeroCard extends StatelessWidget {
                 ),
               ],
             ),
-            SizedBox(height: 16 * scale),
+            SizedBox(height: 10 * scale),
             // 正文 quote
             Row(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
                 // 圆形 avatar
                 Container(
-                  width: 56 * scale,
-                  height: 56 * scale,
+                  width: 44 * scale,
+                  height: 44 * scale,
                   decoration: BoxDecoration(
                     color: Colors.white.withOpacity(0.2),
                     shape: BoxShape.circle,
@@ -1353,22 +1343,23 @@ class _QuoteHeroCard extends StatelessWidget {
                     _authorInit(),
                     style: TextStyle(
                       color: Colors.white,
-                      fontSize: 22 * scale,
+                      fontSize: 18 * scale,
                       fontWeight: FontWeight.w700,
                     ),
                   ),
                 ),
-                SizedBox(width: 14 * scale),
+                SizedBox(width: 12 * scale),
                 Expanded(
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
+                    mainAxisSize: MainAxisSize.min,
                     children: [
                       // title = 作者名
                       Text(
                         latest.title,
                         style: TextStyle(
                           color: Colors.white,
-                          fontSize: 18 * scale,
+                          fontSize: 16 * scale,
                           fontWeight: FontWeight.w700,
                         ),
                         maxLines: 1,
@@ -1376,16 +1367,16 @@ class _QuoteHeroCard extends StatelessWidget {
                       ),
                       if (latest.description != null && latest.description!.isNotEmpty)
                         Padding(
-                          padding: EdgeInsets.only(top: 6 * scale),
+                          padding: EdgeInsets.only(top: 4 * scale),
                           child: Text(
                             latest.description!,
                             style: TextStyle(
                               color: Colors.white.withOpacity(0.95),
-                              fontSize: 14 * scale,
+                              fontSize: 13 * scale,
                               fontStyle: FontStyle.italic,
-                              height: 1.5,
+                              height: 1.4,
                             ),
-                            maxLines: 4,
+                            maxLines: 6, // 7/30: 4 → 6, 长 quote 不被截
                             overflow: TextOverflow.ellipsis,
                           ),
                         ),
@@ -1394,20 +1385,20 @@ class _QuoteHeroCard extends StatelessWidget {
                 ),
               ],
             ),
-            SizedBox(height: 12 * scale),
+            SizedBox(height: 8 * scale),
             // 底部: 日期 + 阅读时长
             Row(
               children: [
-                Icon(Icons.access_time, color: Colors.white.withOpacity(0.7), size: 13 * scale),
+                Icon(Icons.access_time, color: Colors.white.withOpacity(0.7), size: 12 * scale),
                 SizedBox(width: 4 * scale),
                 Text(
                   '《收藏于 ${d.month}月${d.day}日》',
-                  style: TextStyle(color: Colors.white.withOpacity(0.7), fontSize: 11 * scale),
+                  style: TextStyle(color: Colors.white.withOpacity(0.7), fontSize: 10 * scale),
                 ),
                 const Spacer(),
                 Text(
                   '“${latest.duration}”',
-                  style: TextStyle(color: Colors.white.withOpacity(0.65), fontSize: 11 * scale),
+                  style: TextStyle(color: Colors.white.withOpacity(0.65), fontSize: 10 * scale),
                 ),
               ],
             ),
@@ -1596,19 +1587,20 @@ class _ContentHeroCard extends StatelessWidget {
               ),
             ],
           ),
-          padding: EdgeInsets.all(20 * s),
+          padding: EdgeInsets.all(14 * s),
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
+            mainAxisSize: MainAxisSize.min, // 7/30: 自适应高度
             children: [
               Row(
                 children: [
-                  Icon(Icons.bookmark, color: Colors.white, size: 18 * s),
+                  Icon(Icons.bookmark, color: Colors.white, size: 16 * s),
                   SizedBox(width: 6 * s),
                   Text(
                     isEn ? 'Latest saved content' : '刚收藏的内容',
                     style: TextStyle(
                       color: Colors.white.withOpacity(0.92),
-                      fontSize: 12 * s,
+                      fontSize: 11 * s,
                       fontWeight: FontWeight.w600,
                     ),
                   ),
@@ -1635,60 +1627,61 @@ class _ContentHeroCard extends StatelessWidget {
                   ),
                 ],
               ),
-              SizedBox(height: 16 * s),
+              SizedBox(height: 10 * s),
               Row(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
                   // 17/28 Q1=C: 紫底 8% + 源色 icon (双层)
                   Container(
-                    width: 56 * s,
-                    height: 56 * s,
+                    width: 44 * s,
+                    height: 44 * s,
                     decoration: BoxDecoration(
                       color: Colors.white,
                       shape: BoxShape.circle,
                       boxShadow: [
                         BoxShadow(
                           color: sourceColor.withOpacity(0.4),
-                          blurRadius: 12,
-                          offset: const Offset(0, 3),
+                          blurRadius: 8,
+                          offset: const Offset(0, 2),
                         ),
                       ],
                     ),
                     alignment: Alignment.center,
-                    child: Icon(sourceIcon, color: sourceColor, size: 26 * s),
+                    child: Icon(sourceIcon, color: sourceColor, size: 22 * s),
                   ),
-                  SizedBox(width: 14 * s),
+                  SizedBox(width: 12 * s),
                   Expanded(
                     child: Column(
                       crossAxisAlignment: CrossAxisAlignment.start,
+                      mainAxisSize: MainAxisSize.min,
                       children: [
                         // title = 内容标题
                         Text(
                           latest.title,
                           style: TextStyle(
                             color: Colors.white,
-                            fontSize: 16 * s,
+                            fontSize: 15 * s,
                             fontWeight: FontWeight.w700,
                           ),
-                          maxLines: 2,
+                          maxLines: 3, // 7/30: 2 → 3, 长内容不被截
                           overflow: TextOverflow.ellipsis,
                         ),
-                        SizedBox(height: 6 * s),
+                        SizedBox(height: 4 * s),
                         // 副: 时长 + source + 内容类型
                         Row(
                           children: [
-                            Icon(Icons.access_time, color: Colors.white.withOpacity(0.7), size: 12 * s),
+                            Icon(Icons.access_time, color: Colors.white.withOpacity(0.7), size: 11 * s),
                             SizedBox(width: 3 * s),
                             Text(
                               latest.duration,
-                              style: TextStyle(color: Colors.white.withOpacity(0.85), fontSize: 11 * s),
+                              style: TextStyle(color: Colors.white.withOpacity(0.85), fontSize: 10 * s),
                             ),
-                            SizedBox(width: 8 * s),
+                            SizedBox(width: 6 * s),
                             Text(
                               '• ${latest.source}',
-                              style: TextStyle(color: Colors.white.withOpacity(0.85), fontSize: 11 * s),
+                              style: TextStyle(color: Colors.white.withOpacity(0.85), fontSize: 10 * s),
                             ),
-                            SizedBox(width: 8 * s),
+                            SizedBox(width: 6 * s),
                             Container(
                               padding: EdgeInsets.symmetric(horizontal: 6 * s, vertical: 1 * s),
                               decoration: BoxDecoration(
