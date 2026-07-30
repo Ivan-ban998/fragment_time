@@ -56,4 +56,15 @@ class ContentAggregator {
       return [];
     }
   }
+
+  // 7/30: 按 ContentSource 取所有匹配 item (tab-收藏 → 点平台跳详情用)
+  // 沿用 24 桶假数据 (点 36 氪 / B站等能看到现有假内容先, 不接真 RSS 避免 #103 #117 CORS 撞坑)
+  Future<List<ContentItem>> fetchBySource(ContentSource source) async {
+    try {
+      return await news.fetchAllBySource(source);
+    } catch (e) {
+      debugPrint('[aggregator] fetchBySource error: $e');
+      return [];
+    }
+  }
 }

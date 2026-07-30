@@ -93,6 +93,19 @@ class NewsService {
     return _allContent[key] ?? _fallback(userType, scene);
   }
 
+  // 7/30: 按 ContentSource 跨 24 桶取所有匹配 items (供 SourceDetailScreen 用)
+  // 沿用 #103 不接真 RSS: 用现有假数据 (点进 36 氪能看到 6 条假内容先)
+  Future<List<ContentItem>> fetchAllBySource(ContentSource source) async {
+    final results = <ContentItem>[];
+    for (final list in _allContent.values) {
+      for (final item in list) {
+        if (item.sourceType == source) results.add(item);
+      }
+    }
+    debugPrint('[news] fetchAllBySource(${source.name}) → ${results.length} items');
+    return results;
+  }
+
   // 6 角色 × 4 场景 = 24 种推荐，每个 key 至少 4-6 条
   // 6/7 §10 验：24/24 keys 都非空
   static final Map<String, List<ContentItem>> _allContent = {

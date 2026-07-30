@@ -10,6 +10,7 @@ import '../services/handle_service.dart';
 import '../widgets/skeleton.dart';
 import 'content_reader_screen.dart';
 import 'subscription_screen.dart';
+import 'source_detail_screen.dart';
 
 class MySubscriptionsScreen extends StatefulWidget {
   final bool isElderlyMode;
@@ -206,6 +207,8 @@ class _MySubscriptionsScreenState extends State<MySubscriptionsScreen>
         children: [
           // 7/20 16:48 Brien 反馈 "收藏内容多了, 让用户搜搜" → 加搜索框 (跨 3 个子 Tab 共享)
           _buildSearchBar(scale, isEn),
+          // 7/30 Brien "顶部汇总栏不要随滚动溜走" → 拆出来不滚动 (仍显示在搜索框下方, TabBarView 自身滚动)
+          _buildStickySummary(scale, isEn),
           Expanded(
             child: TabBarView(
               controller: _tabController,
@@ -278,6 +281,88 @@ class _MySubscriptionsScreenState extends State<MySubscriptionsScreen>
           ),
         ),
       ),
+    );
+  }
+
+  // 7/30 Brien 反馈 "顶部汇总不要随滚动溜走" → 这里在搜索框下加一个轻量 compact 汇总 (3 个子 Tab 共享)
+  // 不动 SliverPersistentHeader (考虑搜索框 + Tab 切换 是 fixed 原因, 只需 _buildFollowingTab 顶部加 pinned 容器.
+  // 这里为简化: 仅在 “关注” 子 Tab 顶部加一个 _buildStickySummary (其他 2 个子 Tab 原本就无关注计数, 不需总计 0/0) ).
+  // 这背后: 主设计是 "搜索框 + sticky summary 仅在 Tab 3 才显示, 但 Tab 1/2 默认隐藏" — 走 _buildStickySummary(isFollowing:true) 控制可见.
+  Widget _buildStickySummary(double scale, bool isEn) {
+    // 7/30 简化: 为了避免 Tab 1/2 出现 “0 平台 / 0 类目” 语义误导 (默认隐藏), 仅在 Tab 3 (关注) 时可见.
+    // 用 AnimatedSwitcher + ListenableBuilder 听订阅变化
+    return ListenableBuilder(
+      listenable: LocalSubscriptionService.instance,
+      builder: (context, _) {
+        return AnimatedSwitcher(
+          duration: const Duration(milliseconds: 200),
+          child: _tabController.index == 2 ? _buildSummaryBar(scale, isEn) : const SizedBox.shrink(key: ValueKey('hidden')),
+        );
+      },
+    );
+  }
+
+  Widget _buildSummaryBar(double scale, bool isEn) {
+    return FutureBuilder<List<dynamic>>(
+      future: () async {
+        final sources = await SubscriptionService.instance.getSubscribedSources();
+        final categories = await SubscriptionService.instance.getSubscribedCategories();
+        return [sources.length, categories.length];
+      }(),
+      builder: (context, snap) {
+        final p = snap.data?[0] ?? 0;
+        final c = snap.data?[1] ?? 0;
+        return Container(
+          key: const ValueKey('shown'),
+          margin: EdgeInsets.symmetric(horizontal: 16 * scale),
+          padding: EdgeInsets.symmetric(horizontal: 14 * scale, vertical: 10 * scale),
+          decoration: BoxDecoration(
+            color: AppTheme.primary.withOpacity(0.08),
+            borderRadius: BorderRadius.circular(12),
+            border: Border.all(color: AppTheme.primary.withOpacity(0.2)),
+          ),
+          child: Row(
+            children: [
+              Icon(Icons.subscriptions, size: 16 * scale, color: AppTheme.primary),
+              SizedBox(width: 8 * scale),
+              Expanded(
+                child: Text(
+                  isEn
+                      ? 'Following $p platforms · $c categories'
+                      : '我关注了 $p 个平台 · $c 个类目',
+                  style: TextStyle(
+                    fontSize: 13 * scale,
+                    color: AppTheme.primary,
+                    fontWeight: FontWeight.w500,
+                  ),
+                ),
+              ),
+              GestureDetector(
+                onTap: () {
+                  Navigator.push(
+                    context,
+                    MaterialPageRoute(builder: (_) => const SubscriptionScreen()),
+                  );
+                },
+                child: Row(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    Text(
+                      isEn ? 'Manage' : '管理',
+                      style: TextStyle(
+                        fontSize: 12 * scale,
+                        color: AppTheme.primary,
+                        fontWeight: FontWeight.w600,
+                      ),
+                    ),
+                    Icon(Icons.chevron_right, size: 14 * scale, color: AppTheme.primary),
+                  ],
+                ),
+              ),
+            ],
+          ),
+        );
+      },
     );
   }
 
@@ -534,40 +619,45 @@ class _MySubscriptionsScreenState extends State<MySubscriptionsScreen>
             return ListView(
               padding: EdgeInsets.fromLTRB(16 * scale, 16 * scale, 16 * scale, 32 * scale),
               children: [
-                // 17:45 方案 A: Hero 统计
-                _FollowingHeroCard(
-                  platformCount: sources.length,
-                  categoryCount: categories.length,
-                  scale: scale,
-                  isEn: isEn,
-                  onManage: () {
-                    Navigator.push(
-                      context,
-                      MaterialPageRoute(builder: (_) => const SubscriptionScreen()),
-                    );
-                  },
-                ),
-                SizedBox(height: 16 * scale),
+                // 7/30 去掉原先的 _FollowingHeroCard (移到顶部 _buildStickySummary 作 pinned 汇总)
+                SizedBox(height: 12 * scale),
+                // 7/30 Brien "点关注平台/类别 → 看推荐最新热门" → 加横向 chip 跳转 SourceDetailScreen
+                // 多关注也不需竖翻 (总在一屏内)
                 if (sources.isNotEmpty) ...[
                   _FollowingSectionHeader(
-                    label: isEn
-                        ? 'PLATFORMS'
-                        : '关注平台',
+                    label: isEn ? 'PLATFORMS' : '关注平台',
                     icon: Icons.subscriptions,
                     scale: scale,
                   ),
                   SizedBox(height: 12 * scale),
-                  ...sources.map<Widget>((s) => _FollowingSourceRow(
-                        source: s,
-                        isEn: isEn,
-                        scale: scale,
-                        onRemove: () async {
-                          // ignore: use_build_context_synchronously
-                          await SubscriptionService.instance.unsubscribeSource(s);
-                          // 强制刷新: pop+push 重建 tab
-                          (context as Element).markNeedsBuild();
-                        },
-                      )),
+                  SizedBox(
+                    height: 48 * scale,
+                    child: ListView.separated(
+                      scrollDirection: Axis.horizontal,
+                      itemCount: sources.length,
+                      separatorBuilder: (_, __) => SizedBox(width: 8 * scale),
+                      itemBuilder: (context, i) {
+                        final s = sources[i];
+                        return _FollowingSourceChip(
+                          source: s,
+                          isEn: isEn,
+                          scale: scale,
+                          onTap: () {
+                            Navigator.push(
+                              context,
+                              MaterialPageRoute(
+                                builder: (_) => SourceDetailScreen(
+                                  source: s,
+                                  isElderlyMode: widget.isElderlyMode,
+                                  isEn: widget.isEn,
+                                ),
+                              ),
+                            );
+                          },
+                        );
+                      },
+                    ),
+                  ),
                   SizedBox(height: 20 * scale),
                 ],
                 if (categories.isNotEmpty) ...[
@@ -579,21 +669,113 @@ class _MySubscriptionsScreenState extends State<MySubscriptionsScreen>
                     scale: scale,
                   ),
                   SizedBox(height: 12 * scale),
-                  ...categories.map<Widget>((c) => _FollowingCategoryRow(
-                        categoryName: c,
-                        isEn: isEn,
-                        scale: scale,
-                        onRemove: () async {
-                          // ignore: use_build_context_synchronously
-                          await SubscriptionService.instance.unsubscribeCategory(c);
-                          (context as Element).markNeedsBuild();
-                        },
-                      )),
+                  SizedBox(
+                    height: 48 * scale,
+                    child: ListView.separated(
+                      scrollDirection: Axis.horizontal,
+                      itemCount: categories.length,
+                      separatorBuilder: (_, __) => SizedBox(width: 8 * scale),
+                      itemBuilder: (context, i) {
+                        final c = categories[i];
+                        return _FollowingCategoryChip(
+                          categoryName: c,
+                          isEn: isEn,
+                          scale: scale,
+                          onTap: () {
+                            // 7/30: 类目 → 暂时推同样的 SourceDetailScreen 仅以 name 区分 (后续可加 CategoryDetailScreen)
+                            ScaffoldMessenger.of(context).showSnackBar(
+                              SnackBar(
+                                content: Text(
+                                  isEn
+                                      ? '"$c" category detail coming soon'
+                                      : '"$c" 类目详情即将上线',
+                                ),
+                              ),
+                            );
+                          },
+                        );
+                      },
+                    ),
+                  ),
                 ],
               ],
             );
           },
         );
+  }
+
+  // 7/30: 平台横滑 chip — 点击跳 SourceDetailScreen
+  Widget _FollowingSourceChip({
+    required ContentSource source,
+    required bool isEn,
+    required double scale,
+    required VoidCallback onTap,
+  }) {
+    return Material(
+      color: AppTheme.primary.withOpacity(0.1),
+      borderRadius: BorderRadius.circular(24),
+      child: InkWell(
+        borderRadius: BorderRadius.circular(24),
+        onTap: onTap,
+        child: Padding(
+          padding: EdgeInsets.symmetric(horizontal: 14 * scale, vertical: 8 * scale),
+          child: Row(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Icon(source.icon, size: 16 * scale, color: AppTheme.primary),
+              SizedBox(width: 6 * scale),
+              Text(
+                source.name,
+                style: TextStyle(
+                  fontSize: 13 * scale,
+                  color: AppTheme.primary,
+                  fontWeight: FontWeight.w500,
+                ),
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+
+  // 7/30: 类目横滑 chip — 点击推 placeholder (CategoryDetailScreen 后续加)
+  Widget _FollowingCategoryChip({
+    required String categoryName,
+    required bool isEn,
+    required double scale,
+    required VoidCallback onTap,
+  }) {
+    return Material(
+      color: Colors.white.withOpacity(0.85),
+      borderRadius: BorderRadius.circular(24),
+      child: InkWell(
+        borderRadius: BorderRadius.circular(24),
+        onTap: onTap,
+        child: Container(
+          padding: EdgeInsets.symmetric(horizontal: 14 * scale, vertical: 8 * scale),
+          decoration: BoxDecoration(
+            borderRadius: BorderRadius.circular(24),
+            border: Border.all(color: Colors.black12),
+          ),
+          child: Row(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Icon(Icons.local_offer_outlined, size: 14 * scale, color: Colors.black54),
+              SizedBox(width: 6 * scale),
+              Text(
+                categoryName,
+                style: TextStyle(
+                  fontSize: 13 * scale,
+                  color: Colors.black87,
+                  fontWeight: FontWeight.w500,
+                ),
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
   }
 
   // 17:45: 关注 Tab 顶部 Hero 统计 (紫色 24 圆角, 56x56 avatar + 数字 + 管理按钮)

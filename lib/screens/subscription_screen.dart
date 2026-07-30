@@ -157,7 +157,18 @@ class _SubscriptionScreenState extends State<SubscriptionScreen> {
                         .map((source) => _buildSourceChip(source, _selectedSources.contains(source), isEn))
                         .toList(),
                   ),
-                  const SizedBox(height: 24),
+                  const SizedBox(height: 8),
+                  // 7/30: + 自定义 RSS 入口 (沿用 #103 #117 不接真 RSS, 仅存 URL+名字, 后续拉取接入)
+                  Align(
+                    alignment: Alignment.centerLeft,
+                    child: TextButton.icon(
+                      onPressed: () => _showAddCustomRssDialog(context, isEn),
+                      icon: const Icon(Icons.add_link, size: 18),
+                      label: Text(isEn ? 'Add custom RSS feed' : '+ 自定义 RSS 地址'),
+                      style: TextButton.styleFrom(foregroundColor: AppTheme.primary),
+                    ),
+                  ),
+                  const SizedBox(height: 16),
                   Text(
                     isEn ? 'Categories' : '内容类目',
                     style: const TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
@@ -174,6 +185,17 @@ class _SubscriptionScreenState extends State<SubscriptionScreen> {
                     children: allCategories
                         .map((cat) => _buildCategoryChip(cat, _selectedCategories.contains(cat)))
                         .toList(),
+                  ),
+                  const SizedBox(height: 8),
+                  // 7/30: + 新建类目 入口 (仅需 subscribeCategory 存一下)
+                  Align(
+                    alignment: Alignment.centerLeft,
+                    child: TextButton.icon(
+                      onPressed: () => _showAddCustomCategoryDialog(context, isEn),
+                      icon: const Icon(Icons.add, size: 18),
+                      label: Text(isEn ? 'Add custom category' : '+ 新建类目'),
+                      style: TextButton.styleFrom(foregroundColor: AppTheme.primary),
+                    ),
                   ),
                   const SizedBox(height: 32),
                   Card(
@@ -373,6 +395,98 @@ class _SubscriptionScreenState extends State<SubscriptionScreen> {
         Text(value, style: const TextStyle(fontSize: 24, fontWeight: FontWeight.bold, color: AppTheme.primary)),
         Text(label, style: TextStyle(color: AppTheme.textLight, fontSize: 12)),
       ],
+    );
+  }
+
+  // 7/30: + 自定义 RSS 对话框 — 名字 + URL (存 prefs, 后续拉取接入)
+  void _showAddCustomRssDialog(BuildContext context, bool isEn) {
+    final nameCtrl = TextEditingController();
+    final urlCtrl = TextEditingController();
+    showDialog(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        title: Text(isEn ? 'Add RSS feed' : '添加 RSS 订阅'),
+        content: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            TextField(
+              controller: nameCtrl,
+              decoration: InputDecoration(
+                labelText: isEn ? 'Name (e.g. Tech News)' : '名称 (例: 科技早知道)',
+              ),
+            ),
+            const SizedBox(height: 12),
+            TextField(
+              controller: urlCtrl,
+              decoration: InputDecoration(
+                labelText: isEn ? 'RSS URL (https://...)' : 'RSS URL (https://...)',
+              ),
+              keyboardType: TextInputType.url,
+            ),
+          ],
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(ctx),
+            child: Text(isEn ? 'Cancel' : '取消'),
+          ),
+          FilledButton(
+            onPressed: () async {
+              final name = nameCtrl.text.trim();
+              final url = urlCtrl.text.trim();
+              if (name.isEmpty || url.isEmpty) {
+                _showFloatingSnack(ctx, isEn ? 'Both required' : '名称和 URL 都需要填');
+                return;
+              }
+              if (!url.startsWith('http')) {
+                _showFloatingSnack(ctx, isEn ? 'URL must start with http(s)' : 'URL 必须以 http 开头');
+                return;
+              }
+              await SubscriptionService.instance.addCustomRss(name, url);
+              if (ctx.mounted) Navigator.pop(ctx);
+              _showFloatingSnack(context, isEn ? 'RSS added' : 'RSS 已添加');
+            },
+            child: Text(isEn ? 'Add' : '添加'),
+          ),
+        ],
+      ),
+    );
+  }
+
+  // 7/30: + 新建类目 对话框 — 名字 (直接 subscribeCategory)
+  void _showAddCustomCategoryDialog(BuildContext context, bool isEn) {
+    final catCtrl = TextEditingController();
+    showDialog(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        title: Text(isEn ? 'New category' : '新建类目'),
+        content: TextField(
+          controller: catCtrl,
+          decoration: InputDecoration(
+            labelText: isEn ? 'Category name' : '类目名 (例: 摄影技巧)',
+          ),
+          autofocus: true,
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(ctx),
+            child: Text(isEn ? 'Cancel' : '取消'),
+          ),
+          FilledButton(
+            onPressed: () async {
+              final cat = catCtrl.text.trim();
+              if (cat.isEmpty) {
+                _showFloatingSnack(ctx, isEn ? 'Name required' : '名称不能为空');
+                return;
+              }
+              await SubscriptionService.instance.subscribeCategory(cat);
+              if (ctx.mounted) Navigator.pop(ctx);
+              _showFloatingSnack(context, isEn ? 'Category added' : '类目已添加');
+            },
+            child: Text(isEn ? 'Add' : '添加'),
+          ),
+        ],
+      ),
     );
   }
 }
