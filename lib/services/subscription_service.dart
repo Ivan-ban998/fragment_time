@@ -7,6 +7,15 @@ class SubscriptionService {
 
   static const String _sourcesKey = 'subscribed_sources';
   static const String _categoriesKey = 'subscribed_categories';
+  // 7/30: 自定义 RSS — List<String>, 每条格式 'name|url'
+  static const String _customRssKey = 'custom_rss_feeds';
+
+  /// 7/30: 自定义 RSS 项 (name + url)
+  static MapEntry<String, String> parseCustomRss(String combined) {
+    final idx = combined.indexOf('|');
+    if (idx < 0) return MapEntry(combined, '');
+    return MapEntry(combined.substring(0, idx), combined.substring(idx + 1));
+  }
 
   // 6/7 立：宪法 §3 假数据可上线，但平台/类目订阅必须持久化（用户基本设置）
   // 6/8 修复：从 8 个补到 12 个（跟 UI chip 列表对齐，补了 心理/音乐/体育/冥想/编程/理财）
@@ -119,6 +128,27 @@ class SubscriptionService {
   Future<void> _saveCategories(Set<String> categories) async {
     final prefs = await SharedPreferences.getInstance();
     await prefs.setStringList(_categoriesKey, categories.toList());
+  }
+
+  // 7/30: 自定义 RSS feed 管理
+  Future<List<MapEntry<String, String>>> getCustomRssList() async {
+    final prefs = await SharedPreferences.getInstance();
+    final list = prefs.getStringList(_customRssKey) ?? [];
+    return list.map(parseCustomRss).toList();
+  }
+
+  Future<void> addCustomRss(String name, String url) async {
+    final prefs = await SharedPreferences.getInstance();
+    final list = prefs.getStringList(_customRssKey) ?? [];
+    list.add('$name|$url');
+    await prefs.setStringList(_customRssKey, list);
+  }
+
+  Future<void> removeCustomRss(String combined) async {
+    final prefs = await SharedPreferences.getInstance();
+    final list = prefs.getStringList(_customRssKey) ?? [];
+    list.remove(combined);
+    await prefs.setStringList(_customRssKey, list);
   }
 
   Future<List<ContentItem>> fetchSubscribedContent() async {
