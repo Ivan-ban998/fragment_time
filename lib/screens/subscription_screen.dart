@@ -113,115 +113,140 @@ class _SubscriptionScreenState extends State<SubscriptionScreen> {
                 child: ListItemSkeleton(),
               ),
             )
-          : SingleChildScrollView(
-              padding: const EdgeInsets.all(20),
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Container(
-                    padding: const EdgeInsets.all(12),
-                    decoration: BoxDecoration(
-                      color: AppTheme.primary.withOpacity(0.1),
-                      borderRadius: BorderRadius.circular(12),
-                    ),
-                    child: Row(
-                      children: [
-                        Icon(Icons.info_outline, color: AppTheme.primary, size: 20),
-                        const SizedBox(width: 8),
-                        Expanded(
-                          child: Text(
-                            isEn
-                                ? 'Follow platforms and topics you care about — your feed will be tailored.'
-                                : '订阅你感兴趣的内容，每次打开只看你想看的',
-                            style: const TextStyle(color: AppTheme.primary, fontSize: 13),
+          // 7/30: 拆 Column[钉住(管理区) + Expanded(预览列表)]
+          // — Platforms / Categories / Stats 不滚, 预览标题 + 列表可独立滚
+          : Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                SingleChildScrollView(
+                  padding: const EdgeInsets.fromLTRB(20, 16, 20, 8),
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Container(
+                        padding: const EdgeInsets.all(12),
+                        decoration: BoxDecoration(
+                          color: AppTheme.primary.withOpacity(0.1),
+                          borderRadius: BorderRadius.circular(12),
+                        ),
+                        child: Row(
+                          children: [
+                            Icon(Icons.info_outline, color: AppTheme.primary, size: 20),
+                            const SizedBox(width: 8),
+                            Expanded(
+                              child: Text(
+                                isEn
+                                    ? 'Follow platforms and topics you care about — your feed will be tailored.'
+                                    : '订阅你感兴趣的内容，每次打开只看你想看的',
+                                style: const TextStyle(color: AppTheme.primary, fontSize: 13),
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
+                      const SizedBox(height: 20),
+                      Text(
+                        isEn ? 'Platforms' : '内容来源',
+                        style: const TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
+                      ),
+                      const SizedBox(height: 4),
+                      Text(
+                        isEn ? 'Tap to toggle subscriptions' : '点击切换订阅',
+                        style: TextStyle(color: AppTheme.textLight, fontSize: 12),
+                      ),
+                      const SizedBox(height: 12),
+                      Wrap(
+                        spacing: 8,
+                        runSpacing: 8,
+                        children: SubscriptionService.allSources
+                            .map((source) => _buildSourceChip(source, _selectedSources.contains(source), isEn))
+                            .toList(),
+                      ),
+                      const SizedBox(height: 8),
+                      // 7/30: + 自定义 RSS 入口 (沿用 #103 #117 不接真 RSS, 仅存 URL+名字, 后续拉取接入)
+                      Align(
+                        alignment: Alignment.centerLeft,
+                        child: TextButton.icon(
+                          onPressed: () => _showAddCustomRssDialog(context, isEn),
+                          icon: const Icon(Icons.add_link, size: 18),
+                          label: Text(isEn ? 'Add custom RSS feed' : '+ 自定义 RSS 地址'),
+                          style: TextButton.styleFrom(foregroundColor: AppTheme.primary),
+                        ),
+                      ),
+                      const SizedBox(height: 16),
+                      Text(
+                        isEn ? 'Categories' : '内容类目',
+                        style: const TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
+                      ),
+                      const SizedBox(height: 4),
+                      Text(
+                        isEn ? 'Narrow down by topics' : '精准订阅你感兴趣的细分领域',
+                        style: TextStyle(color: AppTheme.textLight, fontSize: 12),
+                      ),
+                      const SizedBox(height: 12),
+                      Wrap(
+                        spacing: 8,
+                        runSpacing: 8,
+                        children: allCategories
+                            .map((cat) => _buildCategoryChip(cat, _selectedCategories.contains(cat)))
+                            .toList(),
+                      ),
+                      const SizedBox(height: 8),
+                      // 7/30: + 新建类目 入口 (仅需 subscribeCategory 存一下)
+                      Align(
+                        alignment: Alignment.centerLeft,
+                        child: TextButton.icon(
+                          onPressed: () => _showAddCustomCategoryDialog(context, isEn),
+                          icon: const Icon(Icons.add, size: 18),
+                          label: Text(isEn ? 'Add custom category' : '+ 新建类目'),
+                          style: TextButton.styleFrom(foregroundColor: AppTheme.primary),
+                        ),
+                      ),
+                      const SizedBox(height: 16),
+                      Card(
+                        margin: EdgeInsets.zero,
+                        child: Padding(
+                          padding: const EdgeInsets.all(16),
+                          child: Row(
+                            mainAxisAlignment: MainAxisAlignment.spaceAround,
+                            children: [
+                              _buildStat(
+                                isEn ? 'Platforms' : '已订来源',
+                                '${_selectedSources.length}',
+                              ),
+                              Container(width: 1, height: 40, color: Colors.grey[300]),
+                              _buildStat(
+                                isEn ? 'Categories' : '已订类目',
+                                '${_selectedCategories.length}',
+                              ),
+                            ],
                           ),
                         ),
-                      ],
-                    ),
-                  ),
-                  const SizedBox(height: 24),
-                  Text(
-                    isEn ? 'Platforms' : '内容来源',
-                    style: const TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
-                  ),
-                  const SizedBox(height: 4),
-                  Text(
-                    isEn ? 'Tap to toggle subscriptions' : '点击切换订阅',
-                    style: TextStyle(color: AppTheme.textLight, fontSize: 12),
-                  ),
-                  const SizedBox(height: 12),
-                  Wrap(
-                    spacing: 8,
-                    runSpacing: 8,
-                    children: SubscriptionService.allSources
-                        .map((source) => _buildSourceChip(source, _selectedSources.contains(source), isEn))
-                        .toList(),
-                  ),
-                  const SizedBox(height: 8),
-                  // 7/30: + 自定义 RSS 入口 (沿用 #103 #117 不接真 RSS, 仅存 URL+名字, 后续拉取接入)
-                  Align(
-                    alignment: Alignment.centerLeft,
-                    child: TextButton.icon(
-                      onPressed: () => _showAddCustomRssDialog(context, isEn),
-                      icon: const Icon(Icons.add_link, size: 18),
-                      label: Text(isEn ? 'Add custom RSS feed' : '+ 自定义 RSS 地址'),
-                      style: TextButton.styleFrom(foregroundColor: AppTheme.primary),
-                    ),
-                  ),
-                  const SizedBox(height: 16),
-                  Text(
-                    isEn ? 'Categories' : '内容类目',
-                    style: const TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
-                  ),
-                  const SizedBox(height: 4),
-                  Text(
-                    isEn ? 'Narrow down by topics' : '精准订阅你感兴趣的细分领域',
-                    style: TextStyle(color: AppTheme.textLight, fontSize: 12),
-                  ),
-                  const SizedBox(height: 12),
-                  Wrap(
-                    spacing: 8,
-                    runSpacing: 8,
-                    children: allCategories
-                        .map((cat) => _buildCategoryChip(cat, _selectedCategories.contains(cat)))
-                        .toList(),
-                  ),
-                  const SizedBox(height: 8),
-                  // 7/30: + 新建类目 入口 (仅需 subscribeCategory 存一下)
-                  Align(
-                    alignment: Alignment.centerLeft,
-                    child: TextButton.icon(
-                      onPressed: () => _showAddCustomCategoryDialog(context, isEn),
-                      icon: const Icon(Icons.add, size: 18),
-                      label: Text(isEn ? 'Add custom category' : '+ 新建类目'),
-                      style: TextButton.styleFrom(foregroundColor: AppTheme.primary),
-                    ),
-                  ),
-                  const SizedBox(height: 32),
-                  Card(
-                    child: Padding(
-                      padding: const EdgeInsets.all(16),
-                      child: Row(
-                        mainAxisAlignment: MainAxisAlignment.spaceAround,
-                        children: [
-                          _buildStat(
-                            isEn ? 'Platforms' : '已订来源',
-                            '${_selectedSources.length}',
-                          ),
-                          Container(width: 1, height: 40, color: Colors.grey[300]),
-                          _buildStat(
-                            isEn ? 'Categories' : '已订类目',
-                            '${_selectedCategories.length}',
-                          ),
-                        ],
                       ),
-                    ),
+                    ],
                   ),
-                  const SizedBox(height: 24),
-                  // 已订内容预览（从 SubscriptionService.fetchSubscribedContent 拿）
-                  _buildSubscribedContent(isEn),
-                  const SizedBox(height: 24),
-                  Center(
+                ),
+                // 7/30: “订阅内容预览” 标题钉住 (单独 row, 不滚)
+                Padding(
+                  padding: const EdgeInsets.fromLTRB(20, 16, 20, 8),
+                  child: Row(
+                    children: [
+                      Icon(Icons.preview_outlined, color: AppTheme.primary, size: 18),
+                      const SizedBox(width: 6),
+                      Text(
+                        isEn ? 'Preview of your feed' : '订阅内容预览',
+                        style: const TextStyle(fontSize: 16, fontWeight: FontWeight.w600),
+                      ),
+                    ],
+                  ),
+                ),
+                // 预览列表独立滚
+                Expanded(
+                  child: _buildSubscribedContent(isEn),
+                ),
+                Padding(
+                  padding: const EdgeInsets.fromLTRB(20, 8, 20, 16),
+                  child: Center(
                     child: Text(
                       isEn
                           ? 'Your follows are saved. The "Saved" tab shows your bookmarks, separate from this.'
@@ -230,8 +255,8 @@ class _SubscriptionScreenState extends State<SubscriptionScreen> {
                       style: TextStyle(color: AppTheme.textLight, fontSize: 12),
                     ),
                   ),
-                ],
-              ),
+                ),
+              ],
             ),
     );
   }
@@ -256,19 +281,24 @@ class _SubscriptionScreenState extends State<SubscriptionScreen> {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        Text(
-          isEn ? 'Preview of your feed' : '订阅内容预览',
-          style: const TextStyle(fontSize: 16, fontWeight: FontWeight.bold),
-        ),
-        const SizedBox(height: 4),
-        Text(
-          isEn
-              ? 'Showing first 5 items from your selected platforms'
-              : '从你选择的平台展示前 5 条',
-          style: TextStyle(color: AppTheme.textLight, fontSize: 12),
+        Padding(
+          padding: const EdgeInsets.symmetric(horizontal: 20),
+          child: Text(
+            isEn
+                ? 'Showing first 5 items from your selected platforms'
+                : '从你选择的平台展示前 5 条',
+            style: TextStyle(color: AppTheme.textLight, fontSize: 12),
+          ),
         ),
         const SizedBox(height: 12),
-        ..._previewItems.take(5).map((item) => _buildPreviewCard(item, isEn)),
+        // 7/30: ListView 独立滚 (标题已提到父级 pinned)
+        Expanded(
+          child: ListView.builder(
+            padding: const EdgeInsets.fromLTRB(20, 0, 20, 8),
+            itemCount: _previewItems.length > 5 ? 5 : _previewItems.length,
+            itemBuilder: (context, i) => _buildPreviewCard(_previewItems[i], isEn),
+          ),
+        ),
       ],
     );
   }
