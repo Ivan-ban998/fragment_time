@@ -240,10 +240,50 @@ class _SubscriptionScreenState extends State<SubscriptionScreen> {
                     ],
                   ),
                 ),
-                // 预览列表独立滚
-                Expanded(
-                  child: _buildSubscribedContent(isEn),
-                ),
+                // 预览列表独立滚 (7/30 修: 不再嵌 _buildSubscribedContent — 避免双 Expanded 拿 0 空间)
+                if (_previewItems.isEmpty)
+                  Padding(
+                    padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 24),
+                    child: Container(
+                      padding: const EdgeInsets.all(16),
+                      decoration: BoxDecoration(
+                        color: Colors.grey[100],
+                        borderRadius: BorderRadius.circular(12),
+                      ),
+                      child: Text(
+                        isEn
+                            ? 'No content yet. Select at least one platform above.'
+                            : '还没有内容。请至少选择一个平台。',
+                        textAlign: TextAlign.center,
+                        style: TextStyle(color: AppTheme.textLight, fontSize: 12),
+                      ),
+                    ),
+                  )
+                else
+                  Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Padding(
+                          padding: const EdgeInsets.symmetric(horizontal: 20),
+                          child: Text(
+                            isEn
+                                ? 'Showing first 5 items from your selected platforms'
+                                : '从你选择的平台展示前 5 条',
+                            style: TextStyle(color: AppTheme.textLight, fontSize: 12),
+                          ),
+                        ),
+                        const SizedBox(height: 12),
+                        Expanded(
+                          child: ListView.builder(
+                            padding: const EdgeInsets.fromLTRB(20, 0, 20, 8),
+                            itemCount: _previewItems.length > 5 ? 5 : _previewItems.length,
+                            itemBuilder: (context, i) => _buildPreviewCard(_previewItems[i], isEn),
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
                 Padding(
                   padding: const EdgeInsets.fromLTRB(20, 8, 20, 16),
                   child: Center(
@@ -258,48 +298,6 @@ class _SubscriptionScreenState extends State<SubscriptionScreen> {
                 ),
               ],
             ),
-    );
-  }
-
-  Widget _buildSubscribedContent(bool isEn) {
-    if (_previewItems.isEmpty) {
-      return Container(
-        padding: const EdgeInsets.all(16),
-        decoration: BoxDecoration(
-          color: Colors.grey[100],
-          borderRadius: BorderRadius.circular(12),
-        ),
-        child: Text(
-          isEn
-              ? 'No content yet. Select at least one platform above.'
-              : '还没有内容。请至少选择一个平台。',
-          textAlign: TextAlign.center,
-          style: TextStyle(color: AppTheme.textLight, fontSize: 12),
-        ),
-      );
-    }
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        Padding(
-          padding: const EdgeInsets.symmetric(horizontal: 20),
-          child: Text(
-            isEn
-                ? 'Showing first 5 items from your selected platforms'
-                : '从你选择的平台展示前 5 条',
-            style: TextStyle(color: AppTheme.textLight, fontSize: 12),
-          ),
-        ),
-        const SizedBox(height: 12),
-        // 7/30: ListView 独立滚 (标题已提到父级 pinned)
-        Expanded(
-          child: ListView.builder(
-            padding: const EdgeInsets.fromLTRB(20, 0, 20, 8),
-            itemCount: _previewItems.length > 5 ? 5 : _previewItems.length,
-            itemBuilder: (context, i) => _buildPreviewCard(_previewItems[i], isEn),
-          ),
-        ),
-      ],
     );
   }
 
