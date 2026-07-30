@@ -289,17 +289,32 @@ class _ContentScreenState extends State<ContentScreen> {
   }
 
   // 加载推荐 6 条 (用 ContentAggregator 6 张看完换 6 张)
-  // 7/30 还原 7/1 fallback: RSS 拉空 → fallback NewsService 24 桶 (避免 _recItems 永远空 → Tinder 卡不显示)
-  // 沿用 SOUL #103 教训: 7/29 删 fallback 后浏览器实测 → Tinder 卡整个消失 + 下面一片白
-  // 7/30 B 修: 加重试上限 3 次, 全失败时 _recItems 留空 + 父层走 Tinder 占位卡
+  // 7/30 D 修: 同步立即返 fallback (24 桶假数据, <100ms), 异步 RSS 到后覆盖
+  // 真凶: RSS 拉 3 个源 × 2 attempt × 8s timeout = 20s+ 才返, 用户等得很烦躁
+  // 沿用 #6 #8 '能跑起来 > 功能强大' — 先看到东西比数据真不真重要
   Future<void> _loadRecommendations() async {
     if (_recLoading) return;
     if (_recRetryCount >= 3) {
       debugPrint('[recommend] 已重试 3 次仍为空, 不再重试 (交占位卡显示)');
       return;
     }
-    setState(() => _recLoading = true);
     _recRetryCount++;
+    // Step 1: 同步立即返 fallback 24 桶 (<100ms) — 用户立刻看到 6 张卡
+    final fallback = NewsService().getRecommendations(widget.userType, widget.scene);
+    final fallbackItems = await fallback;
+    if (!mounted) return;
+    if (fallbackItems.isNotEmpty) {
+      setState(() {
+        _recItems = fallbackItems;
+        _recLoading = false;
+      });
+    } else {
+      setState(() {
+        _recLoading = false;
+      });
+    }
+    // Step 2: 后台异步拉真 RSS — 拿到后覆盖 fallback (如果是非空)
+    setState(() => _recLoading = true);
     try {
       final rec = await ContentAggregator().fetchRecommendContent(
         userType: widget.userType,
@@ -307,51 +322,29 @@ class _ContentScreenState extends State<ContentScreen> {
         isInternational: widget.isInternational,
       );
       if (!mounted) return;
-      if (rec.isEmpty) {
-        // RSS 拉空 → fallback NewsService 24 桶 (保 Tinder 卡永远有内容)
-        debugPrint('[recommend] RSS 拉空, fallback NewsService 24 桶');
-        final fallback = await NewsService().getRecommendations(widget.userType, widget.scene);
-        if (!mounted) return;
-        if (fallback.isNotEmpty) {
-          setState(() {
-            _recItems = fallback;
-            _recLoading = false;
-            _recRetryCount = 0; // 成功 → 重置计数
-          });
-          return;
-        }
-        // fallback 也空 → _recItems 留空, 交占位卡显示
-        debugPrint('[recommend] NewsService 24 桶也空 (可能是 _bucketKey 不匹配), 走占位卡');
+      if (rec.isNotEmpty) {
+        // 真 RSS 拿到, 覆盖 fallback
+        setState(() {
+          _recItems = rec;
+          _recLoading = false;
+          _recRetryCount = 0;
+        });
+        debugPrint('[recommend] RSS 拉到 ${rec.length} 条, 覆盖 fallback');
+      } else {
+        // RSS 还是空, 保持 fallback (用户已看到)
         setState(() {
           _recLoading = false;
+          _recRetryCount = 0;
         });
-        return;
+        debugPrint('[recommend] RSS 拉空, 保持 fallback (用户已看到 24 桶)');
       }
-      setState(() {
-        _recItems = rec;
-        _recLoading = false;
-        _recRetryCount = 0; // 成功 → 重置计数
-      });
     } catch (e) {
-      // 异常 → fallback NewsService 24 桶 (兜底保 Tinder 卡)
-      debugPrint('[recommend] ContentAggregator error: $e, fallback NewsService 24 buckets');
-      try {
-        final fallback = await NewsService().getRecommendations(widget.userType, widget.scene);
-        if (!mounted) return;
-        if (fallback.isNotEmpty) {
-          setState(() {
-            _recItems = fallback;
-            _recLoading = false;
-            _recRetryCount = 0;
-          });
-          return;
-        }
-        setState(() => _recLoading = false);
-      } catch (e2) {
-        debugPrint('[recommend] fallback NewsService also failed: $e2');
-        if (!mounted) return;
-        setState(() => _recLoading = false);
-      }
+      if (!mounted) return;
+      setState(() {
+        _recLoading = false;
+        _recRetryCount = 0;
+      });
+      debugPrint('[recommend] RSS error: $e — 保持 fallback');
     }
   }
 
