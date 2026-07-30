@@ -28,6 +28,8 @@ class TinderRecommendationStack extends StatefulWidget {
   final bool isElderlyMode;
   final Future<void> Function(ContentItem item)? onTapItem;
   final VoidCallback? onAllDismissed;
+  // 7/30 A: 空状态占位卡 + 重试回调 (避免 items 空时整块 widget 消失 → '下面一片白')
+  final VoidCallback? onRetry;
 
   const TinderRecommendationStack({
     super.key,
@@ -38,6 +40,7 @@ class TinderRecommendationStack extends StatefulWidget {
     this.isElderlyMode = false,
     this.onTapItem,
     this.onAllDismissed,
+    this.onRetry,
   });
 
   @override
@@ -177,7 +180,13 @@ class _TinderRecommendationStackState extends State<TinderRecommendationStack> {
   @override
   Widget build(BuildContext context) {
     final items = _items;
-    if (items.isEmpty || _topIndex >= items.length) {
+    // 7/30 A 修: items.isEmpty 不再返 _buildEmpty() (返回空 widget 让父组件 '下面一片白')
+    // 改为: items.isEmpty 走占位卡路径, 保持进度条 + 240dp 卡 + 3 按钮 结构, 不让 widget 消失
+    if (items.isEmpty) {
+      return _buildPlaceholder();
+    }
+    // 6 张全看完 (_topIndex 越界) 才显示 🎉 看完啦
+    if (_topIndex >= items.length) {
       return _buildEmpty();
     }
     final top = items[_topIndex];
@@ -569,6 +578,122 @@ class _TinderRecommendationStackState extends State<TinderRecommendationStack> {
             widget.isEn ? '🎉 All done!' : '🎉 看完啦！',
             style: const TextStyle(fontSize: 18, fontWeight: FontWeight.w600),
           ),
+        ],
+      ),
+    );
+  }
+
+  // 7/30 A: items.isEmpty 时的占位卡 — 保持进度条 + 240dp 卡高 + 3 按钮 结构
+  // 避免父组件 _buildEmptyState 替代整块 Tinder 卡 → '下面一片白'
+  Widget _buildPlaceholder() {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.stretch,
+      mainAxisSize: MainAxisSize.min,
+      children: [
+        // 进度
+        Padding(
+          padding: const EdgeInsets.symmetric(horizontal: 8),
+          child: Row(
+            children: [
+              Text(
+                widget.isEn
+                    ? 'Discover 0 / 0'
+                    : '发现 0 / 0',
+                style: TextStyle(
+                  fontSize: 12,
+                  color: Colors.black54,
+                  fontWeight: FontWeight.w500,
+                ),
+              ),
+            ],
+          ),
+        ),
+        const SizedBox(height: 8),
+        SizedBox(
+          height: 240,
+          child: Center(
+            child: Container(
+              margin: const EdgeInsets.symmetric(horizontal: 48),
+              padding: const EdgeInsets.all(20),
+              decoration: BoxDecoration(
+                color: Colors.white.withOpacity(0.85),
+                borderRadius: BorderRadius.circular(20),
+                border: Border.all(color: Colors.black12),
+              ),
+              child: Column(
+                mainAxisAlignment: MainAxisAlignment.center,
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  Icon(Icons.inbox_outlined, size: 48, color: Colors.indigo.withOpacity(0.5)),
+                  const SizedBox(height: 12),
+                  Text(
+                    widget.isEn ? 'No recommendations yet' : '暂无推荐内容',
+                    style: const TextStyle(fontSize: 16, fontWeight: FontWeight.w600),
+                    textAlign: TextAlign.center,
+                  ),
+                  const SizedBox(height: 8),
+                  Text(
+                    widget.isEn
+                        ? 'Pull down or tap reload to fetch again'
+                        : '下拉刷新或点重试加载新内容',
+                    style: TextStyle(fontSize: 12, color: Colors.black54),
+                    textAlign: TextAlign.center,
+                  ),
+                  const SizedBox(height: 12),
+                  if (widget.onRetry != null)
+                    TextButton.icon(
+                      onPressed: widget.onRetry,
+                      icon: const Icon(Icons.refresh, size: 16),
+                      label: Text(widget.isEn ? 'Reload' : '重试'),
+                      style: TextButton.styleFrom(
+                        foregroundColor: Colors.indigo,
+                      ),
+                    ),
+                ],
+              ),
+            ),
+          ),
+        ),
+        const SizedBox(height: 16),
+        // 3 圆按钮 — 占位状态也保持结构 (灰显)
+        _buildActionBarPlaceholder(),
+      ],
+    );
+  }
+
+  // 7/30 A: 占位卡下方的 3 按钮 (灰显, 不可点)
+  Widget _buildActionBarPlaceholder() {
+    final disabled = Colors.grey.withOpacity(0.4);
+    Widget btn(IconData icon, String label) {
+      return Expanded(
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Container(
+              width: 56,
+              height: 56,
+              decoration: BoxDecoration(
+                shape: BoxShape.circle,
+                color: Colors.white.withOpacity(0.5),
+                border: Border.all(color: disabled, width: 1),
+              ),
+              child: Icon(icon, size: 28, color: disabled),
+            ),
+            const SizedBox(height: 4),
+            Text(label, style: TextStyle(fontSize: 11, color: disabled)),
+          ],
+        ),
+      );
+    }
+    return Padding(
+      padding: const EdgeInsets.symmetric(horizontal: 16),
+      child: Row(
+        children: [
+          btn(Icons.close, widget.isEn ? 'Skip' : '跳过'),
+          const SizedBox(width: 8),
+          btn(Icons.touch_app, widget.isEn ? 'Detail' : '详情'),
+          const SizedBox(width: 8),
+          btn(Icons.favorite_border, widget.isEn ? 'Save' : '收藏'),
         ],
       ),
     );
