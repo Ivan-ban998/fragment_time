@@ -10,6 +10,7 @@ import '../services/robot_name_service.dart';
 import '../services/theme_preference_service.dart';
 import '../services/weekly_recap_service.dart';
 import '../services/pack_io_helpers.dart';
+import '../services/daily_prefs_service.dart';
 import 'history_screen.dart';
 import 'analytics_dashboard_screen.dart';
 import 'study_group_screen.dart';
@@ -365,6 +366,38 @@ class SettingsTab extends StatelessWidget {
                   title: Text(isEn ? 'Elderly Mode' : '老人模式', style: TextStyle(fontSize: 16 * scale)),
                   subtitle: Text(isEn ? 'Large text & buttons' : '字体放大，按键加大', style: TextStyle(fontSize: 13 * scale)),
                   trailing: Switch(value: isElderlyMode, onChanged: (_) => onToggleElderlyMode()),
+                ),
+                // 7/30: 每日推荐 分区 — 问候/天气/引导 3 个分开关
+                Divider(height: 1),
+                ValueListenableBuilder<bool>(
+                  valueListenable: DailyPrefsService.greetingNotifier,
+                  builder: (ctx, on, _) => SwitchListTile(
+                    secondary: Icon(Icons.waving_hand_outlined, size: 24 * scale),
+                    title: Text(isEn ? 'Daily greeting' : '每日问候', style: TextStyle(fontSize: 16 * scale)),
+                    subtitle: Text(isEn ? 'Show greeting on home' : '首页显示问候', style: TextStyle(fontSize: 13 * scale)),
+                    value: on,
+                    onChanged: (v) => DailyPrefsService.instance.setGreetingOn(v),
+                  ),
+                ),
+                ValueListenableBuilder<bool>(
+                  valueListenable: DailyPrefsService.weatherNotifier,
+                  builder: (ctx, on, _) => SwitchListTile(
+                    secondary: Icon(Icons.cloud_outlined, size: 24 * scale),
+                    title: Text(isEn ? 'Weather hint' : '天气提示', style: TextStyle(fontSize: 16 * scale)),
+                    subtitle: Text(isEn ? 'Show weather on home' : '首页显示天气', style: TextStyle(fontSize: 13 * scale)),
+                    value: on,
+                    onChanged: (v) => DailyPrefsService.instance.setWeatherOn(v),
+                  ),
+                ),
+                ValueListenableBuilder<bool>(
+                  valueListenable: DailyPrefsService.guideNotifier,
+                  builder: (ctx, on, _) => SwitchListTile(
+                    secondary: Icon(Icons.tips_and_updates_outlined, size: 24 * scale),
+                    title: Text(isEn ? 'Daily recommendation' : '今日推荐', style: TextStyle(fontSize: 16 * scale)),
+                    subtitle: Text(isEn ? 'Show today\'s pick on home' : '首页显示今日推荐', style: TextStyle(fontSize: 13 * scale)),
+                    value: on,
+                    onChanged: (v) => DailyPrefsService.instance.setGuideOn(v),
+                  ),
                 ),
                 // 6/10 加: 我的 handle（学习小组 / 加入退出用）
                 Divider(height: 1),

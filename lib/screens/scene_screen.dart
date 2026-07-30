@@ -9,6 +9,8 @@ import '../services/analytics_service.dart';
 import '../services/time_aware_recommender.dart';
 import '../services/handle_service.dart';
 import '../services/history_service.dart';
+import '../services/weather_service.dart';
+import '../services/daily_prefs_service.dart';
 import '../main.dart' as appMain;
 import 'content_screen.dart';
 import 'loading_screen.dart';
@@ -243,15 +245,37 @@ class _SceneScreenState extends State<SceneScreen> {
                 },
               ),
               SizedBox(height: 16 * _scale),
-              // 6/25 联动昵称
-              Text(
-                '${DailyMessage.getGreeting(isEn)} $_handle',
-                style: TextStyle(fontSize: 18 * _scale, fontWeight: FontWeight.bold),
-              ),
-              SizedBox(height: 4 * _scale),  // 7/15: title 跟 subtitle 中间 4px (不让紧贴)
-              Text(
-                isEn ? 'What would you like to do?' : '选择你现在想干嘛',
-                style: TextStyle(fontSize: 14 * _scale, color: AppTheme.textLight),
+              // 7/30: 每日问候 + 天气 (受 DailyPrefsService 控制)
+              ValueListenableBuilder<bool>(
+                valueListenable: DailyPrefsService.greetingNotifier,
+                builder: (ctx, greetingOn, _) {
+                  return Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      if (greetingOn)
+                        Text(
+                          '${DailyMessage.getGreeting(isEn)} $_handle',
+                          style: TextStyle(fontSize: 18 * _scale, fontWeight: FontWeight.bold),
+                        ),
+                      if (greetingOn) SizedBox(height: 4 * _scale),
+                      ValueListenableBuilder<bool>(
+                        valueListenable: DailyPrefsService.weatherNotifier,
+                        builder: (ctx2, weatherOn, _) {
+                          if (!weatherOn) return const SizedBox.shrink();
+                          return _WeatherHintChip(
+                            scale: _scale,
+                            isEn: isEn,
+                          );
+                        },
+                      ),
+                      if (greetingOn || true) SizedBox(height: 4 * _scale),
+                      Text(
+                        isEn ? 'What would you like to do?' : '选择你现在想干嘛',
+                        style: TextStyle(fontSize: 14 * _scale, color: AppTheme.textLight),
+                      ),
+                    ],
+                  );
+                },
               ),
               SizedBox(height: 12 * _scale),
               Expanded(
@@ -607,6 +631,85 @@ class _TodayPickCard extends StatelessWidget {
   }
 }
 
+
+// 7/30: 天气提示 chip — 在 SceneScreen 顶部 '选择你想干嘛' 上方
+// 拉 wttr.in (4s timeout), 失败显示 mock 不阻塞 UI
+class _WeatherHintChip extends StatefulWidget {
+  final double scale;
+  final bool isEn;
+  const _WeatherHintChip({required this.scale, required this.isEn});
+
+  @override
+  State<_WeatherHintChip> createState() => _WeatherHintChipState();
+}
+
+class _WeatherHintChipState extends State<_WeatherHintChip> {
+  WeatherInfo? _info;
+
+  @override
+  void initState() {
+    super.initState();
+    WeatherService.fetch().then((w) {
+      if (mounted) setState(() => _info = w);
+    });
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final w = _info;
+    final isEn = widget.isEn;
+    final s = widget.scale;
+    if (w == null) {
+      return Container(
+        padding: EdgeInsets.symmetric(horizontal: 10 * s, vertical: 6 * s),
+        decoration: BoxDecoration(
+          color: AppTheme.primary.withOpacity(0.06),
+          borderRadius: BorderRadius.circular(16),
+        ),
+        child: Row(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Icon(Icons.cloud_outlined, size: 14 * s, color: AppTheme.primary),
+            SizedBox(width: 6 * s),
+            Text(
+              isEn ? 'Loading weather...' : '加载天气中…',
+              style: TextStyle(fontSize: 12 * s, color: AppTheme.primary),
+            ),
+          ],
+        ),
+      );
+    }
+    return Container(
+      padding: EdgeInsets.symmetric(horizontal: 10 * s, vertical: 6 * s),
+      decoration: BoxDecoration(
+        color: AppTheme.primary.withOpacity(0.08),
+        borderRadius: BorderRadius.circular(16),
+      ),
+      child: Row(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Icon(
+            w.isMock ? Icons.wb_sunny_outlined : Icons.cloud_outlined,
+            size: 14 * s,
+            color: AppTheme.primary,
+          ),
+          SizedBox(width: 6 * s),
+          Text(
+            w.city.isEmpty
+                ? (isEn ? '${w.tempC}°C · ${w.description}' : '${w.tempC}°C · ${w.description}')
+                : (isEn ? '${w.city} ${w.tempC}°C · ${w.description}' : '${w.city} ${w.tempC}°C · ${w.description}'),
+            style: TextStyle(fontSize: 12 * s, color: AppTheme.primary, fontWeight: FontWeight.w500),
+          ),
+          SizedBox(width: 6 * s),
+          Text(
+            '· ${w.hint(isEn)}',
+            style: TextStyle(fontSize: 12 * s, color: AppTheme.primary),
+          ),
+        ],
+      ),
+    );
+  }
+}
 
 class DailyEncouragementBanner extends StatefulWidget {
   final String text;

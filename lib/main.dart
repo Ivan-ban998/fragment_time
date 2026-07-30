@@ -22,6 +22,7 @@ import 'services/motivation_service.dart';
 import 'services/llm_service.dart';
 import 'services/analytics_service.dart';
 import 'services/theme_preference_service.dart';
+import 'services/daily_prefs_service.dart';
 import 'services/eye_protection_scope.dart';
 import 'services/handle_service.dart';
 import 'services/robot_name_service.dart';
@@ -367,6 +368,8 @@ class _MainHomeScreenState extends State<MainHomeScreen> {
     _loadHandle();
     // 6/26 迁移: 删老 id 'encourage_*' 的 item (banner 改名言后老 item 装的是完整 LLM 推的鼓励新闻)
     _migrateOldEncourageItems();
+    // 7/30: 每日推荐 开关初始化 (默认值都开, 在 settings 可关)
+    DailyPrefsService.init();
     AnalyticsService.instance.track(AnalyticsService.EVT_APP_OPEN);
   }
 
