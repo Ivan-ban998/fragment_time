@@ -27,6 +27,7 @@ class AiAssistantScreen extends StatefulWidget {
   final UserType? userType; // 6/30 10:11: 帮推荐/答疑需要按角色调 LLM
   final Scene? scene; // 7/1: 推荐兑底用 userType + scene 调 NewsService
   final List<HistoryItem>? todayHistory; // 6/30 10:11: 答疑基于今日历史回答
+  final bool autoAskQuote; // 7/31 沿用 #6 #8 #103: 从名言页进来, AI 主动问这句什么意思
 
   const AiAssistantScreen({
     super.key,
@@ -37,6 +38,7 @@ class AiAssistantScreen extends StatefulWidget {
     this.userType,
     this.scene,
     this.todayHistory,
+    this.autoAskQuote = false,
   });
 
   @override
@@ -57,6 +59,22 @@ class _AiAssistantScreenState extends State<AiAssistantScreen> {
     super.initState();
     _loadHistory();
     _loadDailyGreeting(); // 6/30 12:23: 顶部总结
+    // 7/31 沿用 #6 #8 #103: 从名言页进来 → AI 主动发问 "这句什么意思?"
+    //   postFrame 避免 build 期 setState / context 还未到
+    if (widget.autoAskQuote && widget.contextQuote != null) {
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        if (!mounted) return;
+        _autoAskAboutQuote();
+      });
+    }
+  }
+
+  // 7/31 沿用 #6 #8 #103: 名言页进来 → AI 主动发问
+  void _autoAskAboutQuote() {
+    if (_sending) return;
+    final askText = widget.isEn ? 'What does this quote mean?' : '这句什么意思?';
+    _controller.text = askText;
+    _send(); // 复用现成 _send 逻辑, 7b 5-7s 出第一字 (沿用 #107)
   }
 
   // 6/30 12:23: 顶部总结 — 今日历史主题 + 1 句鼓励
