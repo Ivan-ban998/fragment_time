@@ -1844,12 +1844,14 @@ class _QuoteHistorySectionState extends State<_QuoteHistorySection> {
     if (_loading || _history != null) return;
     setState(() { _loading = true; _failed = false; });
     final src = widget.source != null ? '、出自《${widget.source}》' : '';
+    // 7/31 沿用 #121: 7b 在 NAS CPU 上 30s timeout 太短（实测 31s）, 改 60s
+    // 沿用 #107: prompt 加不确定时只说不知道, 避免 7b 瞎编
     final prompt = widget.isEn
-        ? 'Author: ${widget.author}${src}. Quote: "${widget.quoteText}".\n\nIn 80 words or fewer, briefly introduce the author\'s background and the historical context of this quote. Reply in English.'
-        : '作者: ${widget.author}${src}\n名言: "${widget.quoteText}"\n\n用 80 字以内介绍这位作者的生平和这句名言的历史背景, 不要复述名言本身, 直接回答。';
+        ? 'Author: ${widget.author}${src}. Quote: "${widget.quoteText}".\n\nIn 80 words or fewer, briefly introduce the author\'s background and the historical context of this quote. If you are not sure about this specific quote or author, say "I am not familiar with this specific quote" — DO NOT make up facts. Reply in English.'
+        : '作者: ${widget.author}${src}\n名言: "${widget.quoteText}"\n\n用 80 字以内介绍这位作者的生平和这句名言的历史背景, 不要复述名言本身, 直接回答。\n\n如果你是 7b 小模型, 不熟悉这句或这位作者, 只说 "我对这句不熟悉, 换个试试" — 不要编造事实。';
     try {
       final result = await LlmService.generateRaw(prompt, isEn: widget.isEn)
-        .timeout(const Duration(seconds: 30), onTimeout: () => widget.isEn ? '(History unavailable - timeout)' : '（历史背景暂不可用）');
+        .timeout(const Duration(seconds: 60), onTimeout: () => widget.isEn ? '(History unavailable - timeout)' : '（历史背景暂不可用）');
       if (!mounted) return;
       setState(() { _history = result.trim(); _loading = false; });
     } catch (e) {
@@ -1926,12 +1928,14 @@ class _QuoteExtendedSectionState extends State<_QuoteExtendedSection> {
   Future<void> _generate() async {
     if (_loading || _extended != null) return;
     setState(() { _loading = true; _failed = false; });
+    // 7/31 沿用 #121: timeout 30s → 60s (7b 实测 31s, 边界 fail)
+//   沿用 #107: 加不确定约束, 避免 7b 瞎编
     final prompt = widget.isEn
-        ? 'Quote by ${widget.author}: "${widget.quoteText}".\n\nGive 3 brief reflections on how this quote applies to modern life or work (under 100 words total). Use bullet points.'
-        : '名言作者: ${widget.author}\n名言: "${widget.quoteText}"\n\n用 100 字以内给出 3 个对现代生活或工作的延伸思考, 用项目符号列出。';
+        ? 'Quote by ${widget.author}: "${widget.quoteText}".\n\nGive 3 brief reflections on how this quote applies to modern life or work (under 100 words total). Use bullet points. If you are not familiar with this specific quote, say so — DO NOT make up reflections.'
+        : '名言作者: ${widget.author}\n名言: "${widget.quoteText}"\n\n用 100 字以内给出 3 个对现代生活或工作的延伸思考, 用项目符号列出。\n\n如果你是 7b 小模型不熟悉, 只说 "我对这句不熟悉" — 不要编造。';
     try {
       final result = await LlmService.generateRaw(prompt, isEn: widget.isEn)
-        .timeout(const Duration(seconds: 30), onTimeout: () => widget.isEn ? '(Extended reflection unavailable - timeout)' : '（延伸思考暂不可用）');
+        .timeout(const Duration(seconds: 60), onTimeout: () => widget.isEn ? '(Extended reflection unavailable - timeout)' : '（延伸思考暂不可用）');
       if (!mounted) return;
       setState(() { _extended = result.trim(); _loading = false; });
     } catch (e) {
