@@ -1655,8 +1655,17 @@ class _QuoteReadLayout extends StatelessWidget {
           _QuoteAiSummarySection(quoteText: text, author: item.title, scale: scale, isEn: isEn),
           SizedBox(height: 16 * scale),
 
+          // 7/31 A: 作者生平 + 历史背景 (7b 调, 7s 返)
+          _QuoteHistorySection(quoteText: text, author: item.title, source: source, scale: scale, isEn: isEn),
+          SizedBox(height: 16 * scale),
+
+          // 7/31 B: 延伸思考 / 现代应用 (7b 调, 7s 返)
+          _QuoteExtendedSection(quoteText: text, author: item.title, scale: scale, isEn: isEn),
+          SizedBox(height: 16 * scale),
+
           // 7/15 16:56 Q2: 真接关联阅读 (Hero 详情页底部) — 跟 banner sheet 同源算法
           // 17:19: userType/scene 从 ContentReaderScreen 透传进来 (兑底 officeWorker/learn)
+          // 7/31 C: QuoteRelatedEngine prompt 升级 (补 5 条 LLM 兜底)
           _QuoteRelatedSection(
             quoteText: text,
             author: item.title,
@@ -1791,6 +1800,173 @@ class _QuoteTtsSectionState extends State<_QuoteTtsSection> {
               onPressed: _stop,
               icon: Icon(Icons.stop, color: AppTheme.textLight),
             ),
+        ],
+      ),
+    );
+  }
+}
+
+// 7/31 A: 作者生平 + 历史背景 (沿用 #6 #8 能跑起来 > 等完美)
+class _QuoteHistorySection extends StatefulWidget {
+  final String quoteText;
+  final String author;
+  final String? source;
+  final double scale;
+  final bool isEn;
+  const _QuoteHistorySection({
+    required this.quoteText,
+    required this.author,
+    required this.scale,
+    required this.isEn,
+    this.source,
+  });
+  @override
+  State<_QuoteHistorySection> createState() => _QuoteHistorySectionState();
+}
+class _QuoteHistorySectionState extends State<_QuoteHistorySection> {
+  String? _history;
+  bool _loading = false;
+  bool _failed = false;
+  @override
+  void initState() {
+    super.initState();
+    _generate();
+  }
+  Future<void> _generate() async {
+    if (_loading || _history != null) return;
+    setState(() { _loading = true; _failed = false; });
+    final src = widget.source != null ? '、出自《${widget.source}》' : '';
+    final prompt = widget.isEn
+        ? 'Author: ${widget.author}${src}. Quote: "${widget.quoteText}".\n\nIn 80 words or fewer, briefly introduce the author\'s background and the historical context of this quote. Reply in English.'
+        : '作者: ${widget.author}${src}\n名言: "${widget.quoteText}"\n\n用 80 字以内介绍这位作者的生平和这句名言的历史背景, 不要复述名言本身, 直接回答。';
+    try {
+      final result = await LlmService.generateRaw(prompt, isEn: widget.isEn)
+        .timeout(const Duration(seconds: 30), onTimeout: () => widget.isEn ? '(History unavailable - timeout)' : '（历史背景暂不可用）');
+      if (!mounted) return;
+      setState(() { _history = result.trim(); _loading = false; });
+    } catch (e) {
+      if (!mounted) return;
+      setState(() { _loading = false; _failed = true; });
+    }
+  }
+  @override
+  Widget build(BuildContext context) {
+    final s = widget.scale;
+    return Container(
+      padding: EdgeInsets.all(14 * s),
+      decoration: BoxDecoration(
+        color: AppTheme.secondary.withOpacity(0.04),
+        borderRadius: BorderRadius.circular(12),
+        border: Border.all(color: AppTheme.secondary.withOpacity(0.15)),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            children: [
+              Icon(Icons.history_edu, size: 16 * s, color: AppTheme.secondary),
+              SizedBox(width: 6 * s),
+              Text(
+                widget.isEn ? 'History & Background' : '作者与历史',
+                style: TextStyle(fontSize: 13 * s, fontWeight: FontWeight.w600, color: AppTheme.secondary),
+              ),
+            ],
+          ),
+          SizedBox(height: 10 * s),
+          if (_loading)
+            Row(
+              children: [
+                SizedBox(width: 14 * s, height: 14 * s, child: const CircularProgressIndicator(strokeWidth: 2)),
+                SizedBox(width: 10 * s),
+                Expanded(child: Text(widget.isEn ? 'Loading...' : '加载中...', style: TextStyle(fontSize: 12 * s, color: AppTheme.textLight))),
+              ],
+            )
+          else if (_failed)
+            Text(widget.isEn ? 'Unavailable' : '暂不可用', style: TextStyle(fontSize: 12 * s, color: AppTheme.textLight))
+          else if (_history != null)
+            Text(_history!, style: TextStyle(fontSize: 13 * s, height: 1.6, color: AppTheme.textDark)),
+        ],
+      ),
+    );
+  }
+}
+
+// 7/31 B: 延伸思考 / 现代应用 (沿用 #6 #8)
+class _QuoteExtendedSection extends StatefulWidget {
+  final String quoteText;
+  final String author;
+  final double scale;
+  final bool isEn;
+  const _QuoteExtendedSection({
+    required this.quoteText,
+    required this.author,
+    required this.scale,
+    required this.isEn,
+  });
+  @override
+  State<_QuoteExtendedSection> createState() => _QuoteExtendedSectionState();
+}
+class _QuoteExtendedSectionState extends State<_QuoteExtendedSection> {
+  String? _extended;
+  bool _loading = false;
+  bool _failed = false;
+  @override
+  void initState() {
+    super.initState();
+    _generate();
+  }
+  Future<void> _generate() async {
+    if (_loading || _extended != null) return;
+    setState(() { _loading = true; _failed = false; });
+    final prompt = widget.isEn
+        ? 'Quote by ${widget.author}: "${widget.quoteText}".\n\nGive 3 brief reflections on how this quote applies to modern life or work (under 100 words total). Use bullet points.'
+        : '名言作者: ${widget.author}\n名言: "${widget.quoteText}"\n\n用 100 字以内给出 3 个对现代生活或工作的延伸思考, 用项目符号列出。';
+    try {
+      final result = await LlmService.generateRaw(prompt, isEn: widget.isEn)
+        .timeout(const Duration(seconds: 30), onTimeout: () => widget.isEn ? '(Extended reflection unavailable - timeout)' : '（延伸思考暂不可用）');
+      if (!mounted) return;
+      setState(() { _extended = result.trim(); _loading = false; });
+    } catch (e) {
+      if (!mounted) return;
+      setState(() { _loading = false; _failed = true; });
+    }
+  }
+  @override
+  Widget build(BuildContext context) {
+    final s = widget.scale;
+    return Container(
+      padding: EdgeInsets.all(14 * s),
+      decoration: BoxDecoration(
+        color: Colors.amber.withOpacity(0.05),
+        borderRadius: BorderRadius.circular(12),
+        border: Border.all(color: Colors.amber.withOpacity(0.25)),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            children: [
+              Icon(Icons.tips_and_updates, size: 16 * s, color: Colors.amber.shade800),
+              SizedBox(width: 6 * s),
+              Text(
+                widget.isEn ? 'Modern Reflections' : '延伸思考',
+                style: TextStyle(fontSize: 13 * s, fontWeight: FontWeight.w600, color: Colors.amber.shade800),
+              ),
+            ],
+          ),
+          SizedBox(height: 10 * s),
+          if (_loading)
+            Row(
+              children: [
+                SizedBox(width: 14 * s, height: 14 * s, child: const CircularProgressIndicator(strokeWidth: 2)),
+                SizedBox(width: 10 * s),
+                Expanded(child: Text(widget.isEn ? 'Loading...' : '加载中...', style: TextStyle(fontSize: 12 * s, color: AppTheme.textLight))),
+              ],
+            )
+          else if (_failed)
+            Text(widget.isEn ? 'Unavailable' : '暂不可用', style: TextStyle(fontSize: 12 * s, color: AppTheme.textLight))
+          else if (_extended != null)
+            Text(_extended!, style: TextStyle(fontSize: 13 * s, height: 1.6, color: AppTheme.textDark)),
         ],
       ),
     );

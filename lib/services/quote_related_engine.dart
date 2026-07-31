@@ -129,12 +129,12 @@ class QuoteRelatedEngine {
       final prompt = isEn
           ? 'Quote: "${q.text}" by ${q.author} (${q.source ?? "—"})\n'
               'User context: ${userType.name} in ${scene.name}.\n\n'
-              'Recommend 3 short article titles (in English, each max 12 words) that might be related to this quote.\n'
-              'Return ONLY JSON: {"hits": [{"title": "...", "reason": "..."}, ...]}'
+              'Recommend 5 short article titles (in English, each max 12 words) that might be related to this quote.\n'
+              'Mix types: 2 articles, 2 books, 1 modern essay. Return ONLY JSON: {"hits": [{"title": "...", "reason": "..."}, ...]}'
           : '名言: "${q.text}" by ${q.author} (${q.source ?? "—"})\n'
               '用户角色: ${userType.name}, 场景: ${scene.name}。\n\n'
-              '推荐 3 个跟这句名言相关的短标题 (中文, 每个不超过 18 字), 这些是用户可能想进一步阅读的。\n'
-              '仅返回 JSON: {"hits": [{"title": "...", "reason": "..."}, ...]}';
+              '推荐 5 个跟这句名言相关的短标题 (中文, 每个不超过 18 字), 用户可能想进一步阅读的。\n'
+              '混合类型: 2 篇文章、2 本书、1 个现代短篇。仅返回 JSON: {"hits": [{"title": "...", "reason": "..."}, ...]}';
       final raw = await LlmService.generateRaw(prompt, isEn: isEn)
           .timeout(const Duration(seconds: 30), onTimeout: () => '');
       if (raw.isEmpty) return [];
