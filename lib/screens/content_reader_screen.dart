@@ -1679,6 +1679,8 @@ class _QuoteReadLayout extends StatelessWidget {
           SizedBox(height: 24 * scale),
 
           // 底部: 问 AI 按钮 (复用 banner 那条)
+          // 7/31 沿用 #6 #8 #103: 用户点 = “让 AI 解释这句”, AI 应主动回答,
+          //   不是只弹聊天界面让用户自己打问题. autoAskQuote=true 后 AI 自动生成解释
           SizedBox(
             width: double.infinity,
             child: OutlinedButton.icon(
@@ -1694,6 +1696,7 @@ class _QuoteReadLayout extends StatelessWidget {
                     userTypeName: 'you',
                     contextQuote: text,
                     scene: null,
+                    autoAskQuote: true,
                   ),
                 );
               },
