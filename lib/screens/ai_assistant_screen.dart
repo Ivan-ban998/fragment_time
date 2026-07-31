@@ -61,8 +61,10 @@ class _AiAssistantScreenState extends State<AiAssistantScreen> {
     _loadDailyGreeting(); // 6/30 12:23: 顶部总结
     // 7/31 沿用 #6 #8 #103: 从名言页进来 → AI 主动发问 "这句什么意思?"
     //   postFrame 避免 build 期 setState / context 还未到
+    debugPrint('[AI autoAsk] initState autoAskQuote=${widget.autoAskQuote} contextQuote=${widget.contextQuote != null ? widget.contextQuote!.substring(0, widget.contextQuote!.length.clamp(0, 30)) : "null"}');
     if (widget.autoAskQuote && widget.contextQuote != null) {
       WidgetsBinding.instance.addPostFrameCallback((_) {
+        debugPrint('[AI autoAsk] postFrame fired, mounted=$mounted _sending=$_sending');
         if (!mounted) return;
         _autoAskAboutQuote();
       });
@@ -71,9 +73,11 @@ class _AiAssistantScreenState extends State<AiAssistantScreen> {
 
   // 7/31 沿用 #6 #8 #103: 名言页进来 → AI 主动发问
   void _autoAskAboutQuote() {
+    debugPrint('[AI autoAsk] enter _autoAskAboutQuote _sending=$_sending');
     if (_sending) return;
     final askText = widget.isEn ? 'What does this quote mean?' : '这句什么意思?';
     _controller.text = askText;
+    debugPrint('[AI autoAsk] before _send text="$askText"');
     _send(); // 复用现成 _send 逻辑, 7b 5-7s 出第一字 (沿用 #107)
   }
 
@@ -413,8 +417,10 @@ ${libTitles.map((t) => '- $t').join('\n')}
       {'role': 'user', 'content': widget.isEn ? 'Recommend 3 for me' : '帮我推荐 3 条'},
     ];
     final buf = StringBuffer();
+    debugPrint('[AI autoAsk] chatStream.listen START messages=${messages.length}');
     LlmService.chatStream(messages: messages).listen(
       (chunk) {
+        debugPrint('[AI autoAsk] chunk received len=${chunk.length} preview=${chunk.length > 20 ? chunk.substring(0, 20) : chunk}');
         if (!mounted) return;
         _streamTimer?.cancel();
         buf.write(chunk);
@@ -568,8 +574,10 @@ $historyCtx
       {'role': 'user', 'content': widget.isEn ? 'Help me make sense' : '帮我理清'},
     ];
     final buf = StringBuffer();
+    debugPrint('[AI autoAsk] chatStream.listen START messages=${messages.length}');
     LlmService.chatStream(messages: messages).listen(
       (chunk) {
+        debugPrint('[AI autoAsk] chunk received len=${chunk.length} preview=${chunk.length > 20 ? chunk.substring(0, 20) : chunk}');
         if (!mounted) return;
         _streamTimer?.cancel();
         buf.write(chunk);
@@ -617,6 +625,7 @@ $historyCtx
         });
       },
       onDone: () {
+        debugPrint('[AI autoAsk] onDone buf_len=${buf.toString().length}');
         if (!mounted) return;
         _sending = false;
         _llmRetried = false;
@@ -733,8 +742,10 @@ Rules:
       }
     });
 
+    debugPrint('[AI autoAsk] chatStream.listen START messages=${messages.length}');
     LlmService.chatStream(messages: messages).listen(
       (chunk) {
+        debugPrint('[AI autoAsk] chunk received len=${chunk.length} preview=${chunk.length > 20 ? chunk.substring(0, 20) : chunk}');
         if (!mounted) return;
         _streamTimer?.cancel();
         setState(() {
@@ -754,6 +765,7 @@ Rules:
         }
       },
       onError: (e) {
+        debugPrint('[AI autoAsk] onError: $e');
         if (!mounted) return;
         _sending = false; // 6/29 17:05: 错误也释放防双击
         _llmRetried = false; // 6/30 12:03: _send 走手动重试, 重置 flag
