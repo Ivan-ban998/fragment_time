@@ -75,45 +75,16 @@ class _AiAssistantScreenState extends State<AiAssistantScreen> {
     }
     // 6/30 12:40: 有历史 → 3 个上下文建议 (AI 生成, 5s 超时 fallback 静态)
     final topics = history.take(5).map((h) => h.title).join('、');
-    final sys = widget.isEn
-        ? '''You are an AI assistant. User opened chat. They read today: $topics.
-Suggest 3 short questions (under 15 words each) they'd want to ask. One per line, no numbering, no quotes.'''
-        : '''你是 AI 助手。用户刚打开 chat。他今天读了: $topics。
-建议 3 个他可能想问的提问 (每条不超过 15 字)。每行一个, 不要编号, 不要引号。''';
-    try {
-      final buf = StringBuffer();
-      await LlmService.chatStream(messages: [
-        {'role': 'system', 'content': sys},
-        {'role': 'user', 'content': widget.isEn ? 'Suggest' : '建议'},
-      ]).timeout(const Duration(seconds: 5), onTimeout: (sink) {
-        sink.close();
-      }).forEach((chunk) {
-        buf.write(chunk);
-      });
-      if (!mounted) return;
-      final raw = buf.toString().trim();
-      // 拆行, 去空, 取前 3
-      final suggestions = raw
-          .split(RegExp(r'[\n\r]'))
-          .map((s) => s.trim().replaceAll(RegExp(r'^[\d\.\-\*\s]+'), ''))
-          .where((s) => s.isNotEmpty && s.length <= 30)
-          .take(3)
-          .toList();
-      if (mounted) {
-        setState(() {
-          _contextSuggestions = suggestions.isNotEmpty
-              ? suggestions
-              : _staticSuggestions(history, topics);
-          _dailyGreeting = '';
-        });
-      }
-    } catch (_) {
-      if (!mounted) return;
-      setState(() {
-        _contextSuggestions = _staticSuggestions(history, topics);
-        _dailyGreeting = '';
-      });
-    }
+    // 7/31 沿用 SOUL #6 #8 #103 #107: 7b 在 NAS CPU 上 5s timeout 不够 —
+    //   7b chatStream 首 token 5-7s (沿用 #107 实测),5s timeout 必 hit
+    //   用户感觉"进入 AI 助手就卡 5s"
+    // 修法: 直接走静态 3 建议 (零延迟, 沿用 #6 #8 能跑起来 > 等完美答案)
+    //   用户点建议 / 发消息时才真调 chatStream, 7b 5.7s 出第一字 (沿用 #107 实测, 真能用)
+    if (!mounted) return;
+    setState(() {
+      _contextSuggestions = _staticSuggestions(history, topics);
+      _dailyGreeting = '';
+    });
   }
 
   // 6/30 12:40: LLM 失败 fallback 静态 3 个建议
