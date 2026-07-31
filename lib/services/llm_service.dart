@@ -257,17 +257,23 @@ class LlmService {
           };
 
     try {
+      print('[chatStream] BEFORE request.send endpoint=$endpoint messages_count=${messages.length}');
       final request = http.Request('POST', Uri.parse(endpoint));
       request.headers.addAll(headers);
       if (useRemote) request.headers['Accept'] = 'text/event-stream'; // 6/29 20:25: 云端 SSE
       request.body = jsonEncode(body);
+      print('[chatStream] BEFORE send body_len=${request.body.length}');
       final response = await request.send().timeout(const Duration(seconds: 120));
+      print('[chatStream] AFTER send status=${response.statusCode} content_length=${response.contentLength}');
       if (response.statusCode != 200) {
+        print('[chatStream] NON-200 status, yielding LLM unavailable');
         yield '(LLM unavailable)';
         return;
       }
       // 6/29 20:25: 云端走 MiniMax /chat SSE 格式, 本地走 Ollama 格式
+      print('[chatStream] stream loop START');
       await for (final chunk in response.stream.transform(utf8.decoder).transform(const LineSplitter())) {
+        print('[chatStream] raw line len=${chunk.length} preview=${chunk.substring(0, chunk.length.clamp(0, 30))}');
         if (chunk.isEmpty) continue;
         try {
           if (useRemote) {
@@ -290,7 +296,9 @@ class LlmService {
           }
         } catch (_) {}
       }
-    } catch (e) {
+    } catch (e, st) {
+      print('[chatStream] CATCH ERROR: $e');
+      print('[chatStream] STACK: $st');
       yield '(LLM error: $e)';
     }
   }
