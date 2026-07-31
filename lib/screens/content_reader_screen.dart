@@ -1663,6 +1663,11 @@ class _QuoteReadLayout extends StatelessWidget {
           _QuoteExtendedSection(quoteText: text, author: item.title, scale: scale, isEn: isEn),
           SizedBox(height: 16 * scale),
 
+          // 7/31 H3 demo Phase 1: UI 占位卡片 (沿用 #6 #8 能跑起来 > 等完美)
+          //   完整实现等 Brien 拍 API key + quota 后再接 (沿用 #113 不可逆公开配置)
+          _QuoteH3VideoSection(quoteText: text, author: item.title, scale: scale, isEn: isEn),
+          SizedBox(height: 16 * scale),
+
           // 7/15 16:56 Q2: 真接关联阅读 (Hero 详情页底部) — 跟 banner sheet 同源算法
           // 17:19: userType/scene 从 ContentReaderScreen 透传进来 (兑底 officeWorker/learn)
           // 7/31 C: QuoteRelatedEngine prompt 升级 (补 5 条 LLM 兜底)
@@ -1970,6 +1975,116 @@ class _QuoteExtendedSectionState extends State<_QuoteExtendedSection> {
             Text(widget.isEn ? 'Unavailable' : '暂不可用', style: TextStyle(fontSize: 12 * s, color: AppTheme.textLight))
           else if (_extended != null)
             Text(_extended!, style: TextStyle(fontSize: 13 * s, height: 1.6, color: AppTheme.textDark)),
+        ],
+      ),
+    );
+  }
+}
+
+// 7/31 H3 demo Phase 1: UI 占位卡片 (沿用 #6 #8 能跑起来 > 等完美)
+//   完整接 MiniMax H3 API 等 Brien 拍 key + quota 后 (沿用 #113 不可逆公开配置)
+//   plan: fragment_time_good/docs/H3-demo-plan.md
+class _QuoteH3VideoSection extends StatefulWidget {
+  final String quoteText;
+  final String author;
+  final double scale;
+  final bool isEn;
+  const _QuoteH3VideoSection({
+    required this.quoteText,
+    required this.author,
+    required this.scale,
+    required this.isEn,
+  });
+  @override
+  State<_QuoteH3VideoSection> createState() => _QuoteH3VideoSectionState();
+}
+class _QuoteH3VideoSectionState extends State<_QuoteH3VideoSection> {
+  bool _generating = false;
+  void _onTapGenerate() {
+    // 7/31 Phase 1: 占位交互 — 点击后提示用户 H3 API key 未接
+    //   后续 Phase 2 接 API key + proxy 后, 改为调 h3_proxy 真生成
+    setState(() { _generating = true; });
+    Future.delayed(const Duration(milliseconds: 1500), () {
+      if (!mounted) return;
+      setState(() { _generating = false; });
+      showDialog(
+        context: context,
+        builder: (ctx) => AlertDialog(
+          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
+          title: Text(widget.isEn ? 'AI Video (coming soon)' : 'AI 解读视频 (即将上线)'),
+          content: Text(
+            widget.isEn
+                ? 'This is a placeholder. MiniMax H3 video generation will be enabled once the API key + proxy are configured (per docs/H3-demo-plan.md).'
+                : '这是占位卡片。MiniMax H3 视频生成需等 API key + proxy 接入后启用 (见 docs/H3-demo-plan.md)。',
+          ),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.of(ctx).pop(),
+              child: Text(widget.isEn ? 'OK' : '好的'),
+            ),
+          ],
+        ),
+      );
+    });
+  }
+  @override
+  Widget build(BuildContext context) {
+    final s = widget.scale;
+    return Container(
+      padding: EdgeInsets.all(14 * s),
+      decoration: BoxDecoration(
+        color: const Color(0xFF7C5CFC).withOpacity(0.04),
+        borderRadius: BorderRadius.circular(12),
+        border: Border.all(color: const Color(0xFF7C5CFC).withOpacity(0.25)),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            children: [
+              const Icon(Icons.movie_creation_outlined, size: 16, color: Color(0xFF7C5CFC)),
+              SizedBox(width: 6 * s),
+              Text(
+                widget.isEn ? 'AI Video (15s)' : 'AI 解读视频 (15s)',
+                style: TextStyle(fontSize: 13 * s, fontWeight: FontWeight.w600, color: const Color(0xFF7C5CFC)),
+              ),
+              const Spacer(),
+              Container(
+                padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                decoration: BoxDecoration(
+                  color: Colors.grey.shade300,
+                  borderRadius: BorderRadius.circular(8),
+                ),
+                child: Text(
+                  widget.isEn ? 'Coming soon' : '即将上线',
+                  style: TextStyle(fontSize: 10 * s, color: Colors.grey.shade700),
+                ),
+              ),
+            ],
+          ),
+          SizedBox(height: 8 * s),
+          Text(
+            widget.isEn
+                ? 'MiniMax H3 will generate a 15-second video interpretation for this quote (image + voice + motion).'
+                : 'MiniMax H3 将为这句名言生成 15 秒视频解读 (画面 + 人声 + 动作)。',
+            style: TextStyle(fontSize: 12 * s, height: 1.5, color: AppTheme.textLight),
+          ),
+          SizedBox(height: 10 * s),
+          OutlinedButton.icon(
+            onPressed: _generating ? null : _onTapGenerate,
+            icon: _generating
+                ? const SizedBox(width: 14, height: 14, child: CircularProgressIndicator(strokeWidth: 2))
+                : const Icon(Icons.play_circle_outline, size: 18),
+            label: Text(_generating
+                ? (widget.isEn ? 'Generating...' : '生成中...')
+                : (widget.isEn ? 'Preview (placeholder)' : '预览 (占位)')),
+            style: OutlinedButton.styleFrom(
+              foregroundColor: const Color(0xFF7C5CFC),
+              side: BorderSide(color: const Color(0xFF7C5CFC).withOpacity(0.4)),
+              padding: EdgeInsets.symmetric(vertical: 8 * s),
+              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+            ),
+          ),
         ],
       ),
     );
