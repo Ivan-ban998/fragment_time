@@ -26,7 +26,13 @@ class RssItem {
 class RssService {
   // 7/29 加: NAS 后端代理 (绕过 web 浏览器 CORS 限制, 沿用 SOUL #103 沿用 #113 沿用 #15)
   // 浏览器 fetch 36 氪受 CORS 拦截, 走 NAS proxy 拉 (后端 curl 不受限制)
-  static const String _proxyBase = 'http://127.0.0.1:7088/rss';
+  // 8/1 修 (沿用 #103 真改没改对 — Brien 15:13 硬刷报 127.0.0.1:7088 connection refused):
+  // - 之前 127.0.0.1 = 浏览器本地, NAS rss_proxy 拉不到 (desktop 浏览器撞)
+  // - 改 NAS LAN IP 192.168.1.2 (desktop + 内网浏览器走局域网访问)
+  // - 8/1 二次修: tailscale 100.89.204.123 拒连 (tailscale0 device 不存在, 进程没启)
+  // - rss_proxy.py 也已绑 0.0.0.0 不止 127.0.0.1 (8/1 同步修)
+  // 沿用 #113: 外网访问 fragment_time 时 rss 拉不到 → 下次起 tailscale + 改回 IP
+  static const String _proxyBase = 'http://192.168.1.2:7088/rss';
   // 国内版: 36 氪 (主源)
   static const String _kr36Feed = 'https://36kr.com/feed';
   // 国内备用: 少数派 (7/29 实测 226ms 极快, 36 氪 10s 慢)
