@@ -21,6 +21,7 @@ class ContentAggregator {
     required UserType userType,
     required Scene scene,
     bool isInternational = false,
+    int offset = 0, // 8/1 加 (沿用 #103): 让 '换 6 张' 真换不同 6 条 (Step 2 覆盖 Step 1 时保持 offset 一致)
   }) async {
     try {
       // 7/29 重构: 只走真 RSS (36 氪 / 少数派 / The Verge), 拉空返 []
@@ -28,6 +29,11 @@ class ContentAggregator {
       // _allContent 保留仅供 dev 演示 (news._fetchFakeForDev)
       final rssResults = await news.fetchFromRss(userType, scene, isInternational: isInternational);
       if (rssResults.isNotEmpty) {
+        // 按 offset 错位切 6 条 (跟 getRecommendations Step 1 一致)
+        if (rssResults.length >= 6) {
+          final start = (offset + userType.index * 5 + scene.index * 3) % rssResults.length;
+          return [for (int i = 0; i < 6; i++) rssResults[(start + i) % rssResults.length]];
+        }
         return rssResults;
       }
       // RSS 拉空 -> 返 [] (UI 走空状态)

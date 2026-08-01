@@ -320,6 +320,7 @@ class _ContentScreenState extends State<ContentScreen> {
         userType: widget.userType,
         scene: widget.scene,
         isInternational: widget.isInternational,
+        offset: _recOffset, // 8/1 加 (沿用 #103): 让 Step 2 跟 Step 1 用同样 offset, 避免覆盖回旧 6 条
       );
       if (!mounted) return;
       if (rec.isNotEmpty) {
