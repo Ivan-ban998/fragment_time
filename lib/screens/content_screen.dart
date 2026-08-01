@@ -292,9 +292,9 @@ class _ContentScreenState extends State<ContentScreen> {
   // 7/30 D 修: 同步立即返 fallback (24 桶假数据, <100ms), 异步 RSS 到后覆盖
   // 真凶: RSS 拉 3 个源 × 2 attempt × 8s timeout = 20s+ 才返, 用户等得很烦躁
   // 沿用 #6 #8 '能跑起来 > 功能强大' — 先看到东西比数据真不真重要
-  Future<void> _loadRecommendations() async {
-    if (_recLoading) return;
-    if (_recRetryCount >= 3) {
+  Future<void> _loadRecommendations({bool force = false}) async {
+    if (_recLoading && !force) return;
+    if (_recRetryCount >= 3 && !force) {
       return;
     }
     _recRetryCount++;
@@ -511,6 +511,7 @@ class _ContentScreenState extends State<ContentScreen> {
       _showAllDoneDialog = true;
       _recOffset += 6;
       _recItems = [];
+      _recLoading = false; // 8/1 修: 强制重 load, 不被 _recLoading 卡住
       _recRetryCount = 0; // 7/30 B: 重置重试计数, 下一轮重新计
     });
     await showDialog(
@@ -547,7 +548,7 @@ class _ContentScreenState extends State<ContentScreen> {
                   TextButton(
                     onPressed: () {
                       Navigator.pop(ctx);
-                      _loadRecommendations();
+                      _loadRecommendations(force: true); // 8/1 修: force 重 load
                     },
                     child: Text(isEn ? 'Next 6' : '换 6 张', style: const TextStyle(color: Colors.white, fontWeight: FontWeight.w600)),
                   ),
