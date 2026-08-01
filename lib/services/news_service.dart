@@ -7,9 +7,26 @@ class NewsService {
   /// 不分桶 = 儿童/上班族/退休都看到同样的 = 宪法 §6 违规
   /// 6/9 修复：用 bucketKey（enum 标识符）而不是 .name（"Office Worker" 带空格），
   /// 否则 key="Office Worker_Learn" 永远对不上 _allContent 里的 "officeWorker_learn"
-  Future<List<ContentItem>> getRecommendations(UserType userType, Scene scene) async {
+  /// 8/1 加: offset + shuffle (沿用 SOUL #103 — 之前 "换 6 张" 不响应, 真凶是每桶只 6 条 + 不 shuffle, 换 6 张永远同一组)
+  Future<List<ContentItem>> getRecommendations(UserType userType, Scene scene, {int offset = 0}) async {
     final key = '${userType.bucketKey}_${scene.bucketKey}';
-    return _allContent[key] ?? _fallback(userType, scene);
+    final pool = _allContent[key] ?? _fallback(userType, scene);
+    // 7/30: 1 桶可能 < 6 条 (e.g. student_workout 30 但其他都 6) — 不足时拼凑
+    if (pool.isEmpty) return pool;
+    // 按 offset 取 6 条: offset 0-5 → 不同起点, 桶 ≤6 时旋转返回 (看完再换, 看到不同顺序的同一组)
+    final shuffled = [...pool]..shuffle();
+    final take = 6;
+    if (shuffled.length <= take) {
+      // 不够 6 条: 重复填 + 起点按 offset 旋转
+      final out = <ContentItem>[];
+      for (int i = 0; i < take; i++) {
+        out.add(shuffled[(i + offset) % shuffled.length]);
+      }
+      return out;
+    }
+    // 够 6 条: 起点按 offset 切片
+    final start = offset % shuffled.length;
+    return [for (int i = 0; i < take; i++) shuffled[(start + i) % shuffled.length]];
   }
 
   // 6/28 加: 预热 24 桶 + 国际版备用桶 (LoadingScreen 调用)

@@ -299,7 +299,8 @@ class _ContentScreenState extends State<ContentScreen> {
     }
     _recRetryCount++;
     // Step 1: 同步立即返 fallback 24 桶 (<100ms) — 用户立刻看到 6 张卡
-    final fallback = NewsService().getRecommendations(widget.userType, widget.scene);
+    // 8/1 加 offset (沿用 SOUL #103): "换 6 张" 不响应真凶 — 每桶只 6 条 + 不 shuffle = 永远同一组
+    final fallback = NewsService().getRecommendations(widget.userType, widget.scene, offset: _recOffset);
     final fallbackItems = await fallback;
     if (!mounted) return;
     if (fallbackItems.isNotEmpty) {
