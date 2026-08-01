@@ -214,14 +214,12 @@ class RssService {
         break;
     }
 
-    // 错位切片: 不同 bucket 用不同 offset (循环 RSS items)
-    final offset = (userType.index * 5 + scene.index * 3) % items.length;
-    final picked = <ContentItem>[];
-    for (var i = 0; i < items.length && picked.length < 6; i++) {
-      final idx = (offset + i) % items.length;
-      picked.add(toContentItem(items[idx], contentType: defaultKind));
-    }
-    return picked;
+    // 8/2 修 (沿用 #103 真改没改对 第 N 次): 返整个 items (不裁到 6), 让上游
+    //   getRecommendations / fetchRecommendContent 拿 offset 切片 6 条
+    //   真凶: 之前返 6 条 + 上游 start = offset % 6 → offset 0-5 都循环同一组
+    return items
+        .map((it) => toContentItem(it, contentType: defaultKind))
+        .toList();
   }
 
   /// 7/29 加: 搜索 RSS 关键词 (按 userType×scene 主题词筛)
