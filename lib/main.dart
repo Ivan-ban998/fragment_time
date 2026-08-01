@@ -324,7 +324,6 @@ class _MainHomeScreenState extends State<MainHomeScreen> {
       await _loadDailyQuote();
       // 3. ContentScreen 通过 _subscribedItems 变化自动 rebuild (Consumer/Provider 风格)
     } catch (e) {
-      debugPrint('[force-reload] 失败: $e');
     }
   }
 
@@ -381,7 +380,6 @@ class _MainHomeScreenState extends State<MainHomeScreen> {
       for (final it in old) {
         await LocalSubscriptionService.instance.unsubscribe(it);
       }
-      if (old.isNotEmpty) debugPrint('[migrate] 删了 ${old.length} 个老 encourage_ item');
     } catch (_) {}
   }
 

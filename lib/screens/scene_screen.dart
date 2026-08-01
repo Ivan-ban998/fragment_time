@@ -136,7 +136,6 @@ class _SceneScreenState extends State<SceneScreen> {
                           (state as dynamic)._reloadAll();
                         }
                       } catch (e) {
-                        debugPrint('[scene] reload failed: $e');
                       }
                     },
                   ),

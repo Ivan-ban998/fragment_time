@@ -18,7 +18,6 @@ import '../models/models.dart';
 import '../services/user_preference_service.dart';
 import '../services/eye_protection_scope.dart';
 import '../services/local_subscription_service.dart';
-import '../theme/glass_decoration.dart';
 
 class TinderRecommendationStack extends StatefulWidget {
   final List<ContentItem> items;

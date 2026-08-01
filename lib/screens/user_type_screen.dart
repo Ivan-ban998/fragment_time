@@ -331,7 +331,6 @@ class _UserTypeScreenState extends State<UserTypeScreen> {
                                             } else {
                                             }
                                           } catch (e) {
-                                            debugPrint('[user_type] showLoadingScreen 失败: $e');
                                           }
                                         },
                                       ),

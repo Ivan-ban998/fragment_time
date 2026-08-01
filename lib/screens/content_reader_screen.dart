@@ -265,7 +265,6 @@ class _ContentReaderScreenState extends State<ContentReaderScreen> {
       // 6/25 v17: 不 3s 淺出, 常驻底部, 用户手动 X 关
       _markCompleteTimer?.cancel();
     } catch (e) {
-      debugPrint('详情页 mark complete 失败: $e');
     }
   }
 

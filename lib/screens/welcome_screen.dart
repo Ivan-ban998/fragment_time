@@ -75,7 +75,6 @@ class _WelcomeScreenState extends State<WelcomeScreen> {
       try {
         app.hideWelcomeScreenFromOutside();
       } catch (e) {
-        debugPrint('[welcome] hideWelcomeScreenFromOutside 失败: $e');
       }
     }
   }

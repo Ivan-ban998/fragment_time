@@ -31,7 +31,6 @@ class ContentAggregator {
         return rssResults;
       }
       // RSS 拉空 -> 返 [] (UI 走空状态)
-      debugPrint('[aggregator] RSS 拉空 (${userType.bucketKey}_${scene.bucketKey}, intl=$isInternational) — 返空状态');
       return [];
     } catch (e) {
       debugPrint('ContentAggregator error: $e');
