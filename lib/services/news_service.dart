@@ -8,23 +8,32 @@ class NewsService {
   /// 6/9 修复：用 bucketKey（enum 标识符）而不是 .name（"Office Worker" 带空格），
   /// 否则 key="Office Worker_Learn" 永远对不上 _allContent 里的 "officeWorker_learn"
   /// 8/1 加: offset + shuffle (沿用 SOUL #103 — 之前 "换 6 张" 不响应, 真凶是每桶只 6 条 + 不 shuffle, 换 6 张永远同一组)
+  /// 8/1 加: 优先 fetchFromRss (RSS 真数据 30 条循环), 拉空才 fallback 假数据 (沿用宪法 §1.1 + ROADMAP 🅳)
   Future<List<ContentItem>> getRecommendations(UserType userType, Scene scene, {int offset = 0}) async {
+    // Step 1: 优先走 RSS 真数据 (36氪 / 少数派 via rss_proxy 7088)
+    final rss = await fetchFromRss(userType, scene, isInternational: false);
+    if (rss.isNotEmpty && rss.length >= 6) {
+      // 够 6 条: 按 offset 错位切 (不同 bucket + 换 6 张 拿不同切片)
+      final start = (offset + userType.index * 5 + scene.index * 3) % rss.length;
+      final picked = <ContentItem>[];
+      for (var i = 0; i < 6; i++) {
+        picked.add(rss[(start + i) % rss.length]);
+      }
+      return picked;
+    }
+    // Step 2: RSS 拉空 fallback 假数据 (24 桶 fallback, 旋转起点)
     final key = '${userType.bucketKey}_${scene.bucketKey}';
     final pool = _allContent[key] ?? _fallback(userType, scene);
-    // 7/30: 1 桶可能 < 6 条 (e.g. student_workout 30 但其他都 6) — 不足时拼凑
     if (pool.isEmpty) return pool;
-    // 按 offset 取 6 条: offset 0-5 → 不同起点, 桶 ≤6 时旋转返回 (看完再换, 看到不同顺序的同一组)
     final shuffled = [...pool]..shuffle();
     final take = 6;
     if (shuffled.length <= take) {
-      // 不够 6 条: 重复填 + 起点按 offset 旋转
       final out = <ContentItem>[];
       for (int i = 0; i < take; i++) {
         out.add(shuffled[(i + offset) % shuffled.length]);
       }
       return out;
     }
-    // 够 6 条: 起点按 offset 切片
     final start = offset % shuffled.length;
     return [for (int i = 0; i < take; i++) shuffled[(start + i) % shuffled.length]];
   }
