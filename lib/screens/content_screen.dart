@@ -295,7 +295,6 @@ class _ContentScreenState extends State<ContentScreen> {
   Future<void> _loadRecommendations() async {
     if (_recLoading) return;
     if (_recRetryCount >= 3) {
-      debugPrint('[recommend] 已重试 3 次仍为空, 不再重试 (交占位卡显示)');
       return;
     }
     _recRetryCount++;
@@ -329,14 +328,12 @@ class _ContentScreenState extends State<ContentScreen> {
           _recLoading = false;
           _recRetryCount = 0;
         });
-        debugPrint('[recommend] RSS 拉到 ${rec.length} 条, 覆盖 fallback');
       } else {
         // RSS 还是空, 保持 fallback (用户已看到)
         setState(() {
           _recLoading = false;
           _recRetryCount = 0;
         });
-        debugPrint('[recommend] RSS 拉空, 保持 fallback (用户已看到 24 桶)');
       }
     } catch (e) {
       if (!mounted) return;

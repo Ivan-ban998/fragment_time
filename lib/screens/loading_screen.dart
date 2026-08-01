@@ -99,7 +99,6 @@ class _LoadingScreenState extends State<LoadingScreen>
         }
         _markDone(1);
       } catch (e) {
-        debugPrint('[loading] LLM keep_alive 失败 (兑底): $e');
         _markDone(1);
       }
     }();

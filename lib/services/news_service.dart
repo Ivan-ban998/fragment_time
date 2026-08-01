@@ -102,7 +102,6 @@ class NewsService {
         if (item.sourceType == source) results.add(item);
       }
     }
-    debugPrint('[news] fetchAllBySource(${source.name}) → ${results.length} items');
     return results;
   }
 
