@@ -49,13 +49,30 @@ class LlmService {
     if (kIsWeb) {
       return webhost.currentHostname();
     }
-    return '192.168.1.20';
+    return '192.168.1.2';
   }
   static String get _ollamaEndpoint {
     return 'http://$_ollamaHost:11434/api/chat';
   }
   // 6/25 E: 7b CPU 推理太慢 (首 token 30-60s), 切 1.5b (CPU 上 5-10x 快, 老人模式总结质量仍可)
   static const String _model = 'qwen2.5:7b'; // 6/29 16:55: 1.5b 不理解"音乐/英语/冥想"区别, 回到 7b
+  // 8/2 沿用 SOUL #126 #127: minimax 反代同 Ollama 模式, web 动态取 hostname
+  // key 在 NAS 反代持有, web bundle 不接触 key (沿用 18:10 安全注释)
+  static String get _llmProxyHost {
+    if (kIsWeb) return webhost.currentHostname();
+    return '192.168.1.2';
+  }
+  static String get _llmProxyEndpoint {
+    return 'http://$_llmProxyHost:11435/api/llm';
+  }
+  // 8/2 默认走 minimax 反代 (key 隐式走 NAS, 不进 build); 不传 LLM_BACKEND=ollama 兜底本地
+  // 跟 Ollama 同端口风格 (11435), web 端同 hostname 解析
+  static bool get _useLlmProxy {
+    const backend = String.fromEnvironment('LLM_BACKEND', defaultValue: 'proxy');
+    return backend != 'ollama';
+  }
+  // 8/2 model: 反代模式走 minimax-Text-01 (沿用 7/16 那批 APK 验证过的模型)
+  static const String _remoteModel = 'MiniMax-Text-01';
   // 18:10: 本地 Ollama 默认模型; MiniMax 用 MiniMax-M2 (thinking model)
 
   static Stream<String> generateStream({
@@ -72,8 +89,10 @@ class LlmService {
     final userPrompt = _buildUserPrompt(userType, scene, languageCode, isInternational);
 
     final useRemote = _webSafeUseRemote;
-    final endpoint = useRemote ? _remoteEndpoint : _ollamaEndpoint;
-    final model = useRemote ? 'MiniMax-M2.7' : _model;
+    // 8/2 沿用: 默认走 NAS 反代 (minimax key 在 NAS, web 安全); 编译期 LLM_BACKEND=ollama 可兜底
+    final useProxy = _useLlmProxy;
+    final endpoint = useRemote ? _remoteEndpoint : (useProxy ? _llmProxyEndpoint : _ollamaEndpoint);
+    final model = useRemote ? _remoteModel : (useProxy ? _remoteModel : _model);
 
     Map<String, dynamic> body;
     Map<String, String> headers = {'Content-Type': 'application/json'};
@@ -182,8 +201,9 @@ class LlmService {
   // 6/11 加: 原始 prompt 接口 - 给私教/回顾这种需要自定义 prompt 的场景
   static Future<String> generateRaw(String prompt, {bool isEn = true}) async {
     final useRemote = _webSafeUseRemote;
-    final endpoint = useRemote ? _remoteEndpoint : _ollamaEndpoint;
-    final model = useRemote ? 'MiniMax-M2.7' : _model;
+    final useProxy = _useLlmProxy;
+    final endpoint = useRemote ? _remoteEndpoint : (useProxy ? _llmProxyEndpoint : _ollamaEndpoint);
+    final model = useRemote ? _remoteModel : (useProxy ? _remoteModel : _model);
 
     final headers = {'Content-Type': 'application/json'};
     final body = useRemote
@@ -235,8 +255,9 @@ class LlmService {
     int numPredict = 400,
   }) async* {
     final useRemote = _webSafeUseRemote;
-    final endpoint = useRemote ? _remoteEndpoint : _ollamaEndpoint;
-    final model = useRemote ? 'MiniMax-M2.7' : _model;
+    final useProxy = _useLlmProxy;
+    final endpoint = useRemote ? _remoteEndpoint : (useProxy ? _llmProxyEndpoint : _ollamaEndpoint);
+    final model = useRemote ? _remoteModel : (useProxy ? _remoteModel : _model);
     final headers = {'Content-Type': 'application/json'};
     if (useRemote) headers['Authorization'] = 'Bearer $_apiKey';
 
@@ -509,8 +530,9 @@ class LlmService {
     String languageCode = 'zh',
   }) async {
     final useRemote = _webSafeUseRemote;
-    final endpoint = useRemote ? _remoteEndpoint : _ollamaEndpoint;
-    final model = useRemote ? 'MiniMax-M2.7' : _model;
+    final useProxy = _useLlmProxy;
+    final endpoint = useRemote ? _remoteEndpoint : (useProxy ? _llmProxyEndpoint : _ollamaEndpoint);
+    final model = useRemote ? _remoteModel : (useProxy ? _remoteModel : _model);
 
     final userMsg = languageCode == 'en'
         ? 'Title: $title\n\nContent: $description\n\nMake 3 multiple choice questions in English.'
