@@ -205,18 +205,18 @@ try {
 }
 "
 
-# 4) 重启 server (no-cache headers, 绝对路径避免 cwd 依赖)
-echo "=== restart http server on 9090 (no-cache) ==="
-ps aux | grep "http.server 9090\|no_cache_server" | grep -v grep | awk '{print $2}' | xargs -r kill 2>/dev/null
-sleep 1
-nohup python3 /volume1/AI_Jarvis/OpenClaw/workspace/projects/fragment_time_good/build/no_cache_server.py 9090 \
-    > "$LOG" 2>&1 &
-disown
-sleep 2
+# 4) 不要重启 9090 server (沿用 SOUL #6 #125 + 8/2 10:31 教训)
+# 9090 是 Haisoul Group 集团门户 (systemd haisoul-9090.service 管的)
+# fragment_time 走 7080 no_cache_server (pid 1244950, build/web/ cwd)
+# 老脚本这步会 kill 9090 拉起 fragment_time, 这是错的 (一 build 就抢 Haisoul 端口)
+# 修法: 直接跳过, build/web 让 7080 no_cache_server 自动 serve (Python SimpleHTTPRequestHandler 读文件系统, 不需要 restart)
+echo "=== skip 9090 restart (Haisoul Group 集团门户 systemd 占用) ==="
+echo "  fragment_time 走 7080 no_cache_server (auto-serve build/web)"
+echo "  9090 systemd haisoul-9090.service (Haisoul Group) — 不动"
 
 # 5) 报告
 echo ""
 echo "=== done ==="
-echo "URL: http://192.168.1.20:9090/"
+echo "URL: http://192.168.1.2:7080/ (fragment_time) | http://192.168.1.2:9090/ (Haisoul Group 集团门户)"
 echo "Log: $LOG"
-ss -tlnp 2>/dev/null | grep ":9090" | head -1
+ss -tlnp 2>/dev/null | grep ":9090\|:7080" | head -2

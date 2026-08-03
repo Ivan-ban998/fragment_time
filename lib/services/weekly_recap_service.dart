@@ -126,7 +126,7 @@ class WeeklyRecapService {
     if (kIsWeb) {
       host = webhost.currentHostname();
     } else {
-      host = '192.168.1.20';
+      host = '192.168.1.2';
     }
     final endpoint = 'http://$host:11434/api/chat';
     try {
