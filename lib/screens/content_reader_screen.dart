@@ -2055,12 +2055,14 @@ class _QuoteH3VideoSectionState extends State<_QuoteH3VideoSection> {
               Container(
                 padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
                 decoration: BoxDecoration(
+                  // 8/4 修 #169 A2: Colors.grey.shade300 装饰, 设计意图 (即将上线"灰底"), 不动
                   color: Colors.grey.shade300,
                   borderRadius: BorderRadius.circular(8),
                 ),
                 child: Text(
                   widget.isEn ? 'Coming soon' : '即将上线',
-                  style: TextStyle(fontSize: 10 * s, color: Colors.grey.shade700),
+                  // 8/4 修 #169 A1: 文字 Colors.grey.shade700 暗色不可见, 改 hintColor
+                  style: TextStyle(fontSize: 10 * s, color: AppTheme.hintColor(context)),
                 ),
               ),
             ],

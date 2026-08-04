@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/foundation.dart';
+import '../theme/app_theme.dart';
 import 'inline_read_view_stub.dart'
     if (dart.library.html) 'inline_read_view_web.dart' as impl;
 
@@ -34,15 +35,18 @@ class _InlineReadViewState extends State<InlineReadView> {
         height: widget.height,
         alignment: Alignment.center,
         decoration: BoxDecoration(
+          // 8/4 修 #169 A2: Colors.grey.shade100 装饰, 设计意图 (加载失败"灰底"), 不动
           color: Colors.grey.shade100,
           borderRadius: BorderRadius.circular(12),
         ),
-        child: const Column(
+        child: Column(
           mainAxisAlignment: MainAxisAlignment.center,
           children: [
-            Icon(Icons.cloud_off, size: 32, color: Colors.grey),
+            // 8/4 修 #169 A1: Icon 颜色 + 文字颜色 暗色不可见
+            // 拆 const Column → 普通 Column, 才能用 context 调 AppTheme.hintColor
+            Icon(Icons.cloud_off, size: 32, color: AppTheme.hintColor(context)),
             SizedBox(height: 8),
-            Text('加载失败', style: TextStyle(color: Colors.grey)),
+            Text('加载失败', style: TextStyle(color: AppTheme.hintColor(context))),
           ],
         ),
       );
