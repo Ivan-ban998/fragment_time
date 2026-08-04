@@ -396,26 +396,33 @@ class _MainHomeScreenState extends State<MainHomeScreen> {
   bool _quoteLoading = false; // 6/29: 防止点 "下一个" 按钮时双击
 
   Future<void> _loadDailyQuote() async {
+    debugPrint('[Quote] _loadDailyQuote start, isEn=$isEn');
     try {
       // 6/26 重构: 只调名言, 删鼓励 (名言对各角色通用)
       Future<String> llmCall(String prompt) async {
         final buffer = StringBuffer();
-        await for (final chunk in LlmService.generateStream(
-          userType: UserType.officeWorker, // 名言不跟 userType 绑, 随便传个
-          scene: Scene.learn,
-          languageCode: _languageCode,
-          isInternational: _isInternational,
-        ).timeout(const Duration(seconds: 5), onTimeout: (sink) {
-          // 6/28 Brien 反馈: '顶上的名言呢' — LLM 冷启动 12-20s 不 throw 也不返回
-          // 这里 5s 强行 timeout, 避免 _dailyQuote 永远 null
-          sink.close();
-        })) {
-          buffer.write(chunk);
+        // 8/3 修: 不用 Stream.timeout + sink.close (sink.close() 不会取消上游 http.Client,
+        // socket 持续挂导致后续 send 排队同 host, AI 助手也卡。改用 try/finally 包装,
+        // 5s 后返回当前 buffer 跳出, 上游 http.Client 由 generateStream 内部 timeout(120s) 自己 release)
+        try {
+          await for (final chunk in LlmService.generateStream(
+            userType: UserType.officeWorker, // 名言不跟 userType 绑, 随便传个
+            scene: Scene.learn,
+            languageCode: _languageCode,
+            isInternational: _isInternational,
+          ).timeout(const Duration(seconds: 5))) {
+            buffer.write(chunk);
+          }
+        } on TimeoutException {
+          // 5s 到点: 返回当前已写 buffer, 不等上游流结束
+          debugPrint('[Quote] LLM 5s timeout, 已写 ${buffer.length} chars, 跳兜底');
         }
         return buffer.toString();
       }
 
+      debugPrint('[Quote] calling getDailyQuote...');
       final quote = await _streakService.getDailyQuote(isEn: isEn, llmCall: llmCall);
+      debugPrint('[Quote] got quote, text.length=${quote.text.length}');
       // 7/15: LLM 或 fallback 返 Quote, 超过 80 字兑底 (仍返回原 Quote, 让 banner 截)
       final trimmed = quote.text.length > 80
           ? Quote(text: quote.text.substring(0, 80) + '…', author: quote.author, source: quote.source, textEn: quote.textEn, authorEn: quote.authorEn, createdAt: quote.createdAt)
@@ -425,6 +432,7 @@ class _MainHomeScreenState extends State<MainHomeScreen> {
         _dailyQuote = trimmed;
       });
     } catch (e) {
+      debugPrint('[Quote] catch: $e');
       // 6/28 Brien 反馈: '顶上的名言呢' = _dailyQuote 一直是 null, banner 不显示
       // 真凶: 这里 catch 之后 _dailyQuote 永不被设值, main.dart 的 banner condition 永远失败
       // 修: 兑底给一句硬编码名言 + 仍 setState
