@@ -5,6 +5,7 @@
 
 import 'package:flutter/material.dart';
 import 'package:webview_flutter/webview_flutter.dart';
+import '../theme/app_theme.dart';
 
 class InAppWebViewScreen extends StatefulWidget {
   final String url;
@@ -94,7 +95,8 @@ class _InAppWebViewScreenState extends State<InAppWebViewScreen> {
                     Text(
                       '请用浏览器打开:\n${widget.url}',
                       textAlign: TextAlign.center,
-                      style: const TextStyle(color: Colors.grey),
+                      // 8/4 修 #169 A1: 裸 Colors.grey 暗色不可见, 改 AppTheme.hintColor (brightness-aware)
+                      style: TextStyle(color: AppTheme.hintColor(context)),
                     ),
                   ],
                 ),
