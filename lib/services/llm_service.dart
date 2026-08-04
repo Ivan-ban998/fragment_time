@@ -132,9 +132,12 @@ class LlmService {
       ..body = jsonEncode(body);
 
     // 6/11 修复：30s → 120s，Ollama 7B 冷启动 27s + 出 800 token 70s，30s 不够
-    final response = await http.Client().send(req).timeout(
+    // 8/3 修 #127+#130 follow-up: 抽 client 出来, 5s 早退时主动 close, 避免 socket 复用堵后续 send
+    final client = http.Client();
+    final response = await client.send(req).timeout(
       const Duration(seconds: 120),
       onTimeout: () {
+        client.close(); // 关键: 释放 socket, 下次 send 不排队同 host
         throw LlmException('timeout 120s: $endpoint');
       },
     );
