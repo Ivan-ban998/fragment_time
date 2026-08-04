@@ -32,7 +32,9 @@ class RssService {
   // - 8/1 二次修: tailscale 100.89.204.123 拒连 (tailscale0 device 不存在, 进程没启)
   // - rss_proxy.py 也已绑 0.0.0.0 不止 127.0.0.1 (8/1 同步修)
   // 沿用 #113: 外网访问 fragment_time 时 rss 拉不到 → 下次起 tailscale + 改回 IP
-  static const String _proxyBase = 'http://192.168.1.2:7088/rss';
+  // 8/4 修 #169 CORS: 相对路径 /rss 同 origin, 避免跨域被拒
+// ft_server.py 在 7080 同时 serve fragment_time + /rss 路径
+static const String _proxyBase = '/rss';
   // 国内版: 36 氪 (主源)
   static const String _kr36Feed = 'https://36kr.com/feed';
   // 国内备用: 少数派 (7/29 实测 226ms 极快, 36 氪 10s 慢)
