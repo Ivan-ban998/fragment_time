@@ -838,10 +838,10 @@ class _WeeklyRecapCard extends StatelessWidget {
               SizedBox(height: 12 * scale),
               Row(
                 children: [
-                  _statItem('📖', '${r.watchedArticles}', isEn ? 'articles' : '篇文章', scale),
-                  _statItem('🎧', '${r.listenedAudio}', isEn ? 'listened' : '次听', scale),
-                  _statItem('🔖', '${r.savedCount}', isEn ? 'saved' : '个收藏', scale),
-                  _statItem('⏱', '${r.minutesActive}', isEn ? 'min' : '分钟', scale),
+                  _statItem(context, '📖', '${r.watchedArticles}', isEn ? 'articles' : '篇文章', scale),
+                  _statItem(context, '🎧', '${r.listenedAudio}', isEn ? 'listened' : '次听', scale),
+                  _statItem(context, '🔖', '${r.savedCount}', isEn ? 'saved' : '个收藏', scale),
+                  _statItem(context, '⏱', '${r.minutesActive}', isEn ? 'min' : '分钟', scale),
                 ],
               ),
             ],
@@ -851,7 +851,7 @@ class _WeeklyRecapCard extends StatelessWidget {
     );
   }
 
-  Widget _statItem(String emoji, String num, String label, double scale) {
+  Widget _statItem(BuildContext context, String emoji, String num, String label, double scale) {
     return Expanded(
       child: Column(
         children: [
@@ -859,7 +859,8 @@ class _WeeklyRecapCard extends StatelessWidget {
           SizedBox(height: 4 * scale),
           Text(num,
               style: TextStyle(fontSize: 18 * scale, fontWeight: FontWeight.w700, color: AppTheme.primary)),
-          Text(label, style: TextStyle(fontSize: 11 * scale, color: Colors.grey[600])),
+          // 8/4 修 #169 A1: 文字 Colors.grey[600] 暗色不可见
+          Text(label, style: TextStyle(fontSize: 11 * scale, color: AppTheme.hintColor(context))),
         ],
       ),
     );

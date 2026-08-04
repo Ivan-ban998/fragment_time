@@ -1679,12 +1679,14 @@ class _QuoteDetailSheet extends StatelessWidget {
                           padding: const EdgeInsets.only(bottom: 10),
                           child: Text(
                             '《${q.source}》',
-                            style: TextStyle(fontSize: 13, color: Colors.grey[600]),
+                            // 8/4 修 #169 A1: 文字 Colors.grey[600] 暗色不可见
+                            style: TextStyle(fontSize: 13, color: AppTheme.hintColor(context)),
                           ),
                         ),
                       Text(
                         '“${q.text}”',
-                        style: TextStyle(fontSize: 14, fontStyle: FontStyle.italic, color: Colors.grey[800], height: 1.5),
+                        // 8/4 修 #169 A1: 名言引用 Colors.grey[800] 暗色不可见, hintColor 亮色够浅
+                        style: TextStyle(fontSize: 14, fontStyle: FontStyle.italic, color: AppTheme.hintColor(context), height: 1.5),
                       ),
                     ],
                   ),
@@ -1700,7 +1702,8 @@ class _QuoteDetailSheet extends StatelessWidget {
                   children: [
                     Text(
                       isEn ? 'Related: ' : '相关: ',
-                      style: TextStyle(fontSize: 11, color: Colors.grey[600]),
+                      // 8/4 修 #169 A1: 文字 Colors.grey[600] 暗色不可见
+                      style: TextStyle(fontSize: 11, color: AppTheme.hintColor(context)),
                     ),
                     ...llmKeywords!.map((kw) => Container(
                       padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
@@ -1798,7 +1801,8 @@ class _QuoteDetailSheet extends StatelessWidget {
                           const SizedBox(width: 4),
                           Text(
                             '${h.duration} · ${h.source}',
-                            style: TextStyle(fontSize: 11, color: Colors.grey[600]),
+                            // 8/4 修 #169 A1: 文字 Colors.grey[600] 暗色不可见
+                            style: TextStyle(fontSize: 11, color: AppTheme.hintColor(context)),
                           ),
                         ]),
                       ],
