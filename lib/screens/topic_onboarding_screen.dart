@@ -162,7 +162,8 @@ class _TopicOnboardingScreenState extends State<TopicOnboardingScreen> {
                         isEn ? 'Skip' : '跳过',
                         style: TextStyle(
                           fontSize: 15 * scale,
-                          color: Colors.grey[700],
+                          // 8/4 修 #169 A1: 文字 Colors.grey[700] 暗色不可见
+                          color: AppTheme.hintColor(context),
                         ),
                       ),
                     ),

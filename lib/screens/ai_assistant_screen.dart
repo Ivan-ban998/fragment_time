@@ -4,6 +4,7 @@ import 'package:shared_preferences/shared_preferences.dart';
 import 'dart:async';
 import 'dart:convert';
 import '../theme/glass_decoration.dart';
+import '../theme/app_theme.dart';
 import '../services/llm_service.dart';
 import '../services/news_service.dart';
 import '../services/audio_play_service.dart';
@@ -1034,7 +1035,8 @@ Rules:
                             widget.isEn ? 'Quote context' : '名言上下文',
                             style: TextStyle(
                               fontSize: 11 * scale,
-                              color: Colors.grey[600],
+                              // 8/4 修 #169 A1: 文字 Colors.grey[600] 暗色不可见
+                              color: AppTheme.hintColor(context),
                             ),
                           ),
                       ],
@@ -1224,7 +1226,8 @@ Rules:
                           hintText: widget.isEn ? 'Ask anything...' : '问点什么...',
                           hintStyle: TextStyle(
                             fontSize: 14 * scale,
-                            color: Colors.grey[500],
+                            // 8/4 修 #169 A1: hintText 文字 Colors.grey[500] 暗色不可见
+                            color: AppTheme.hintColor(context),
                           ),
                           border: OutlineInputBorder(
                             borderRadius: BorderRadius.circular(24),
@@ -1395,7 +1398,8 @@ class _MessageBubble extends StatelessWidget {
                     message.text,
                     style: TextStyle(
                       fontSize: 12 * scale,
-                      color: Colors.grey[600],
+                      // 8/4 修 #169 A1: 文字 Colors.grey[600] 暗色不可见
+                      color: AppTheme.hintColor(context),
                     ),
                   ),
                 ),
@@ -1586,7 +1590,8 @@ class _CardTile extends StatelessWidget {
                         '${card.source} · ${card.duration}',
                         style: TextStyle(
                           fontSize: 11 * scale,
-                          color: Colors.grey[600],
+                          // 8/4 修 #169 A1: 文字 Colors.grey[600] 暗色不可见
+                          color: AppTheme.hintColor(context),
                         ),
                         maxLines: 1,
                         overflow: TextOverflow.ellipsis,

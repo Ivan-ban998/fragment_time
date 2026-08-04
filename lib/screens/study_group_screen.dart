@@ -280,7 +280,8 @@ class _GroupCard extends StatelessWidget {
               ),
               Text(
                 '${group.memberIds.length} ${isEn ? 'members' : '人'}',
-                style: TextStyle(fontSize: 11, color: Colors.grey[600]),
+                // 8/4 修 #169 A1: 文字 Colors.grey[600] 暗色不可见
+                style: TextStyle(fontSize: 11, color: AppTheme.hintColor(context)),
               ),
               IconButton(
                 icon: const Icon(Icons.share, size: 16),
@@ -290,7 +291,7 @@ class _GroupCard extends StatelessWidget {
             ],
           ),
           const SizedBox(height: 4),
-          Text(group.topic, style: TextStyle(fontSize: 12, color: Colors.grey[600])),
+          Text(group.topic, style: TextStyle(fontSize: 12, color: AppTheme.hintColor(context))),
           const SizedBox(height: 12),
           // 组进度条
           Stack(
