@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:flutter/material.dart';
 import 'package:flutter/foundation.dart' show kIsWeb;
 import '../theme/glass_decoration.dart';
@@ -86,16 +88,22 @@ class _LoadingScreenState extends State<LoadingScreen>
     () async {
       try {
         // 轻量 prompt: 调一下服务, 让 keep_alive 生效
+        // 8/4 修 #168 (沿用 main.dart 8/3 修): Stream.timeout + sink.close() 不取消上游 http.Client
+        // socket 持续挂导致后续 send 排队同 host, AI 助手也卡. 改用 try/TimeoutException 包装,
+        // 3s 后跳兜底, 上游 http.Client 由 generateStream 内部 timeout(120s) 自己 release
         final buffer = StringBuffer();
-        await for (final _ in LlmService.generateStream(
-          userType: _userTypeFromName(userTypeName),
-          scene: Scene.learn,
-          languageCode: widget.languageCode,
-          isInternational: isEn,
-        ).timeout(const Duration(seconds: 3), onTimeout: (sink) {
-          sink.close();
-        })) {
-          buffer.write(_);
+        try {
+          await for (final _ in LlmService.generateStream(
+            userType: _userTypeFromName(userTypeName),
+            scene: Scene.learn,
+            languageCode: widget.languageCode,
+            isInternational: isEn,
+          ).timeout(const Duration(seconds: 3))) {
+            buffer.write(_);
+          }
+        } on TimeoutException {
+          // 3s 到点: 返回当前已写 buffer, 不等上游流结束
+          debugPrint('[Loading] LLM keep_alive 3s timeout, 已写 ${buffer.length} chars, 跳兑底');
         }
         _markDone(1);
       } catch (e) {
