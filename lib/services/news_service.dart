@@ -101,9 +101,11 @@ class NewsService {
     final rss = RssService(isInternational: isInternational);
     try {
       final items = await rss.fetchByBucket(userType, scene);
+      // 8/4 修 #169: 成功/拉空都打 log (沿 #25 #26 #27), 让 "没感变化" 根因可查
+      debugPrint('[news] fetchFromRss userType=$userType scene=$scene international=$isInternational → ${items.length} 条');
       if (items.isNotEmpty) return items;
-    } catch (e) {
-      debugPrint('[news] RSS fetchByBucket 失败 (online): $e');
+    } catch (e, st) {
+      debugPrint('[news] RSS fetchByBucket 失败 (online): $e\n$st');
     }
     // 拉空 / 失败: 返空数组 (不撒谎)
     // 之前返 _allContent 是欺骗访客 — 那些 "https://www.zhihu.com/search?q=..." 是搜索词, 不是真文章
