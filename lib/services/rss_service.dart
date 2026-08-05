@@ -59,7 +59,7 @@ static const String _proxyBase = '/rss';
   /// 7/29 加: 多 RSS 源 fallback 链
   List<String> get _feedUrls => isInternational
       ? [_vergeFeed]
-      : [_kr36Feed, _sspaiFeed]; // 国内主 36 氪, 慢则 fallback 少数派
+      : [_sspaiFeed, _kr36Feed]; // 8/5 修: 36kr 触发火山引擎 WAF 挑战 (返 17KB HTML 不是 RSS), sspai 提到主源, 36kr 留 fallback
 
   String get _sourceName => isInternational ? 'The Verge' : '36氪';
 
