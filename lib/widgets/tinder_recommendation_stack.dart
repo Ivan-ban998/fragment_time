@@ -62,15 +62,17 @@ class _TinderRecommendationStackState extends State<TinderRecommendationStack> {
     // 父 widget 传 items
   }
 
-  // 8/6 修: _loadRecommendations force 重新设 _recItems 时, _topIndex 不重置
-  // 永远走 _buildEmpty() "看完啦" (沿 #18 不重复老修法)
-  // 真凶: TinderRecommendationStack 没 didUpdateWidget, _topIndex = 6 卡在 state
-  // 修: items 列表整体变 (first id 不同) -> 重置 _topIndex = 0 + 清拖拽状态
+  // 8/6 修 v2: _loadRecommendations force 重新设 _recItems 时, _topIndex 不重置
+  // 永远走 _buildEmpty() "看完啦" (沿 #18 不重复老修法, 913bb9b 修错真凶)
+  // v1 真凶: 判 old.items.isNotEmpty + first.id 不同 — 但 _onAllSixDismissed
+  //   先 setState _recItems = [] (老状态就是 []), 新 items 进来 old.items 实际是 []
+  //   条件永远不触发 = 9:56 第一版 913bb9b 仍卡 "看完啦"
+  // v2 修: 父 widget 的 items 引用变 (新 list) → 总重置 _topIndex = 0
+  //   避免空判 + 拖到一半后端换 list 的边界 case
   @override
   void didUpdateWidget(TinderRecommendationStack old) {
     super.didUpdateWidget(old);
-    if (old.items.isNotEmpty && widget.items.isNotEmpty &&
-        widget.items.first.id != old.items.first.id) {
+    if (!identical(old.items, widget.items)) {
       _topIndex = 0;
       _dragOffset = Offset.zero;
       _dragAngle = 0;
