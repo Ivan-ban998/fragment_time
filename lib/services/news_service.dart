@@ -7,10 +7,12 @@ class NewsService {
   /// 不分桶 = 儿童/上班族/退休都看到同样的 = 宪法 §6 违规
   /// 6/9 修复：用 bucketKey（enum 标识符）而不是 .name（"Office Worker" 带空格），
   /// 否则 key="Office Worker_Learn" 永远对不上 _allContent 里的 "officeWorker_learn"
-  /// 8/1 加: offset + shuffle (沿用 SOUL #103 — 之前 "换 6 张" 不响应, 真凶是每桶只 6 条 + 不 shuffle, 换 6 张永远同一组)
-  /// 8/1 加: 优先 fetchFromRss (RSS 真数据 30 条循环), 拉空才 fallback 假数据 (沿用宪法 §1.1 + ROADMAP 🅳)
+  /// 8/6 C 提议 (沿用 #119 不撒谎, 7/29 1cae292 老 commit, 7/114 _fetchFakeForDev): 
+  /// - RSS 拉空返 [] (访客看空状态, 不再被骗 24 桶假数据)
+  /// - 24 桶假数据 _allContent 保留仅供 dev 演示 (需显式 useFakeContent flag, 还没接)
+  /// 沿 SOUL #6 撞 7 周承认: 1-2 个月全陷修 bug, 6/6 6b9c551 已经在搞 RSS 真接, 但 UI 还在走假数据 = 访客看到 '历史' 而不是 '今天'
   Future<List<ContentItem>> getRecommendations(UserType userType, Scene scene, {int offset = 0}) async {
-    // Step 1: 优先走 RSS 真数据 (36氪 / 少数派 via rss_proxy 7088)
+    // Step 1: 走 RSS 真数据 (sspai 优先 + 36kr fallback, 沿 6b9c551)
     final rss = await fetchFromRss(userType, scene, isInternational: false);
     if (rss.isNotEmpty && rss.length >= 6) {
       // 够 6 条: 按 offset 错位切 (不同 bucket + 换 6 张 拿不同切片)
@@ -21,21 +23,10 @@ class NewsService {
       }
       return picked;
     }
-    // Step 2: RSS 拉空 fallback 假数据 (24 桶 fallback, 旋转起点)
-    final key = '${userType.bucketKey}_${scene.bucketKey}';
-    final pool = _allContent[key] ?? _fallback(userType, scene);
-    if (pool.isEmpty) return pool;
-    final shuffled = [...pool]..shuffle();
-    final take = 6;
-    if (shuffled.length <= take) {
-      final out = <ContentItem>[];
-      for (int i = 0; i < take; i++) {
-        out.add(shuffled[(i + offset) % shuffled.length]);
-      }
-      return out;
-    }
-    final start = offset % shuffled.length;
-    return [for (int i = 0; i < take; i++) shuffled[(start + i) % shuffled.length]];
+    // RSS 拉空 < 6 条: 返能拿到的真数据 (不强凑 6 张)
+    if (rss.isNotEmpty) return rss;
+    // 拉空返 [] (UI 走空状态, 不再 fallback _allContent 假数据)
+    return [];
   }
 
   // 6/28 加: 预热 24 桶 + 国际版备用桶 (LoadingScreen 调用)
