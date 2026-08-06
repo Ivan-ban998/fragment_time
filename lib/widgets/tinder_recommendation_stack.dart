@@ -62,6 +62,23 @@ class _TinderRecommendationStackState extends State<TinderRecommendationStack> {
     // 父 widget 传 items
   }
 
+  // 8/6 修: _loadRecommendations force 重新设 _recItems 时, _topIndex 不重置
+  // 永远走 _buildEmpty() "看完啦" (沿 #18 不重复老修法)
+  // 真凶: TinderRecommendationStack 没 didUpdateWidget, _topIndex = 6 卡在 state
+  // 修: items 列表整体变 (first id 不同) -> 重置 _topIndex = 0 + 清拖拽状态
+  @override
+  void didUpdateWidget(TinderRecommendationStack old) {
+    super.didUpdateWidget(old);
+    if (old.items.isNotEmpty && widget.items.isNotEmpty &&
+        widget.items.first.id != old.items.first.id) {
+      _topIndex = 0;
+      _dragOffset = Offset.zero;
+      _dragAngle = 0;
+      _isDragging = false;
+      _seenIds.clear();
+    }
+  }
+
   void _onPanStart(DragStartDetails d) {
     setState(() => _isDragging = true);
   }
