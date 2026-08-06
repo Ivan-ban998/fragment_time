@@ -397,13 +397,24 @@ class _MainHomeScreenState extends State<MainHomeScreen> {
 
   Future<void> _loadDailyQuote() async {
     debugPrint('[Quote] _loadDailyQuote start, isEn=$isEn');
+    // 8/6 修: 不阻塞 banner. 先 hardcoded pool 立即 setState, 后台异步调 LLM 写 cache.
+    // 真凶链: 之前 await getDailyQuote 等 LLM 16.98s, banner 阻塞 17s 才出 (沿 #169 真凶链 #21 #126 #127 同根因).
+    // 老 commit 8d7e464 试过 .timeout(8s) 跳, 8/3 e2582cb 改 try/finally 5s, 都还卡上游 socket 释放.
+    // 修: 立即出 banner, 后台 LLM 跑完写 cache, 下次启动看 cache 直接返, 永不快出.
+    final pool = isEn ? _QuotePoolFallback.en : _QuotePoolFallback.zh;
+    final immediate = pool[DateTime.now().day % pool.length];
+    if (!mounted) return;
+    setState(() {
+      _dailyQuote = immediate;
+    });
+    unawaited(_loadDailyQuoteAsync());
+  }
+
+  // 8/6 后台异步版: 调 LLM + 写 cache, 不阻塞 UI. 只在 banner 已经立即显示后跑.
+  Future<void> _loadDailyQuoteAsync() async {
     try {
-      // 6/26 重构: 只调名言, 删鼓励 (名言对各角色通用)
       Future<String> llmCall(String prompt) async {
         final buffer = StringBuffer();
-        // 8/3 修: 不用 Stream.timeout + sink.close (sink.close() 不会取消上游 http.Client,
-        // socket 持续挂导致后续 send 排队同 host, AI 助手也卡。改用 try/finally 包装,
-        // 5s 后返回当前 buffer 跳出, 上游 http.Client 由 generateStream 内部 timeout(120s) 自己 release)
         try {
           await for (final chunk in LlmService.generateStream(
             userType: UserType.officeWorker, // 名言不跟 userType 绑, 随便传个
@@ -414,13 +425,12 @@ class _MainHomeScreenState extends State<MainHomeScreen> {
             buffer.write(chunk);
           }
         } on TimeoutException {
-          // 5s 到点: 返回当前已写 buffer, 不等上游流结束
           debugPrint('[Quote] LLM 5s timeout, 已写 ${buffer.length} chars, 跳兜底');
         }
         return buffer.toString();
       }
 
-      debugPrint('[Quote] calling getDailyQuote...');
+      debugPrint('[Quote] calling getDailyQuote (后台异步)...');
       final quote = await _streakService.getDailyQuote(isEn: isEn, llmCall: llmCall);
       debugPrint('[Quote] got quote, text.length=${quote.text.length}');
       // 7/15: LLM 或 fallback 返 Quote, 超过 80 字兑底 (仍返回原 Quote, 让 banner 截)
@@ -432,19 +442,8 @@ class _MainHomeScreenState extends State<MainHomeScreen> {
         _dailyQuote = trimmed;
       });
     } catch (e) {
-      debugPrint('[Quote] catch: $e');
-      // 6/28 Brien 反馈: '顶上的名言呢' = _dailyQuote 一直是 null, banner 不显示
-      // 真凶: 这里 catch 之后 _dailyQuote 永不被设值, main.dart 的 banner condition 永远失败
-      // 修: 兑底给一句硬编码名言 + 仍 setState
-      debugPrint('名言 加载失败 (兑底): $e');
-      final pool = isEn
-          ? _QuotePoolFallback.en
-          : _QuotePoolFallback.zh;
-      final fallback = pool[DateTime.now().day % pool.length];
-      if (!mounted) return;
-      setState(() {
-        _dailyQuote = fallback;
-      });
+      // 后台跑: 失败就静默 (banner 已经显示 hardcoded pool), 不报错
+      debugPrint('[Quote] 后台 LLM 失败 (静默, banner 仍显示): $e');
     }
   }
 
