@@ -293,7 +293,7 @@ class _ContentScreenState extends State<ContentScreen> {
   // 真凶: RSS 拉 3 个源 × 2 attempt × 8s timeout = 20s+ 才返, 用户等得很烦躁
   // 沿用 #6 #8 '能跑起来 > 功能强大' — 先看到东西比数据真不真重要
   Future<void> _loadRecommendations({bool force = false}) async {
-    if (_recLoading && !force) return;
+    if (_recLoading) return; // 8/6 沿 #6 撞 7 周 + #18 撞 5 次升一阶: force 也守, _onAllSixDismissed 已 setState _recLoading=false (line 523) 不卡
     if (_recRetryCount >= 3 && !force) {
       return;
     }
