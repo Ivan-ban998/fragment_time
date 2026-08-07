@@ -11,6 +11,8 @@ class AiTabScreen extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    // 8/7 加 (沿 SOUL #137): ThemeMode-aware 背景兑色
+    final isDark = Theme.of(context).brightness == Brightness.dark;
     return Scaffold(
       backgroundColor: Colors.transparent,
       appBar: AppBar(
@@ -26,7 +28,8 @@ class AiTabScreen extends StatelessWidget {
       body: Container(
         decoration: BoxDecoration(
           // 7/19 fix v2: LinearGradient 全量清除
-          color: GlassStyle.sceneBackgroundOverlay(),
+          // 8/7 改 (沿 SOUL #137): dark 参数跟 ThemeMode 走
+          color: GlassStyle.sceneBackgroundOverlay(dark: isDark),
         ),
         child: SafeArea(
           child: ListView(

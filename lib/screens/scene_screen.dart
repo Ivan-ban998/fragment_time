@@ -153,14 +153,18 @@ class _SceneScreenState extends State<SceneScreen> {
       ),
       // 6/29 段 1: AI 助手悬浮气泡
       // 6/30 00:15: AI 助手挪到 Tab 0 (AiTabScreen), SceneScreen 不再需要 floatingActionButton
+      // 8/7 加 (沿 SOUL #137): ThemeMode-aware 背景兑色 (暗色不兑白叠, 兑黑叠)
+      //   真凶: 6/28 Brien 反馈 '手机总是黑黑' — 老人/上班族看着累
+      //   修法: Theme.of(c).brightness 选 light/dark → GlassStyle.sceneBackgroundOverlay(dark: ...)
       // 6/14 v5.4: 选场景页背景加白叠
       body: Container(
         decoration: BoxDecoration(
           // 7/19 fix v2: LinearGradient 全量清除
-          color: GlassStyle.sceneBackgroundOverlay(),
+          // 8/7 改 (沿 SOUL #137): dark 参数跟 ThemeMode 走
+          color: GlassStyle.sceneBackgroundOverlay(dark: Theme.of(context).brightness == Brightness.dark),
         ),
         child: SafeArea(
-        child: Padding(
+          child: Padding(
           // 21:00 banner 从 main.dart 移入, Padding top 100 → 8 (banner 自己管)
           padding: EdgeInsets.fromLTRB(20 * _scale, 8, 20 * _scale, 20 * _scale),
           child: Column(

@@ -103,11 +103,14 @@ class _UserTypeScreenState extends State<UserTypeScreen> {
 
     final copyrightFooter = widget.config.copyrightFooter as String;
 
+    // 8/7 加 (沿 SOUL #137): ThemeMode-aware 背景兑色
+    final isDark = Theme.of(context).brightness == Brightness.dark;
     // 6/14 v5.4: 选角色页背景加白叠 (跟 content 一致, 不闷)
     return Container(
       decoration: BoxDecoration(
         // 7/19 fix v2: LinearGradient 全量清除
-        color: GlassStyle.sceneBackgroundOverlay(),
+        // 8/7 改 (沿 SOUL #137): dark 参数跟 ThemeMode 走
+        color: GlassStyle.sceneBackgroundOverlay(dark: isDark),
       ),
       child: Scaffold(
         backgroundColor: Colors.transparent,
