@@ -58,14 +58,16 @@ class LlmService {
   static const String _model = 'qwen2.5:7b'; // 6/29 16:55: 1.5b 不理解"音乐/英语/冥想"区别, 回到 7b
   // 8/2 沿用 SOUL #126 #127: minimax 反代同 Ollama 模式, web 动态取 hostname
   // key 在 NAS 反代持有, web bundle 不接触 key (沿用 18:10 安全注释)
-  static String get _llmProxyHost {
-    if (kIsWeb) return webhost.currentHostname();
-    return '192.168.1.2';
+  // 8/7 改 (沿 SOUL #171 模式 #137 真凶): 同 origin /api/llm
+  //   真凶: web 调 http://hostname:11435/api/llm 撞 Chrome CNA 限制
+  //     (insecure context 7080 → 另一个 insecure context 11435 = ERR_NETWORK_IO_SUSPENDED)
+  //   修法: 走相对路径 /api/llm → ft_server.py 代理 llm_proxy:11435, 同 origin 不撞 CNA
+  static const String _llmProxyEndpoint = '/api/llm';
+  // native (APK) 保留原始 11435 endpoint (native 不撞 CNA)
+  static String get _nativeLlmProxyEndpoint {
+    return 'http://${_ollamaHost}:11435/api/llm';
   }
-  static String get _llmProxyEndpoint {
-    return 'http://$_llmProxyHost:11435/api/llm';
-  }
-  // 8/2 默认走 minimax 反代 (key 隐式走 NAS, 不进 build); 不传 LLM_BACKEND=ollama 兜底本地
+  // 8/7 加 (沿 SOUL #137 真凶): 默认走 minimax 反代 (key 隐式走 NAS, 不进 build); 不传 LLM_BACKEND=ollama 兜底本地
   // 跟 Ollama 同端口风格 (11435), web 端同 hostname 解析
   static bool get _useLlmProxy {
     const backend = String.fromEnvironment('LLM_BACKEND', defaultValue: 'proxy');
@@ -91,7 +93,7 @@ class LlmService {
     final useRemote = _webSafeUseRemote;
     // 8/2 沿用: 默认走 NAS 反代 (minimax key 在 NAS, web 安全); 编译期 LLM_BACKEND=ollama 可兜底
     final useProxy = _useLlmProxy;
-    final endpoint = useRemote ? _remoteEndpoint : (useProxy ? _llmProxyEndpoint : _ollamaEndpoint);
+    final endpoint = useRemote ? _remoteEndpoint : (useProxy ? (kIsWeb ? _llmProxyEndpoint : _nativeLlmProxyEndpoint) : _ollamaEndpoint);
     final model = useRemote ? _remoteModel : (useProxy ? _remoteModel : _model);
 
     Map<String, dynamic> body;
@@ -205,7 +207,7 @@ class LlmService {
   static Future<String> generateRaw(String prompt, {bool isEn = true}) async {
     final useRemote = _webSafeUseRemote;
     final useProxy = _useLlmProxy;
-    final endpoint = useRemote ? _remoteEndpoint : (useProxy ? _llmProxyEndpoint : _ollamaEndpoint);
+    final endpoint = useRemote ? _remoteEndpoint : (useProxy ? (kIsWeb ? _llmProxyEndpoint : _nativeLlmProxyEndpoint) : _ollamaEndpoint);
     final model = useRemote ? _remoteModel : (useProxy ? _remoteModel : _model);
 
     final headers = {'Content-Type': 'application/json'};
@@ -259,7 +261,7 @@ class LlmService {
   }) async* {
     final useRemote = _webSafeUseRemote;
     final useProxy = _useLlmProxy;
-    final endpoint = useRemote ? _remoteEndpoint : (useProxy ? _llmProxyEndpoint : _ollamaEndpoint);
+    final endpoint = useRemote ? _remoteEndpoint : (useProxy ? (kIsWeb ? _llmProxyEndpoint : _nativeLlmProxyEndpoint) : _ollamaEndpoint);
     final model = useRemote ? _remoteModel : (useProxy ? _remoteModel : _model);
     final headers = {'Content-Type': 'application/json'};
     if (useRemote) headers['Authorization'] = 'Bearer $_apiKey';
@@ -534,7 +536,7 @@ class LlmService {
   }) async {
     final useRemote = _webSafeUseRemote;
     final useProxy = _useLlmProxy;
-    final endpoint = useRemote ? _remoteEndpoint : (useProxy ? _llmProxyEndpoint : _ollamaEndpoint);
+    final endpoint = useRemote ? _remoteEndpoint : (useProxy ? (kIsWeb ? _llmProxyEndpoint : _nativeLlmProxyEndpoint) : _ollamaEndpoint);
     final model = useRemote ? _remoteModel : (useProxy ? _remoteModel : _model);
 
     final userMsg = languageCode == 'en'
