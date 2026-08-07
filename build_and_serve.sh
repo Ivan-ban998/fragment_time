@@ -31,12 +31,15 @@ fi
 # 2) canvaskit renderer 需要 canvaskit 目录, 不清除
 
 # 2.5) 复制干净 SW 到 build/web (6/25 PWA: HTTPS 下生效, HTTP 下 index.html 跳过注册)
-cp -f /volume1/AI_Jarvis/OpenClaw/workspace/projects/fragment_time_good/web/service-worker.js \
-      /volume1/AI_Jarvis/OpenClaw/workspace/projects/fragment_time_good/build/web/service-worker.js 2>/dev/null
-if [ -f /volume1/AI_Jarvis/OpenClaw/workspace/projects/fragment_time_good/build/web/service-worker.js ]; then
-  echo "  service-worker.js copied to build/web"
-else
-  echo "  WARNING: service-worker.js copy failed"
+# 8/7 改 (沿 SOUL #137 真凶): 不再 cp web/service-worker.js → build/web/
+#   真凶: 老 Chrome tab 已注册老 SW, 持续 fetch /service-worker.js 走老路由, 拿不到新 ft_server.py 路由
+#   Clear-Site-Data 只对首次 register 生效, 已激活 SW 无效
+#   修法: build/web/ 不放 service-worker.js → fetch /service-worker.js 404
+#     → 老 SW register() 抛 'NetworkError' → 老 SW 永远 install 失败 → 不再 intercept fetch
+#     → Chrome 拿新 index.html → 浏览器不 register SW → 真正拿到新 build
+if [ -f "$PROJECT_DIR/build/web/service-worker.js" ]; then
+  rm -f "$PROJECT_DIR/build/web/service-worker.js"
+  echo "  removed old build/web/service-worker.js (8/7 #137 修法)"
 fi
 
 # 2.6) 复制本地字体 web/fonts/ -> build/web/fonts/ (7/22 fontFallback 本地化)
