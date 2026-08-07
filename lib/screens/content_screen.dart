@@ -1002,7 +1002,7 @@ class _ContentScreenState extends State<ContentScreen> {
     return Container(
       margin: EdgeInsets.only(bottom: 8 * _scale),
       padding: EdgeInsets.all(12 * _scale),
-      decoration: GlassStyle.glassCardOnLight(opacity: 0.6, radius: 16),
+      decoration: GlassStyle.glassCardOnLight(opacity: 0.6, radius: 16, dark: Theme.of(context).brightness == Brightness.dark),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
