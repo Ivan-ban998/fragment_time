@@ -1,6 +1,7 @@
 import 'package:flutter/foundation.dart';
 import '../models/models.dart';
 import 'rss_service.dart';
+import 'apple_podcasts_service.dart';
 
 class InternationalService {
   /// 6/7 修复：按 userType × scene 分桶返回 24 种国际内容
@@ -10,11 +11,25 @@ class InternationalService {
     return _allContent[key] ?? _fallback(userType, scene);
   }
 
-  // 7/29 加: 真接 The Verge RSS (internationalService.search 之前是假数据)
+  // 7/29 加: 真接 The Verge RSS + Apple Podcasts iTunes Search (internationalService.search 之前是假数据)
+  // 8/7 改 (沿 ROADMAP #D + SOUL #137 真凶): 加 Apple Podcasts 真接, 仅 metadata + 跳原站
   Future<List<ContentItem>> search(String query) async {
     if (query.trim().isEmpty) return [];
     final q = query.toLowerCase();
     final results = <ContentItem>[];
+
+    // 8/7 加: 真接 Apple Podcasts iTunes Search API (公开 JSON, 宪法 §1.1 拿 metadata + 跳原站)
+    try {
+      final apple = ApplePodcastsService();
+      final appleResults = await apple.search(q, country: 'us', limit: 20);
+      if (appleResults.isNotEmpty) {
+        results.addAll(appleResults.map((p) => p.toContentItem()));
+      }
+    } catch (e) {
+      debugPrint('[intl] Apple Podcasts search failed: $e');
+    }
+
+    // 保留 _allContent substring 匹配作为兜底 (老逻辑)
     for (final list in _allContent.values) {
       for (final item in list) {
         if (item.title.toLowerCase().contains(q)) {
