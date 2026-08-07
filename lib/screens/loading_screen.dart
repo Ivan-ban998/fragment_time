@@ -226,11 +226,18 @@ class _LoadingScreenState extends State<LoadingScreen>
   Widget build(BuildContext context) {
     final isEn = widget.isInternational;
     final scale = widget.isElderlyMode ? 1.3 : 1.0;
+    // 8/7 加 (沿 SOUL #188): ThemeMode-aware text 色 (背景仍固定白, 不闪屏)
+    //   真凶: 4 个 TextStyle color = GlassStyle.onGlassSecondary/Primary 硬编码 light 单色
+    //     暗色用户看到 LoadingScreen 4s 闪屏 = 灰字 + 白底反差大
+    //   修法: GlassStyle.onGlassText(c) helper 返 Theme.of(c).brightness 适配色
+    final greetingColor = GlassStyle.onGlassText(context, primary: false);
+    final primaryColor = GlassStyle.onGlassText(context);
 
     return Scaffold(
       // 6/28 Brien 反馈: '页面总是黑黑的, 深色模式, 永远' (即使 WelcomeScreen 白 background, SceneScreen / LoadingScreen 在 dark theme 下 还是 dark)
       // 真凶: sceneBackgroundOverlay 只叠 0.18 白, dark theme 下 surface 近黑, 叠上去还是近黑
       // 修: LoadingScreen 是独立的过渡页, 直接强制 light 背景 (不等 theme)
+      // 8/7 沿 SOUL #188: 背景仍固定白 (4s 闪屏), 但 text 颜色跟 ThemeMode 走 (避免反差大)
       backgroundColor: const Color(0xFFF8F6FC),
       body: Container(
         decoration: BoxDecoration(
@@ -249,7 +256,8 @@ class _LoadingScreenState extends State<LoadingScreen>
                   '${_emoji()}  ${_greeting()},',
                   style: TextStyle(
                     fontSize: 18 * scale,
-                    color: GlassStyle.onGlassSecondary,
+                    // 8/7 改 (沿 SOUL #188): greetingColor 跟 ThemeMode 走
+                    color: greetingColor,
                   ),
                 ),
                 SizedBox(height: 8 * scale),
@@ -258,7 +266,8 @@ class _LoadingScreenState extends State<LoadingScreen>
                   style: TextStyle(
                     fontSize: 36 * scale,
                     fontWeight: FontWeight.w800,
-                    color: GlassStyle.onGlassPrimary,
+                    // 8/7 改 (沿 SOUL #188): primaryColor 跟 ThemeMode 走
+                    color: primaryColor,
                     height: 1.2,
                   ),
                 ),
@@ -266,7 +275,7 @@ class _LoadingScreenState extends State<LoadingScreen>
                   isEn ? 'Preparing your day...' : '准备你的一天...',
                   style: TextStyle(
                     fontSize: 16 * scale,
-                    color: GlassStyle.onGlassSecondary,
+                    color: greetingColor,
                   ),
                 ),
                 SizedBox(height: 48 * scale),
@@ -277,8 +286,8 @@ class _LoadingScreenState extends State<LoadingScreen>
                   child: LinearProgressIndicator(
                     value: _progress,
                     minHeight: 10 * scale,
-                    backgroundColor: GlassStyle.onGlassSecondary.withOpacity(0.15),
-                    valueColor: AlwaysStoppedAnimation(GlassStyle.onGlassPrimary),
+                    backgroundColor: greetingColor.withOpacity(0.15),
+                    valueColor: AlwaysStoppedAnimation(primaryColor),
                   ),
                 ),
                 SizedBox(height: 24 * scale),
@@ -298,8 +307,8 @@ class _LoadingScreenState extends State<LoadingScreen>
                               done ? Icons.check_circle : Icons.circle_outlined,
                               size: 22 * scale,
                               color: done
-                                  ? GlassStyle.onGlassPrimary
-                                  : GlassStyle.onGlassSecondary.withOpacity(0.5),
+                                  ? primaryColor
+                                  : greetingColor.withOpacity(0.5),
                             ),
                             SizedBox(width: 12 * scale),
                             Expanded(
@@ -311,14 +320,15 @@ class _LoadingScreenState extends State<LoadingScreen>
                                     style: TextStyle(
                                       fontSize: 15 * scale,
                                       fontWeight: FontWeight.w600,
-                                      color: GlassStyle.onGlassPrimary,
+                                      // 8/7 改 (沿 SOUL #188): 跟 ThemeMode 走
+                                      color: primaryColor,
                                     ),
                                   ),
                                   Text(
                                     t.detail,
                                     style: TextStyle(
                                       fontSize: 12 * scale,
-                                      color: GlassStyle.onGlassSecondary,
+                                      color: greetingColor,
                                     ),
                                   ),
                                 ],
@@ -352,7 +362,8 @@ class _LoadingScreenState extends State<LoadingScreen>
                           }
                         : null,
                     style: ElevatedButton.styleFrom(
-                      backgroundColor: GlassStyle.onGlassPrimary,
+                      // 8/7 改 (沿 SOUL #188): 跟 ThemeMode 走
+                      backgroundColor: primaryColor,
                       foregroundColor: Colors.white,
                       shape: RoundedRectangleBorder(
                         borderRadius: BorderRadius.circular(16),
