@@ -292,12 +292,38 @@ class GlassStyle {
   }
 
   // 6/15 场景背景柔化 (LinearGradient 全量清除 → 改兑底半透明色)
-  static Color sceneBackgroundOverlay({double opacity = 0.18}) {
+  // 8/7 改 (沿 SOUL #137 真凶): 亮背景兑白 + 暗背景兑黑 (theme-aware)
+  //   真凶: sceneBackgroundOverlay 永远返 Colors.white.withOpacity(0.18)
+  //     → dark theme 下叠上去仍近黑 (沿 #137 #160 撞: 6/28 Brien 反馈 '手机总是黑黑')
+  //   修法: 加 dark 参数 → SceneScreen 传 Theme.of(c).brightness == dark
+  static Color sceneBackgroundOverlay({double opacity = 0.18, bool dark = false}) {
+    if (dark) return Colors.black.withOpacity(opacity);
     return Colors.white.withOpacity(opacity);
   }
 
   // 6/14 v5: 亮背景下玻璃卡 (暗边框 + 深阴影, 玻璃感靠轮廓不是白度)
-  static BoxDecoration glassCardOnLight({double opacity = 0.65, double radius = 20}) {
+  // 8/7 改 (沿 SOUL #137): 加 dark 参数, 暗色下调浅黑底 + 亮边框, 不再白叠糊
+  static BoxDecoration glassCardOnLight({double opacity = 0.65, double radius = 20, bool dark = false}) {
+    if (dark) {
+      // 8/7 暗色版: 深灰叠 + 亮边 + 蓝低阴影, 兑底 surface=0xFF1C1B1F (深黑灰)
+      //   真凶: 之前在暗色下永远返 Colors.white.withOpacity(0.65) 浅白糊在黑底 = 看上去像 "贴白纸"
+      //   修法: 暗色下用深灰叠 + 浅蓝边框, 兑底颜色更和谐
+      return BoxDecoration(
+        color: const Color(0xFF2A2830).withOpacity(opacity * 0.9),
+        borderRadius: BorderRadius.circular(radius),
+        border: Border.all(
+          color: Colors.white.withOpacity(0.16),
+          width: 1.0,
+        ),
+        boxShadow: [
+          BoxShadow(
+            color: Colors.black.withOpacity(0.40),
+            blurRadius: 24,
+            offset: const Offset(0, 6),
+          ),
+        ],
+      );
+    }
     return BoxDecoration(
       color: Colors.white.withOpacity(opacity),
       borderRadius: BorderRadius.circular(radius),
