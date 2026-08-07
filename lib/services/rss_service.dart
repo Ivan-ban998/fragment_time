@@ -2,7 +2,11 @@
 // 7/14 Brien 拍板接真 RSS (国内 36 氪 + 国际 The Verge)
 // 走宪法 §1.1: 只接 metadata (title/url/description), 不存原片, 跳原站
 
-import 'package:flutter/foundation.dart' show kIsWeb;
+import 'package:flutter/foundation.dart' show kIsWeb, debugPrint;
+// 8/7 加 (沿 SOUL #137 真凶): web 上 print() 走 console.log 估计被截,
+//   真接 dart:html console.log 避免 release mode print 走 stdout 丢
+import 'web_console_stub.dart'
+    if (dart.library.html) 'web_console_web.dart' as webconsole;
 import 'package:http/http.dart' as http;
 import 'package:xml/xml.dart' as xml;
 import '../models/models.dart';
@@ -56,6 +60,18 @@ static const String _proxyBase = '/rss';
 
   RssService({this.isInternational = false});
 
+  // 8/7 加 (沿 SOUL #137 真凶): 客户端 dedupe
+  //   8 userType × 4 scene = 24 桶, UI 进场景页 / refresh / Tinder 换 6 张
+  //   → 同一 bucket 反复调 fetchByBucket → 8-16 个同源 fetch 堆栈
+  //   复 bug 链: Chrome 6 连接池 + 服务端单线程 → 浏览器看 pending
+  //   修法: 同一 bucket 多次调 = 1 个 in-flight, 其他 await 同一 Future
+  static final Map<String, Future<List<RssItem>>> _pendingByFeedUrl = {};
+  static final Map<String, List<RssItem>> _cachedByFeedUrl = {};
+  static DateTime? _cacheLoadedAt;
+
+  // 缓存 TTL: 5 分钟 (用户拖动 Tinder / 切场景 不要反复拉)
+  static const Duration _cacheTtl = Duration(minutes: 5);
+
   /// 7/29 加: 多 RSS 源 fallback 链
   List<String> get _feedUrls => isInternational
       ? [_vergeFeed]
@@ -65,41 +81,83 @@ static const String _proxyBase = '/rss';
 
   /// 7/14 加: 拉 RSS feed + 解析 (3 retries, 5s timeout each)
   /// 7/29 改: 多源 fallback + 单次 timeout 拉到 8s (36 氪实测 10s 慢)
+  /// 8/7 加 (沿 SOUL #137): 客户端 dedupe by feedUrl — 同一源多个并发 fetch 合成 1 个 HTTP 请求
   Future<List<RssItem>> fetchTop({int limit = 20}) async {
-    // 7/29: 按 _feedUrls 顺序试, 任一源拿到就返 (不聚合 — 避免重复)
+    // 8/7 dedupe: 按 feedUrl (不是整组 _feedUrls) 逐个 dedupe
+    //   fetchTop 试多源 fallback, 每个源独立 dedupe
+    final List<RssItem> aggregated = [];
     for (final feedUrl in _feedUrls) {
-      for (var attempt = 1; attempt <= 2; attempt++) {
-        try {
-          final resp = await http
-              .get(
-                Uri.parse(_resolveUrl(feedUrl)),
-                headers: const {
-                  'User-Agent': 'fragment_time/1.0 (NAS)',
-                  'Accept': 'application/rss+xml, application/xml;q=0.9, */*;q=0.8',
-                },
-              )
-              .timeout(const Duration(seconds: 8));
+      // 查 cache (5min TTL)
+      if (_cachedByFeedUrl.containsKey(feedUrl) &&
+          _cacheLoadedAt != null &&
+          DateTime.now().difference(_cacheLoadedAt!) < _cacheTtl) {
+        aggregated.addAll(_cachedByFeedUrl[feedUrl]!);
+        continue;
+      }
+      // 查 in-flight (8/7 修: 同源并发只 1 个 HTTP)
+      final inFlight = _pendingByFeedUrl[feedUrl];
+      if (inFlight != null) {
+        final items = await inFlight;
+        aggregated.addAll(items);
+        continue;
+      }
+      // 发起新 fetch (存 in-flight, 完成清空)
+      final future = _fetchFeed(feedUrl, limit: limit);
+      _pendingByFeedUrl[feedUrl] = future;
+      try {
+        final items = await future;
+        // 8/7 改 (沿 SOUL #137 真凶): 只 cache 成功 + 非空结果
+        // 真凶: 之前空结果也 cache → 5 分钟内反复返空 (用户刷新 / 切 bucket 都不重试)
+        if (items.isNotEmpty) {
+          _cachedByFeedUrl[feedUrl] = items;
+          _cacheLoadedAt ??= DateTime.now();
+        }
+        aggregated.addAll(items);
+      } finally {
+        _pendingByFeedUrl.remove(feedUrl);
+      }
+      // 拿到 6+ 条就别试下一个源 (省请求)
+      if (aggregated.length >= 6) break;
+    }
+    return aggregated;
+  }
 
-          if (resp.statusCode == 200) {
-            final items = _parse(resp.body, limit);
-            if (items.isNotEmpty) return items;
-            // 解析空 -> 试下一个源
-            break;
-          }
-          // 5xx 才重试, 4xx 直接试下一个源
-          if (resp.statusCode < 500) break;
-        } catch (e) {
-          // timeout/network -> 重试一次
-          if (attempt < 2) {
-            await Future.delayed(Duration(milliseconds: 300));
-            continue;
-          }
-          // 该源失败 -> 试下一个
+  /// 8/7 加 (沿 SOUL #137): 单源 RSS 拉取 (1 个 HTTP 请求)
+  Future<List<RssItem>> _fetchFeed(String feedUrl, {required int limit}) async {
+    for (var attempt = 1; attempt <= 2; attempt++) {
+      try {
+        final resp = await http
+            .get(
+              Uri.parse(_resolveUrl(feedUrl)),
+              headers: const {
+                'User-Agent': 'fragment_time/1.0 (NAS)',
+                'Accept': 'application/rss+xml, application/xml;q=0.9, */*;q=0.8',
+              },
+            )
+            .timeout(const Duration(seconds: 8));
+
+        if (resp.statusCode == 200) {
+          // 8/7 加 (沿 SOUL #137 真凶): web 专用 console.log 验 0 条真凶
+          //   真凶: 后端 curl 返 10 条, 但 Dart http package 在 web 上可能 body 被截断 / 编码错
+          webconsole.log('[rss] $feedUrl → status=${resp.statusCode} bodyLen=${resp.body.length}');
+          final items = _parse(resp.body, limit);
+          webconsole.log('[rss] $feedUrl → parsed ${items.length} items');
+          if (items.isNotEmpty) return items;
+          // 解析空 -> 试下一个源 (在外层循环里 break 走)
           break;
         }
+        // 5xx 才重试, 4xx 直接试下一个源
+        if (resp.statusCode < 500) break;
+      } catch (e) {
+        // timeout/network -> 重试一次
+        if (attempt < 2) {
+          await Future.delayed(Duration(milliseconds: 300));
+          continue;
+        }
+        // 该源失败 -> 试下一个
+        break;
       }
     }
-    // 所有源都失败 -> 返回 [] (UI 走空状态)
     return [];
   }
 
