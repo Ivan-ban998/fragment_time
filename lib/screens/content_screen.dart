@@ -42,6 +42,7 @@ import '../services/study_group_service.dart';
 import '../services/weekly_recap_service.dart';
 import '../services/analytics_service.dart';
 import '../services/handle_service.dart';
+import '../services/connectivity_helper.dart';
 
 class ContentScreen extends StatefulWidget {
   final UserType userType;
@@ -82,6 +83,10 @@ class _ContentScreenState extends State<ContentScreen> {
   // 7/30 B: 推荐重试计数器 (避免 _recItems 一直空时无限重试)
   int _recRetryCount = 0;
   bool _showCompletionBanner = false;
+  // 8/8 加 (沿 SOUL #188 透明原则): 离线状态
+  bool _isOffline = false;
+  DateTime? _offlineSince;
+  void Function()? _connectivityUnsubscribe;
   bool _aiOfferShown = false; // 6/30 12:23: 读完弹 AI sheet 防重复
   bool _hasScrolled = false; // 6/26: 滚到过文章中部才显"读完啦"按钮
   bool _ttsPlaying = false;
@@ -140,6 +145,18 @@ class _ContentScreenState extends State<ContentScreen> {
     _recordOpen();
     _startProgressTimer();
     _bodyScroll.addListener(_onBodyScroll);
+    // 8/8 加 (沿 SOUL #188 透明原则): 离线状态监听
+    _isOffline = !ConnectivityHelper.isOnline();
+    if (_isOffline) _offlineSince = DateTime.now();
+    _connectivityUnsubscribe = ConnectivityHelper.addListener(
+      onChange: (online) {
+        if (!mounted) return;
+        setState(() {
+          _isOffline = !online;
+          _offlineSince = online ? null : DateTime.now();
+        });
+      },
+    );
   }
 
   @override
@@ -149,6 +166,7 @@ class _ContentScreenState extends State<ContentScreen> {
     _progressTimer?.cancel();
     _bodyScroll.removeListener(_onBodyScroll);
     _bodyScroll.dispose();
+    _connectivityUnsubscribe?.call(); // 8/8 加: 取消离线监听
     TtsService.instance.stop();
     super.dispose();
   }
@@ -656,6 +674,8 @@ class _ContentScreenState extends State<ContentScreen> {
                 // 7/25 14:05 DEBUG v4 清除 (真凶已锁 = 透明玻璃 + 浅文字色)
                 // 6/7 儿童安全: child userType 顶部绿色盾牌
                 if (widget.userType == UserType.child) _buildChildShield(),
+                // 8/8 加 (沿 SOUL #188 透明原则): 离线状态下显示 banner
+                if (_isOffline) _buildOfflineBanner(),
                 // 6/9 TL;DR 精要 banner (拿上次同 userType+scene 总结)
                 if (_showTlDrBanner && _tlDrText.isNotEmpty) _buildTlDrBanner(),
                 // 6/9 续读小卡 (3 条 progress 0-100)
@@ -936,6 +956,47 @@ class _ContentScreenState extends State<ContentScreen> {
               style: TextStyle(
                 fontSize: 12 * _scale,
                 color: const Color(0xFF16A34A),
+                fontWeight: FontWeight.w600,
+              ),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  // 8/8 加 (沿 SOUL #188 透明原则): 离线状态 banner
+  // 沿 #117 沿用 alert: navigator.onLine 不绝对可靠, 仅作兜底 UX
+  Widget _buildOfflineBanner() {
+    // 8/8 计算离线时长, 透明告知用户
+    final since = _offlineSince;
+    String timeStr = '';
+    if (since != null) {
+      final mins = DateTime.now().difference(since).inMinutes;
+      if (mins < 1) timeStr = isEn ? 'just now' : '刚刚';
+      else if (mins < 60) timeStr = isEn ? '$mins min ago' : '$mins 分钟前';
+      else timeStr = isEn ? '${mins ~/ 60}h ago' : '${mins ~/ 60} 小时前';
+    }
+    return Container(
+      margin: EdgeInsets.only(bottom: 8 * _scale),
+      padding: EdgeInsets.symmetric(horizontal: 12 * _scale, vertical: 8 * _scale),
+      decoration: BoxDecoration(
+        color: const Color(0xFFF59E0B).withOpacity(0.12),
+        borderRadius: BorderRadius.circular(12),
+        border: Border.all(color: const Color(0xFFF59E0B).withOpacity(0.4), width: 1),
+      ),
+      child: Row(
+        children: [
+          const Icon(Icons.wifi_off, color: Color(0xFFF59E0B), size: 18),
+          SizedBox(width: 8 * _scale),
+          Expanded(
+            child: Text(
+              isEn
+                  ? '📡 Offline mode — showing cached content${timeStr.isEmpty ? '' : ' ($timeStr)'}'
+                  : '📡 离线模式 — 显示缓存内容${timeStr.isEmpty ? '' : '（$timeStr 缓存）'}',
+              style: TextStyle(
+                fontSize: 12 * _scale,
+                color: const Color(0xFFF59E0B),
                 fontWeight: FontWeight.w600,
               ),
             ),

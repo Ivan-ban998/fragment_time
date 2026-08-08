@@ -207,6 +207,46 @@ static const String _proxyBase = '/rss';
     return result;
   }
 
+  /// 8/8 加 (沿 SOUL #137): 简化 dedupe — URL 完全相同 + title 80% 相似
+  static List<RssItem> _dedupeSimilar(List<RssItem> items) {
+    final result = <RssItem>[];
+    final seenUrls = <String>{};
+    final seenTitles = <String>[]; // normalized titles for similarity
+
+    String normalize(String s) {
+      return s
+          .toLowerCase()
+          .replaceAll(RegExp(r'[\s\p{P}]+', unicode: true), '')
+          .substring(0, s.length.clamp(0, 100));
+    }
+
+    for (final item in items) {
+      if (!seenUrls.add(item.url)) continue; // URL 重复 skip
+      final normTitle = normalize(item.title);
+      bool tooSimilar = false;
+      for (final seen in seenTitles) {
+        if (normTitle.isEmpty || seen.isEmpty) continue;
+        // 8/8 简化: 包含关系 + 80% 长度比
+        if (normTitle.contains(seen) || seen.contains(normTitle)) {
+          tooSimilar = true;
+          break;
+        }
+        final minLen = normTitle.length < seen.length ? normTitle.length : seen.length;
+        final maxLen = normTitle.length > seen.length ? normTitle.length : seen.length;
+        if (maxLen == 0) continue;
+        // 8/8 简化: 80% 长度比 (不象 KMP / Levenshtein, 但足以 catch 转发标题)
+        if (minLen / maxLen > 0.8) {
+          tooSimilar = true;
+          break;
+        }
+      }
+      if (tooSimilar) continue;
+      result.add(item);
+      seenTitles.add(normTitle);
+    }
+    return result;
+  }
+
   /// 8/7 加 (沿 SOUL #137): 单源 RSS 拉取 (1 个 HTTP 请求)
   Future<List<RssItem>> _fetchFeed(String feedUrl, {required int limit}) async {
     for (var attempt = 1; attempt <= 2; attempt++) {
@@ -362,28 +402,42 @@ static const String _proxyBase = '/rss';
     // 8/2 修 (沿用 #103 真改没改对 第 N 次): 返整个 items (不裁到 6), 让上游
     //   getRecommendations / fetchRecommendContent 拿 offset 切片 6 条
     //   真凶: 之前返 6 条 + 上游 start = offset % 6 → offset 0-5 都循环同一组
-    return items
+    // 8/8 升一阶 (沿 SOUL #137): cross-source dedupe, 防止同一条新闻被多源拉到
+    final deduped = _dedupeSimilar(items);
+    return deduped
         .map((it) => toContentItem(it, contentType: defaultKind))
         .toList();
   }
 
-  /// 7/29 加: 搜索 RSS 关键词 (按 userType×scene 主题词筛)
-  /// 简单 substring 匹配 title/description, 返回前 N 条真 RSS
+  /// 7/29 加: 搜索 RSS 关键词
+  /// 8/8 升一阶 (沿 SOUL #137 #160): relevance 排序 + title 命中 > desc 命中 + 全源 aggregate
+  ///   旧实现: 简单 substring match, title 和 desc 同权, 多源可能拼一块全返
+  ///   真凶: query="AI" 在 50 条 RSS 里命中 30+ 条, 但 90% 命中在 desc, 重要度一样
+  ///   修法: title 命中 +3, desc 命中 +1, 按分数降序
   Future<List<ContentItem>> searchInRss(String query, {int limit = 10}) async {
     if (query.trim().isEmpty) return [];
     final items = await fetchTop(limit: 30);
     if (items.isEmpty) return [];
+
+    // 8/8 升一阶 (沿 SOUL #137): dedupe by URL (同一 URL 不重复)
+    final seenUrls = <String>{};
+    final uniqueItems = items.where((it) => seenUrls.add(it.url)).toList();
+
     final q = query.toLowerCase();
-    final matched = <RssItem>[];
-    for (final item in items) {
-      if (item.title.toLowerCase().contains(q) ||
-          item.description.toLowerCase().contains(q)) {
-        matched.add(item);
-      }
+    final scored = <(RssItem, int)>[];
+    for (final item in uniqueItems) {
+      final titleHit = item.title.toLowerCase().contains(q);
+      final descHit = item.description.toLowerCase().contains(q);
+      if (!titleHit && !descHit) continue;
+      // 8/8 升一阶: title 命中 > desc 命中
+      final score = (titleHit ? 3 : 0) + (descHit ? 1 : 0);
+      scored.add((item, score));
     }
-    return matched
+    scored.sort((a, b) => b.$2.compareTo(a.$2));
+
+    return scored
         .take(limit)
-        .map((r) => toContentItem(r, contentType: 'article'))
+        .map((r) => toContentItem(r.$1, contentType: 'article'))
         .toList();
   }
 }
