@@ -2,13 +2,17 @@
 // 7/14 Brien 拍板接真 RSS (国内 36 氪 + 国际 The Verge)
 // 走宪法 §1.1: 只接 metadata (title/url/description), 不存原片, 跳原站
 
-import 'package:flutter/foundation.dart' show kIsWeb, debugPrint;
+import 'package:flutter/foundation.dart' show kIsWeb;
 // 8/7 加 (沿 SOUL #137 真凶): web 上 print() 走 console.log 估计被截,
 //   真接 dart:html console.log 避免 release mode print 走 stdout 丢
 import 'web_console_stub.dart'
     if (dart.library.html) 'web_console_web.dart' as webconsole;
 import 'package:http/http.dart' as http;
 import 'package:xml/xml.dart' as xml;
+import 'package:shared_preferences/shared_preferences.dart';
+import 'dart:convert' show jsonEncode, jsonDecode;
+// 8/8 加 (沿 SOUL #189): unawaited() 标记 fire-and-forget Future
+import 'dart:async' show unawaited;
 import '../models/models.dart';
 
 class RssItem {
@@ -25,6 +29,23 @@ class RssItem {
     required this.pubDate,
     required this.sourceName,
   });
+
+  /// 8/8 加 (沿 SOUL #189): disk cache 序列化
+  Map<String, dynamic> toJson() => {
+        't': title,
+        'u': url,
+        'd': description,
+        'p': pubDate.millisecondsSinceEpoch,
+        's': sourceName,
+      };
+
+  static RssItem fromJson(Map<String, dynamic> j) => RssItem(
+        title: j['t'] as String? ?? '',
+        url: j['u'] as String? ?? '',
+        description: j['d'] as String? ?? '',
+        pubDate: DateTime.fromMillisecondsSinceEpoch(j['p'] as int? ?? 0),
+        sourceName: j['s'] as String? ?? '',
+      );
 }
 
 class RssService {
@@ -45,6 +66,51 @@ static const String _proxyBase = '/rss';
   static const String _sspaiFeed = 'https://sspai.com/feed';
   // 国际版: The Verge
   static const String _vergeFeed = 'https://www.theverge.com/rss/index.xml';
+
+  // 8/8 加 (沿 SOUL #189): 持久化 cache (SharedPreferences)
+  //   用户痛点: 冷启动 / reload web / 断网 → 28 桶全部 8s×N 慢加载
+  //   修法: 落盘最近一次成功结果 + 加载时间, 启动先返旧 + 后台静默刷新
+  //   §1.1 严: 只 cache metadata (title/url/description/pubDate/sourceName), 不存原片
+  static const String _diskPrefix = 'rss_cache_';
+  static const String _diskLoadedAtSuffix = '_loaded_at';
+  // 8/8 升一阶: disk cache 24h TTL (in-memory 还是 5min, 两层独立)
+  //   24h rationale: 公开 RSS 多数 1-4h 发布频率, 24h 兜底够了
+  //   stale-while-revalidate: 启动优先返旧, 后台 fetch 成功后覆盖
+  static const Duration _diskTtl = Duration(hours: 24);
+
+  /// 8/8 加: 从 disk 读 cache (冷启动秒开用)
+  static Future<List<RssItem>> _loadFromDisk(String feedUrl) async {
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      final key = '$_diskPrefix${feedUrl.hashCode.abs()}';
+      final raw = prefs.getString(key);
+      final loadedAt = prefs.getInt('$key$_diskLoadedAtSuffix');
+      if (raw == null || loadedAt == null) return [];
+      final age = DateTime.now().millisecondsSinceEpoch - loadedAt;
+      if (age < 0 || age > _diskTtl.inMilliseconds) return [];
+      final list = (jsonDecode(raw) as List).cast<Map<String, dynamic>>();
+      return list.map(RssItem.fromJson).toList();
+    } catch (_) {
+      return [];
+    }
+  }
+
+  /// 8/8 加: 写 disk cache (成功后, 异步 fire-and-forget)
+  static Future<void> _saveToDisk(String feedUrl, List<RssItem> items) async {
+    if (items.isEmpty) return;
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      final key = '$_diskPrefix${feedUrl.hashCode.abs()}';
+      final json = jsonEncode(items.map((it) => it.toJson()).toList());
+      await prefs.setString(key, json);
+      await prefs.setInt(
+        '$key$_diskLoadedAtSuffix',
+        DateTime.now().millisecondsSinceEpoch,
+      );
+    } catch (_) {
+      // 写盘失败不影响主流程 (in-memory 仍 cache)
+    }
+  }
 
   /// 7/29 加: 走 NAS proxy 拉 feed (web 端) — kIsWeb true
   /// native 端 (mobile) 直接 fetch — 没有 CORS 限制
@@ -83,43 +149,62 @@ static const String _proxyBase = '/rss';
   /// 7/29 改: 多源 fallback + 单次 timeout 拉到 8s (36 氪实测 10s 慢)
   /// 8/7 加 (沿 SOUL #137): 客户端 dedupe by feedUrl — 同一源多个并发 fetch 合成 1 个 HTTP 请求
   Future<List<RssItem>> fetchTop({int limit = 20}) async {
-    // 8/7 dedupe: 按 feedUrl (不是整组 _feedUrls) 逐个 dedupe
-    //   fetchTop 试多源 fallback, 每个源独立 dedupe
+    // 8/8 升一阶 (沿 SOUL #189 #137):
+    //   1. in-memory cache (5min TTL) — 沿用 8/7
+    //   2. disk cache (24h TTL) — 8/8 新加, 冷启动秒开
+    //   3. 后台静默刷新 — 拿旧数据马上返, fetch 完成覆盖
     final List<RssItem> aggregated = [];
+    final List<String> needsFetch = [];
+
     for (final feedUrl in _feedUrls) {
-      // 查 cache (5min TTL)
+      // 1. in-memory cache
       if (_cachedByFeedUrl.containsKey(feedUrl) &&
           _cacheLoadedAt != null &&
           DateTime.now().difference(_cacheLoadedAt!) < _cacheTtl) {
         aggregated.addAll(_cachedByFeedUrl[feedUrl]!);
         continue;
       }
-      // 查 in-flight (8/7 修: 同源并发只 1 个 HTTP)
+      // 2. disk cache (冷启动用) — 同步返旧数据, 后台静默刷新
+      final diskItems = await _loadFromDisk(feedUrl);
+      if (diskItems.isNotEmpty) {
+        // 旧数据先填占位 (in-memory 也写一份, 5min 内不重复查 disk)
+        _cachedByFeedUrl[feedUrl] = diskItems;
+        _cacheLoadedAt ??= DateTime.now();
+        aggregated.addAll(diskItems);
+      }
+      // 3. 标记要 fetch (有 disk 数据 = 静默后台, 无 disk 数据 = 同步等)
+      needsFetch.add(feedUrl);
+    }
+
+    // 4. 并发 fetch (沿 SOUL #137 dedupe: 同源串行, 不同源并发)
+    for (final feedUrl in needsFetch) {
       final inFlight = _pendingByFeedUrl[feedUrl];
       if (inFlight != null) {
-        final items = await inFlight;
-        aggregated.addAll(items);
+        await inFlight;
         continue;
       }
-      // 发起新 fetch (存 in-flight, 完成清空)
       final future = _fetchFeed(feedUrl, limit: limit);
       _pendingByFeedUrl[feedUrl] = future;
       try {
         final items = await future;
-        // 8/7 改 (沿 SOUL #137 真凶): 只 cache 成功 + 非空结果
-        // 真凶: 之前空结果也 cache → 5 分钟内反复返空 (用户刷新 / 切 bucket 都不重试)
         if (items.isNotEmpty) {
           _cachedByFeedUrl[feedUrl] = items;
           _cacheLoadedAt ??= DateTime.now();
+          // 8/8 新加: 落盘 (fire-and-forget, 不阻塞)
+          unawaited(_saveToDisk(feedUrl, items));
         }
-        aggregated.addAll(items);
       } finally {
         _pendingByFeedUrl.remove(feedUrl);
       }
-      // 拿到 6+ 条就别试下一个源 (省请求)
-      if (aggregated.length >= 6) break;
     }
-    return aggregated;
+
+    // 5. 重组结果: 优先取最新 in-memory (fetch 后已更新), 没 fetch 到的用 disk
+    final List<RssItem> result = [];
+    for (final feedUrl in _feedUrls) {
+      final mem = _cachedByFeedUrl[feedUrl];
+      if (mem != null) result.addAll(mem);
+    }
+    return result;
   }
 
   /// 8/7 加 (沿 SOUL #137): 单源 RSS 拉取 (1 个 HTTP 请求)
