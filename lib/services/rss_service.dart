@@ -377,9 +377,53 @@ static const String _proxyBase = '/rss';
   }
 
   /// 7/14 加: 按 user_type × scene 映射 RSS items (简单发配 — 真实推荐算法 P1 干)
+  // 8/8 加 (沿 SOUL #137 #160): 4 套 scene 主题词筛
+  //  旧: 30 条 RSS 共享池, userType/scene 只切视觉类型, 不筛内容 → 跑题 (学场景看到 5G 商业新闻)
+  //  修: 按 scene 主题词筛, 命中 ≥ 1 纳入, 0 命中 fallback 全部 (沿 SOUL #119 不撒谎)
+  //  沿 #19 沿用 alert: userType 不分 (8 类型共用 4 套主题词), 留给 Brien 醒后拍
+  static const Map<Scene, List<String>> _sceneKeywords = {
+    Scene.learn: [
+      'AI', 'GPT', 'LLaMA', 'Claude', 'Gemini', 'AGI', 'Agent',
+      '科技', '编程', '学术', '商业', '公司', '模型', '论文', '投资人', '开源',
+      '芯片', '云', '数据', '算法', '训练', '推理', 'GPU', 'Transformer', 'API',
+      '机器学习', '深度学习', 'VR', 'AR', '黑客', '发布', '研发', '实验室',
+      '创业', '融资', '上市', 'IPO', '财报', '估值', '股市', '金融', '投资',
+    ],
+    Scene.listen: [
+      '音乐', '播客', '演出', '专辑', '音频', '节目', '故事', '电台',
+      '相声', '脱口秀', '采访', '访谈', '讲座', '广播', '听书', '有声',
+      '说书', '评书', '朗诵', '新闻', '财经', '谈论', '今晚', '今晚聊',
+      '收听', '主播', '人声', '歌手', '作曲家', '乐队', '巡回',
+    ],
+    Scene.relax: [
+      '生活', '美食', '旅游', '文化', '影评', '书评', '旅行', '摄影',
+      '心理', '冥想', '读书', '电影', '时尚', '家居', '宠物', '养生',
+      '健康', '美容', '', '心境', '散文', '随笔', '日记', '手账',
+      '插花', '茶', '咖啡', '烘焙', '小说', '艺术', '展览', '设计',
+    ],
+    Scene.workout: [
+      '运动', '跑步', '健身', '训练', '比赛', '体育', '装备', '户外',
+      '瑜伽', '马拉松', '减肥', '肌肉', '跑步机', '普拉提', '自行车',
+      '徒步', '登山', '游泳', '足球', '篮球', '网球', '高尔夫', '滑雪',
+      '心率', '能量', '体能', '护膝', '体重', '蛋白', '塑形',
+    ],
+  };
+
   Future<List<ContentItem>> fetchByBucket(UserType userType, Scene scene) async {
     final items = await fetchTop(limit: 30);
     if (items.isEmpty) return [];
+
+    // 8/8 升一阶 (沿 SOUL #137 #160): scene 主题词筛
+    final keywords = _sceneKeywords[scene] ?? [];
+    final filtered = keywords.isEmpty
+        ? items
+        : items.where((it) {
+            final text = '${it.title} ${it.description}'.toLowerCase();
+            return keywords.any((kw) => text.contains(kw.toLowerCase()));
+          }).toList();
+
+    // 8/8 沿 SOUL #119: 0 命中 fallback 全部 (不撒谎, 跑题比没结果轻)
+    final result = filtered.isEmpty ? items : filtered;
 
     // 简单发配: 6 桶都拿到 RSS items, 不同 bucket 显示不同切片
     // 7/14: 不做内容分类 (没时间), 但给不同 bucket 起不同 default card_type 视觉变化
@@ -403,7 +447,7 @@ static const String _proxyBase = '/rss';
     //   getRecommendations / fetchRecommendContent 拿 offset 切片 6 条
     //   真凶: 之前返 6 条 + 上游 start = offset % 6 → offset 0-5 都循环同一组
     // 8/8 升一阶 (沿 SOUL #137): cross-source dedupe, 防止同一条新闻被多源拉到
-    final deduped = _dedupeSimilar(items);
+    final deduped = _dedupeSimilar(result);
     return deduped
         .map((it) => toContentItem(it, contentType: defaultKind))
         .toList();
