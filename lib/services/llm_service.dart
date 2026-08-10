@@ -9,9 +9,40 @@ import 'package:flutter/foundation.dart';
 // 6/11 条件 import: web 才用 dart:html, native 不 import 避免编译失败
 import 'web_host_stub.dart'
     if (dart.library.html) 'web_host_web.dart' as webhost;
+import '../config/runtime_mode.dart';
 import '../models/models.dart';
 
 class LlmService {
+  /// 8/10 staging mock (沿 SOUL #125 #188 + Brien '生产/运营切换'):
+  ///   staging / dev 模式返 stub, 不连 LLM (省 token + 不依赖 Ollama)
+  static Stream<String> _stagingMockStream(String langCode) async* {
+    final text = langCode == 'en'
+        ? '[STAGING] This is a mock response. Configure your LLM provider and build with --dart-define=RUNTIME_MODE=prod for real AI.'
+        : '[STAGING 模式] 这是占位回复。配置 LLM provider + 加 --dart-define=RUNTIME_MODE=prod 走真 AI。';
+    // 逐字 yield 模拟流式 (5 chars per chunk, 让 UI 看到 loading 走)
+    for (var i = 0; i < text.length; i += 5) {
+      await Future<void>.delayed(const Duration(milliseconds: 50));
+      final end = (i + 5).clamp(0, text.length);
+      yield text.substring(i, end);
+    }
+  }
+
+  static String _stagingMockRaw(String langCode) {
+    return langCode == 'en'
+        ? '[STAGING mock] Configure LLM provider for real response.'
+        : '[STAGING mock] 配置 LLM provider 走真回复。';
+  }
+
+  static List<QuizQuestion> _stagingMockQuiz() {
+    return [
+      QuizQuestion(
+        question: '[STAGING] 这是占位题 - 真 LLM 会生成 3 道选择题',
+        choices: ['A. 占位选项 1', 'B. 占位选项 2', 'C. 占位选项 3', 'D. 占位选项 4'],
+        correctIndex: 0,
+        explanation: 'STAGING 模式 — 切到 prod 走真 LLM。',
+      ),
+    ];
+  }
 
 // 18:26 Thinking strip: MiniMax 输出 ... 块, 我们只 yield 答案部分
     // 18:26 Thinking strip helper (MiniMax 'reasoning model')
@@ -84,6 +115,12 @@ class LlmService {
     required bool isInternational,
     String? prefSummary, // 6/13 6: 用户偏好摘要, nil = 不用
   }) async* {
+    // 8/10 staging 守卫 (沿 SOUL #125)
+    if (RuntimeMode.current.useStub) {
+      debugPrint('[llm staging] 返 mock stream, 不连 LLM');
+      yield* _stagingMockStream(languageCode);
+      return;
+    }
     // 18:26 Thinking strip state (MiniMax reasoning model)
     String _miniMaxBuffer = '';
     int _miniMaxYieldedLen = 0;
@@ -205,6 +242,11 @@ class LlmService {
 
   // 6/11 加: 原始 prompt 接口 - 给私教/回顾这种需要自定义 prompt 的场景
   static Future<String> generateRaw(String prompt, {bool isEn = true}) async {
+    // 8/10 staging 守卫
+    if (RuntimeMode.current.useStub) {
+      debugPrint('[llm staging] 返 mock raw');
+      return _stagingMockRaw(isEn ? 'en' : 'zh');
+    }
     final useRemote = _webSafeUseRemote;
     final useProxy = _useLlmProxy;
     final endpoint = useRemote ? _remoteEndpoint : (useProxy ? (kIsWeb ? _llmProxyEndpoint : _nativeLlmProxyEndpoint) : _ollamaEndpoint);
@@ -259,6 +301,21 @@ class LlmService {
     required List<Map<String, String>> messages,
     int numPredict = 400,
   }) async* {
+    // 8/10 staging 守卫
+    if (RuntimeMode.current.useStub) {
+      debugPrint('[llm staging] chatStream 返 mock');
+      // 取最后一条 user message 的前 50 字 mock 回
+      final lastUser = messages.lastWhere(
+        (m) => m['role'] == 'user',
+        orElse: () => {'role': 'user', 'content': ''},
+      );
+      final lang = messages.any((m) {
+        final c = m['content'];
+        return c != null && c.contains(RegExp(r'[\u4e00-\u9fff]'));
+      }) ? 'zh' : 'en';
+      yield* _stagingMockStream(lang);
+      return;
+    }
     final useRemote = _webSafeUseRemote;
     final useProxy = _useLlmProxy;
     final endpoint = useRemote ? _remoteEndpoint : (useProxy ? (kIsWeb ? _llmProxyEndpoint : _nativeLlmProxyEndpoint) : _ollamaEndpoint);
@@ -534,6 +591,11 @@ class LlmService {
     required String description,
     String languageCode = 'zh',
   }) async {
+    // 8/10 staging 守卫
+    if (RuntimeMode.current.useStub) {
+      debugPrint('[llm staging] generateQuiz 返 mock');
+      return _stagingMockQuiz();
+    }
     final useRemote = _webSafeUseRemote;
     final useProxy = _useLlmProxy;
     final endpoint = useRemote ? _remoteEndpoint : (useProxy ? (kIsWeb ? _llmProxyEndpoint : _nativeLlmProxyEndpoint) : _ollamaEndpoint);

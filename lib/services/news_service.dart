@@ -1,4 +1,5 @@
 import 'package:flutter/foundation.dart';
+import '../config/runtime_mode.dart';
 import '../models/models.dart';
 import 'rss_service.dart';
 
@@ -12,7 +13,24 @@ class NewsService {
   /// - 24 桶假数据 _allContent 保留仅供 dev 演示 (需显式 useFakeContent flag, 还没接)
   /// 沿 SOUL #6 撞 7 周承认: 1-2 个月全陷修 bug, 6/6 6b9c551 已经在搞 RSS 真接, 但 UI 还在走假数据 = 访客看到 '历史' 而不是 '今天'
   Future<List<ContentItem>> getRecommendations(UserType userType, Scene scene, {int offset = 0}) async {
-    // Step 1: 走 RSS 真数据 (sspai 优先 + 36kr fallback, 沿 6b9c551)
+    // 8/10 改 (沿 SOUL #125 #188 + Brien '生产/运营切换'):
+    //   - staging / dev 模式 → _allContent stub (24 桶假数据, 不连外网)
+    //   - prod 模式 → RSS 真接 (sspai 优先 + 36kr fallback, 宪法 §1.1 严)
+    final key = '${userType.bucketKey}_${scene.bucketKey}';
+    if (RuntimeMode.current.useStub) {
+      debugPrint('[news staging] 返 stub 24 桶 key=$key');
+      final stub = _allContent[key] ?? _fallback(userType, scene);
+      if (stub.isEmpty) return stub;
+      // 同样按 offset 错位切 (保证 tinder 换 6 张能轮转)
+      final start = (offset + userType.index * 5 + scene.index * 3) % stub.length;
+      final picked = <ContentItem>[];
+      for (var i = 0; i < 6 && i < stub.length; i++) {
+        picked.add(stub[(start + i) % stub.length]);
+      }
+      return picked;
+    }
+
+    // prod: Step 1: 走 RSS 真数据 (sspai 优先 + 36kr fallback, 沿 6b9c551)
     final rss = await fetchFromRss(userType, scene, isInternational: false);
     if (rss.isNotEmpty && rss.length >= 6) {
       // 够 6 条: 按 offset 错位切 (不同 bucket + 换 6 张 拿不同切片)

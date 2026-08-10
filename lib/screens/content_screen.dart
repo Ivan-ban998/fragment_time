@@ -20,6 +20,7 @@ import 'package:flutter/services.dart';
 import 'package:flutter/foundation.dart';
 import 'package:url_launcher/url_launcher.dart';
 import '../models/models.dart';
+import '../config/runtime_mode.dart';
 import '../services/llm_service.dart';
 import '../services/history_service.dart';
 import '../theme/app_theme.dart';
@@ -611,6 +612,23 @@ class _ContentScreenState extends State<ContentScreen> {
         backgroundColor: GlassStyle.glassAppBarBg,
         foregroundColor: GlassStyle.glassAppBarFg,
         elevation: GlassStyle.glassAppBarElevation,
+        // 8/10 staging banner (沿 SOUL #125 #188 + Brien '生产/运营切换')
+        // prod 模式返 null = 不显示, 不影响生产体验
+        bottom: RuntimeMode.current.isProd
+            ? null
+            : PreferredSize(
+                preferredSize: const Size.fromHeight(28),
+                child: Container(
+                  width: double.infinity,
+                  color: RuntimeMode.current.bannerColor,
+                  padding: const EdgeInsets.symmetric(vertical: 4, horizontal: 16),
+                  child: Text(
+                    '${RuntimeMode.current.label} · ${RuntimeMode.current.bannerText}',
+                    style: const TextStyle(fontSize: 12, fontWeight: FontWeight.w600),
+                    textAlign: TextAlign.center,
+                  ),
+                ),
+              ),
         title: Column(
           mainAxisSize: MainAxisSize.min,
           crossAxisAlignment: CrossAxisAlignment.center,
