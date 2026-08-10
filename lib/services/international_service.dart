@@ -1,4 +1,5 @@
 import 'package:flutter/foundation.dart';
+import '../config/runtime_mode.dart';
 import '../models/models.dart';
 import 'rss_service.dart';
 import 'apple_podcasts_service.dart';
@@ -6,9 +7,24 @@ import 'apple_podcasts_service.dart';
 class InternationalService {
   /// 6/7 修复：按 userType × scene 分桶返回 24 种国际内容
   /// 每个 key 至少 4-6 条
+  /// 8/10 改 (沿 SOUL #125 #188 + Brien '生产/运营切换'):
+  ///   - staging / dev 模式 → _allContent stub (24 桶假数据, 不连外网)
+  ///   - prod 模式 → fetchFromRss 真接 (The Verge + Apple Podcasts, 宪法 §1.1 严)
   Future<List<ContentItem>> getRecommendations(UserType userType, Scene scene) async {
-    final key = '${userType.bucketKey}_${scene.bucketKey}'; // 6/9 修复：同 news_service.dart
-    return _allContent[key] ?? _fallback(userType, scene);
+    final key = '${userType.bucketKey}_${scene.bucketKey}';
+
+    // staging / dev: 走 stub 24 桶 (沿 SOUL #188 透明原则, UI 顶部 banner 标识 STAGING)
+    if (RuntimeMode.current.useStub) {
+      debugPrint('[intl staging] 返 stub 24 桶 key=$key');
+      return _allContent[key] ?? _fallback(userType, scene);
+    }
+
+    // prod: 走真 RSS
+    final rss = await fetchFromRss(userType, scene);
+    if (rss.isNotEmpty && rss.length >= 6) return rss;
+    if (rss.isNotEmpty) return rss;
+    // 拉空返空 (沿 SOUL #119 不撒谎, 访客看空状态)
+    return [];
   }
 
   // 7/29 加: 真接 The Verge RSS + Apple Podcasts iTunes Search (internationalService.search 之前是假数据)

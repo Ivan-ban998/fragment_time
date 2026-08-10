@@ -16,10 +16,26 @@ LOG="/tmp/ft_http.log"
 
 cd "$PROJECT_DIR"
 
+# 8/10 加 (沿 SOUL #125 #188 + Brien '生产/运营切换'):
+#   --mode=prod     生产 (默认, RSS + Ollama, 宪法 §1.1 严)
+#   --mode=staging  运营/测试 (stub 24 桶 + LLM mock + banner 标识)
+#   --mode=dev      dev (同 staging + 额外 debugPrint)
+RUNTIME_MODE="prod"
+if [ "$1" = "--mode=staging" ]; then
+  RUNTIME_MODE="staging"
+elif [ "$1" = "--mode=dev" ]; then
+  RUNTIME_MODE="dev"
+elif [ -n "$1" ] && [ "$1" != "--mode=prod" ]; then
+  echo "未知参数: $1 (应 --mode=prod|staging|dev)"
+  exit 1
+fi
+echo "=== RUNTIME_MODE=$RUNTIME_MODE ==="
+
 # 1) build
 echo "=== flutter build web --release (canvaskit default) ==="
 # 默认走本地 Ollama（无需 key）；如需外部 LLM，set LLM_API_KEY + LLM_ENDPOINT 环境变量
 DART_DEFINES="--dart-define=BUILD_MODE=domestic"
+DART_DEFINES="$DART_DEFINES --dart-define=RUNTIME_MODE=$RUNTIME_MODE"
 # 6/10 加: 每次 build 注入 BUILD_VERSION = 时间戳短码（让你看 Settings → 版本信息验证拿到最新 build）
 BUILD_TS=$(date +%y%m%d-%H%M)
 DART_DEFINES="$DART_DEFINES --dart-define=BUILD_VERSION=$BUILD_TS"
