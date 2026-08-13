@@ -27,8 +27,9 @@ class ContentAggregator {
       // 7/29 重构: 只走真 RSS (36 氪 / 少数派 / The Verge), 拉空返 []
       // 8/13 升一阶 (沿 SOUL #119): 真 RSS 不足 6 → NewsService 兑底精选到 6 (避免 tinder 半空)
       //   实际逻辑都在 NewsService.getRecommendations 内部, 这里直接复用
+      // 8/13 修: 透传 isInternational 让国际版走 The Verge+NPR (国内走 sspai+NPR+36kr)
       final result = await NewsService().getRecommendations(
-        userType, scene, offset: offset,
+        userType, scene, offset: offset, isInternational: isInternational,
       );
       return result;
     } catch (e) {
