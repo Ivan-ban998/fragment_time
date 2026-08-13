@@ -1,5 +1,84 @@
 # Fragment Time Changelog
 
+## 2026-08-13 (下午续) — tinder 内容真实化 + AI 体验大修 + 上线验证
+
+### 🎯 24 桶 tinder 跳不出内容 治本 (沿 SOUL #137 真凶链)
+
+**症状**: 用户报 tinder 跳不出内容 → 占位卡"今日暂无新内容"
+**根因 (test 驱动治本)**:
+- `rss_service.dart:220` `_dedupeSimilar.normalize` 链式调用,`s.length.clamp(0,100)` 在 `replaceAll` 之后用
+- 中文标题缩短后 substring 越界 → `RangeError` → `fetchByBucket` 整体崩 → 24 桶全空
+
+**修法** (`a3fb3f9`): `stripped.length.clamp(0,100)` — 用 replaceAll 后长度,永安全
+
+**真凶链方法**: 沿 SOUL #137 "真对比多个相似路径找物理差别, 不是猜真凶" + `flutter test` 模拟 production 链路看堆栈 (而不是猜)
+
+### 🟢 24 桶全满 6 张 (沿 SOUL #119 不撒谎 + #188 透明)
+
+| commit | 改动 |
+|---|---|
+| `2da58ef` | `NewsService.getRecommendations` prod 模式允许精选兑底 (RSS≥6 纯真, 1-5 补精选, 0 全精选) |
+| `b6c1c98` | `ContentAggregator.fetchRecommendContent` 复用 NewsService 单一来源 |
+| `f6e3874` | tinder UI: `curated_*` 灰色 "精选" chip vs `rss_*` 红色 "实时" Live 圆点 |
+| `e4d2a11` | `_feedUrls` 国内加 NPR Top Stories + NPR Music, 国际加 NPR, 同步 `ft_server.py` 白名单 |
+| `6af6229` | **国际版纯英文** — 透传 `isInternational`, 国际版 RSS<6 不补中文精选 (避免污染英文体验) |
+
+**验证** (`flutter test`):
+- 国际版 4 场景: 0 中文, 5 条真 RSS ✅
+- 国内版 4 场景: 6 条 (5 真 RSS + 1 精选) ✅
+
+### 🤖 AI 体验大修 (端到端 30s+ → 1.6s)
+
+**真凶链** (3 个连环):
+1. **llm-proxy systemd 实例 env 隔离** → `LLM_API_KEY` 丢失 → `has_key: false`
+2. **endpoint 路径错** → systemd ExecStartPre 写 `${BASE_URL}` 没补 `/chat/completions` 后缀 → MiniMax 返 404
+3. **fragment_time timeout 120s** → 坏路径等天荒地老, 用户以为 AI 死了
+
+**修法** (`cf462b6` + 3 处 systemd unit 修):
+1. **systemd unit 改写** `/home/Brien/.config/systemd/user/llm-proxy.service`
+   - 直接读 Hermes `.env` 取 `MINIMAX_CN_API_KEY` + `MINIMAX_CN_BASE_URL`
+   - `ExecStart` 显式 `export LLM_ENDPOINT="${MINIMAX_CN_BASE_URL}/chat/completions"`
+2. **fragment_time `llm_service.dart`**:
+   - 3 处 timeout 120s → 15s (fail fast)
+   - `generateRaw` 加 `_ollamaFallbackRaw()` 兜底 (proxy 挂自动降级本地 7b)
+
+**验证** (curl 端到端):
+- `POST /api/llm` 1.6s 首 chunk (从 30s+ 提速 18 倍)
+- `has_key: true` + `endpoint: https://api.minimaxi.com/v1/chat/completions`
+- systemd restart 后仍 working ✅
+
+### 📜 Git 状态
+
+- **12 个 commit** 推 GitHub `fix/linear-gradient-full-cleanup` 分支 (SSH 限流这次没拦)
+- **Gitea NAS 本地备份** 同步推到 `gitea/fix/linear-gradient-full-cleanup`
+- `origin/main` 仍是 7/28 13d826d (待 Brien 决定 push 方式)
+
+### 🆕 SOUL 新规则 (8/13 下午)
+
+- **#193** 链式调用前一步可能改变长度, clamp 必须用最后一步的结果
+- **#194** 多 RSS 源扩展必须同步 `ft_server.py` ALLOWED_RSS_DOMAINS 白名单
+
+### 📜 关键 commit (已推 GitHub)
+
+```
+6af6229 fix(rss): isInternational 透传 NewsService→RssService
+cf462b6 fix(llm): timeout 120s→15s fail fast + Ollama 7b fallback
+e4d2a11 feat(rss): _feedUrls 加 NPR Top Stories + NPR Music
+f6e3874 feat(tinder): curated_ id 显示'精选'灰底 chip
+b6c1c98 refactor(aggregator): fetchRecommendContent 复用 NewsService
+2da58ef fix(news): prod 模式允许精选兑底 (24 桶 tinder 全满 6 张)
+a3fb3f9 fix(rss): _dedupeSimilar.normalize clamp 用 stripped.length
+```
+
+### 📜 沿用 alert 老坑 (待 Brien 拍)
+
+- `origin/main` 仍是 7/28 13d826d (13 个 commit 待推, 需手动 merge)
+- `pubspec.lock` 含 105 个依赖未审 (Flutter 3.27 升级遗留)
+- `lib/main.dart` 1834 行 + `content_screen.dart` 1949 行 (单文件过大, 按 feature 拆 module 是 P2)
+- 305 处 `withOpacity` deprecation (沿用 ROADMAP §C 不擅自动)
+
+---
+
 ## 2026-08-13 — 全面 Bug 审计 + 6 修复 (沿 SOUL #103 真改没改对 第 N+1 次)
 
 ### 🎯 深度审计 8 个核心文件 → 发现 9 个 bug,治本 6 个

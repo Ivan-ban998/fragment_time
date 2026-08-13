@@ -43,6 +43,24 @@
       });
     }
   </script>
+  <!-- 8/13 加 (沿 SOUL #137 #169 真凶链): 主动 unregister 老 SW + 清缓存
+       真凶: HTTPS 下老 SW active 拦截 fetch, 返老 main.dart.js → 4 场景看到同一组 (老 RSS)
+       修: 进入页面立即 unregister 老 SW + 清缓存, 强制浏览器拿新版
+       ft_server.py 已经返 404 阻止新 SW register, 配合 unregister 旧 SW 强制清缓存 -->
+  <script>
+    if ('serviceWorker' in navigator) {
+      navigator.serviceWorker.getRegistrations().then(regs => {
+        for (const reg of regs) {
+          reg.unregister().then(() => console.log('[SW-cleanup] unregistered:', reg.scope));
+        }
+      });
+      if (window.caches) {
+        caches.keys().then(keys => {
+          for (const k of keys) caches.delete(k);
+        });
+      }
+    }
+  </script>
 </head>
 <body>
   <!-- 7/24 14:52 Brien 反馈 console: GET /fonts/notosanssc/v36/<hash>.ttf 404 + GET /fonts/notoemoji/v47/<hash>.ttf 404 -->
