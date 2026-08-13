@@ -214,10 +214,15 @@ static const String _proxyBase = '/rss';
     final seenTitles = <String>[]; // normalized titles for similarity
 
     String normalize(String s) {
-      return s
+      final stripped = s
           .toLowerCase()
-          .replaceAll(RegExp(r'[\s\p{P}]+', unicode: true), '')
-          .substring(0, s.length.clamp(0, 100));
+          .replaceAll(RegExp(r'[\s\p{P}]+', unicode: true), '');
+      // 8/13 治本 (沿 SOUL #103 真改没改对 第 N+2 次): 之前用 s.length.clamp(0,100),
+      //   但 replaceAll 后 stripped 已经变短 (中文标题去掉标点空白后短很多),
+      //   仍按 s.length 切会 RangeError (Not in inclusive range 0..35: 43)
+      //   后果: _dedupeSimilar 抛 → fetchByBucket 整体崩 → 24 桶全部 0 items
+      //   修: 用 stripped.length 算 clamp, 永远安全
+      return stripped.substring(0, stripped.length.clamp(0, 100));
     }
 
     for (final item in items) {
