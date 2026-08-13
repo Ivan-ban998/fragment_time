@@ -144,13 +144,14 @@ static const String _proxyBase = '/rss';
 
   /// 7/29 加: 多 RSS 源 fallback 链
   /// 8/13 升一阶 (沿 SOUL #137 真凶链): 国际版 + 国内版都加 NPR 公开源
-  ///   - 国内: sspai(主) + NPR(英文新闻补 listen/relax) + 36kr(fallback 经常 WAF)
-  ///   - 国际: Verge(主,atom) + NPR(补充英文新闻)
-  ///   - NPR Music (1039): 听场景专属, 含音乐/演出/专辑/歌手, 命中 listen 主题词
+  ///   - 国内: sspai(主) + NPR Top Stories(英文新闻补 listen/relax) + 36kr(fallback 经常 WAF)
+  ///   - 国际: Verge(主,atom) + NPR Top Stories + NPR Music(听场景专属英文 podcast)
+  ///   - 8/13 沿 SOUL #160: NPR Music 移到国际版 (NPR Music 是英文, 国内用户用不到)
+  ///   - NPR Music (1039): 音乐/演出/专辑/歌手命中 listen 主题词 (英文 podcast)
   ///     注: _fetchFeed 走同一个 _parse, RSS 2.0 标准 + itunes:duration 都兼容
   List<String> get _feedUrls => isInternational
-      ? [_vergeFeed, _nprFeed]
-      : [_sspaiFeed, _nprFeed, _nprMusicFeed, _kr36Feed];
+      ? [_vergeFeed, _nprFeed, _nprMusicFeed]
+      : [_sspaiFeed, _nprFeed, _kr36Feed];
 
   String get _sourceName => isInternational ? 'The Verge' : '36氪';
 
@@ -377,17 +378,38 @@ static const String _proxyBase = '/rss';
 
   /// 7/14 加: 把 RSS item 转 ContentItem (适配 24 桶)
   ContentItem toContentItem(RssItem r, {String contentType = 'article'}) {
+    // 8/13 治本 (沿 SOUL #169 不撒谎 + 透明原则): 用真实 source name 替代 _sourceName
+    //   真凶: 之前 _sourceName 写死 '36氪' / 'The Verge' → NPR item 也显示 '36氪' (跨源混杂)
+    //   后果: UI 显示 "来源:36氪" 但实际是 NPR Music 英文 podcast → 误导用户
+    //   修: source 用真实 feedUrl host (sspai.com → '少数派', npr.org → 'NPR', 36kr.com → '36氪')
+    final realSource = _resolveSourceName(r.url);
     return ContentItem(
       id: 'rss_${r.url.hashCode.abs()}',
       title: r.title,
       description: r.description,
-      source: r.sourceName,
+      source: realSource,
       sourceType: isInternational ? ContentSource.rss : ContentSource.news36kr,
       contentType: contentType == 'card' ? ContentType.card : ContentType.article,
       duration: '5min',
       externalUrl: r.url,
       priceType: ContentPriceType.free,
     );
+  }
+
+  /// 8/13 加: 从 URL 解析真实 source name (sspai/npr/36kr/theverge)
+  String _resolveSourceName(String url) {
+    if (url.contains('sspai.com')) return '少数派';
+    if (url.contains('npr.org')) {
+      // NPR Music (1039) vs NPR Top Stories (1001) 区分
+      if (url.contains('1039')) return 'NPR Music';
+      return 'NPR';
+    }
+    if (url.contains('36kr.com')) return '36氪';
+    if (url.contains('theverge.com')) return 'The Verge';
+    if (url.contains('bbci.co.uk')) return 'BBC';
+    if (url.contains('ximalaya.com')) return '喜马拉雅';
+    // fallback: 原 _sourceName
+    return _sourceName;
   }
 
   /// 7/14 加: 按 user_type × scene 映射 RSS items (简单发配 — 真实推荐算法 P1 干)
