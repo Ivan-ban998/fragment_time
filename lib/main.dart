@@ -333,8 +333,8 @@ class _MainHomeScreenState extends State<MainHomeScreen> {
 
   bool _isInternational = false;
   bool _isElderlyMode = false;
-  // 6/13 护眼状态：null=未加载，true=开，false=关
-  bool? _eyeProtectionOn;
+  // 6/13 护眼状态: _eyeProtectionOn 由父 _FragmentTimeAppState 持有 (EyeProtectionScope 监听它)
+  // 这里不再声明 (8/8 删: 之前重复声明 bool? 字段, 从未被读, 死代码 shadow 风险)
   String _languageCode = 'zh';
   UserType? _selectedUserType;
   List<ContentItem> _subscribedItems = [];
