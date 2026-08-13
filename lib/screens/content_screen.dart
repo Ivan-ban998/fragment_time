@@ -312,7 +312,16 @@ class _ContentScreenState extends State<ContentScreen> {
   // 真凶: RSS 拉 3 个源 × 2 attempt × 8s timeout = 20s+ 才返, 用户等得很烦躁
   // 沿用 #6 #8 '能跑起来 > 功能强大' — 先看到东西比数据真不真重要
   Future<void> _loadRecommendations({bool force = false}) async {
-    if (_recLoading) return; // 8/6 沿 #6 撞 7 周 + #18 撞 5 次升一阶: force 也守, _onAllSixDismissed 已 setState _recLoading=false (line 523) 不卡
+    // 8/8 升一阶 (沿 SOUL #169 #18 #6 #103): force=true 显式解锁 _recLoading
+    //   真凶: 之前 _onAllSixDismissed 已 setState _recLoading=false, 但 _loadRecommendations
+    //     收到 force=true 仍未重置 _recLoading 守卫, 后续 await fallback 期间 _recLoading
+    //     可能被 setState 切回 true ("换 6 张" 不响应)
+    //   修: force=true 显式 _recLoading = false + _recRetryCount = 0, 触发新一轮真 load
+    if (force) {
+      _recLoading = false;
+      _recRetryCount = 0;
+    }
+    if (_recLoading) return;
     if (_recRetryCount >= 3 && !force) {
       return;
     }
@@ -1452,6 +1461,7 @@ class _ContentScreenState extends State<ContentScreen> {
   }
 
   // 7/29 加: RSS 拉空时空状态. 访客看到"今日暂无新内容" + 下拉重试
+  // 8/8 升一阶: 显示 _loadFromBucketErr 调试信息 (沿 SOUL #25 #26 #27 沿 #169 不撒谎)
   Widget _buildEmptyState() {
     final sourceLabel = widget.isInternational ? 'The Verge' : '36氪 / 少数派';
     return Container(
@@ -1481,6 +1491,14 @@ class _ContentScreenState extends State<ContentScreen> {
                       : '正在拉 $sourceLabel 的最新内容 · 下拉刷新',
                   style: TextStyle(fontSize: 12 * _scale, color: AppTheme.hintColor(context)),
                 ),
+                // 8/8: 显示底层错误 (沿 #117 沿用 alert: 仅在用户报错时显示)
+                if (_loadFromBucketErr.isNotEmpty && kDebugMode) ...[
+                  SizedBox(height: 4 * _scale),
+                  Text(
+                    'debug: $_loadFromBucketErr',
+                    style: TextStyle(fontSize: 10 * _scale, color: AppTheme.hintColor(context).withOpacity(0.6)),
+                  ),
+                ],
               ],
             ),
           ),
