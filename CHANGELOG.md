@@ -1,5 +1,70 @@
 # Fragment Time Changelog
 
+## 2026-08-13 — 全面 Bug 审计 + 6 修复 (沿 SOUL #103 真改没改对 第 N+1 次)
+
+### 🎯 深度审计 8 个核心文件 → 发现 9 个 bug,治本 6 个
+
+**审计范围**: main.dart (1834) + content_screen.dart (1931) + rss_service.dart (487) + llm_service.dart (698) + news_service.dart (352) + content_aggregator.dart (75) + tinder_recommendation_stack.dart (719) + main.dart 跨屏路径
+
+**审计方法**: 沿 SOUL #103 "真对比多个相似路径找物理差别, 不是猜真凶" + #137 真凶链 + #169 不撒谎
+
+### 🐛 3 个 P0 治本
+
+**Bug #1: `stripThinkTags` MiniMax 思维链泄露** (`llm_service.dart:50`)
+- **真凶**: 注释说"删除  ...  块"(MiniMax reasoning),但代码只匹配 ``` 三反引号 (Markdown 代码栅栏)
+- **后果**: 1) LLM reasoning block 整段漏到 UI (用户看到 AI 思维过程) 2) 真代码块被误删
+- **修法**: 同时 strip  完整块 + 未关闭块 (chunk 边界截断) + 兜底 ```
+- **沿用**: #103 真改 vs 真猜
+
+**Bug #2: `_sceneKeywords.relax` 含空串 → relax 过滤失效** (`rss_service.dart:401`)
+- **真凶**: `text.contains('')` 永远 true → 所有新闻都"命中" relax 主题词
+- **后果**: 整个 8/8 的"4 套 scene 主题词筛"对 relax 完全失效,跑题严重 (学场景也能看到娱乐)
+- **修法**: 删空串 1 个字符
+- **沿用**: #160 scene 主题词 + #119 不撒谎
+
+**Bug #3: `_loadRecommendations` force 参数从不生效 → "换 6 张" 卡死** (`content_screen.dart:314`)
+- **真凶**: `force` 参数声明但内部不检查,`_onAllSixDismissed` setState 把 `_recLoading = false`,函数进来又被 async setState 切回 true,守卫拦住
+- **后果**: 用户报"换 6 张没反应" — 第 4 次尝试修仍没修对 (CHANGELOG: 1808cfd → 287acdf → 2db53bd → 5f0ffbe → 307d892 → 913bb9b → 1c16c00)
+- **修法**: `force=true` 显式 `_recLoading = false` + `_recRetryCount = 0`
+- **沿用**: #103 改了 ≠ 修了 + #18 force flag 必须真生效
+
+### 🔧 3 个 P1/P2 清理
+
+**Bug #4: `_MainHomeScreenState._eyeProtectionOn` 重复声明** (`main.dart:337`)
+- 父 `_FragmentTimeAppState` 已持有此字段,子 class 又声明一个 `bool?` 从未读写
+- 修法: 删子 class 字段,留注释指引到父
+
+**Bug #5: `_loadFromBucketErr` 死字段** (`content_screen.dart:236`)
+- 桶数据加载失败/为空时 setState 写入,但 build() 从不显示
+- 修法: `_buildEmptyState` 加 debug 行 (kDebugMode 守卫,生产不显示)
+
+**Bug #6: `llm_service.dart` 8 个 `print()` 残留** (`llm_service.dart:339-380`)
+- chatStream 函数 print 调试, web release 模式 print 走 stdout 被截
+- 修法: 全部替换为 `debugPrint` (release 自动剥)
+
+### 📊 验证
+
+- ✅ `flutter analyze` 0 error (490 issues, 全是原有 withOpacity deprecation + unused field, 沿 #15 不擅自动)
+- ✅ `flutter build web` 成功, 65.3s, main.dart.js 3.2MB
+- ✅ 沿用 ROADMAP §C 决策: withOpacity 500 处不动 (Flutter 3.27 升级遗留)
+
+### 🆕 SOUL 新规则 (8/13)
+
+- **#190** `force` 参数必须显式生效 — 声明了不检查 = 等于不声明
+- **#191** 关键词列表不能含空串 — `text.contains('')` 永远 true = 过滤失效
+- **#192** regex 注释要跟实现一致 — "strip 思维链" 写 ``` 是骗自己
+
+### 📜 关键 commit (待推)
+
+- `fix(llm): stripThinkTags 真 strip MiniMax reasoning 块 (沿 SOUL #103 #190)`
+- `fix(rss): 删 _sceneKeywords.relax 空串 (沿 SOUL #160 #191)`
+- `fix(tinder): _loadRecommendations force 显式解锁 _recLoading (沿 SOUL #18 #190)`
+- `chore: 删 _MainHomeScreenState._eyeProtectionOn 重复字段`
+- `chore: _loadFromBucketErr 接 _buildEmptyState debug 显示`
+- `chore: llm_service 8 个 print → debugPrint (沿 SOUL #25 #27)`
+
+---
+
 ## 2026-07-28 — 听一声 8 天连环坑 治本 + GitHub 治本 + 正式上线
 
 ### 🎯 听一声 "啥也没有" / "白屏" 8 天真凶 (治本)
