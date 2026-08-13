@@ -12,13 +12,17 @@ class NewsService {
   /// - RSS 拉空返 [] (访客看空状态, 不再被骗 24 桶假数据)
   /// - 24 桶假数据 _allContent 保留仅供 dev 演示 (需显式 useFakeContent flag, 还没接)
   /// 沿 SOUL #6 撞 7 周承认: 1-2 个月全陷修 bug, 6/6 6b9c551 已经在搞 RSS 真接, 但 UI 还在走假数据 = 访客看到 '历史' 而不是 '今天'
-  Future<List<ContentItem>> getRecommendations(UserType userType, Scene scene, {int offset = 0}) async {
+  Future<List<ContentItem>> getRecommendations(UserType userType, Scene scene, {int offset = 0, bool isInternational = false}) async {
     // 8/10 改 (沿 SOUL #125 #188 + Brien '生产/运营切换'):
     //   - staging / dev 模式 → _allContent stub (24 桶假数据, 不连外网)
     //   - prod 模式 → RSS 真接 (sspai 优先 + 36kr fallback, 宪法 §1.1 严)
+    // 8/13 升一阶 (沿 SOUL #103 真改没改对 第 N+3 次):
+    //   真凶: 之前 getRecommendations 不接 isInternational 参数 → 国际版用户走国内 RSS (sspai+36kr)
+    //   后果: 国际版用户看到中文 RSS → 文不对题
+    //   修: 加 isInternational 参数, 透传到 fetchFromRss → RssService 走 The Verge + NPR
     final key = '${userType.bucketKey}_${scene.bucketKey}';
     if (RuntimeMode.current.useStub) {
-      debugPrint('[news staging] 返 stub 24 桶 key=$key');
+      debugPrint('[news staging] 返 stub 24 桶 key=$key intl=$isInternational');
       final stub = _allContent[key] ?? _fallback(userType, scene);
       if (stub.isEmpty) return stub;
       // 同样按 offset 错位切 (保证 tinder 换 6 张能轮转)
@@ -30,12 +34,14 @@ class NewsService {
       return picked;
     }
 
-    // prod: Step 1: 走 RSS 真数据 (sspai 优先 + 36kr fallback, 沿 6b9c551)
-    final rss = await fetchFromRss(userType, scene, isInternational: false);
+    // prod: Step 1: 走 RSS 真数据 (国内 sspai+36kr / 国际 The Verge+NPR, 沿 6b9c551 + 8/13)
+    // 8/13 修: 透传 isInternational → RssService 走正确源链
+    final rss = await fetchFromRss(userType, scene, isInternational: isInternational);
     // 8/13 升一阶 (沿 SOUL #119 不撒谎 + 真用户体验):
     //   RSS ≥ 6 → 纯真数据 (沿宪法 §1.1)
-    //   RSS 1-5 → 补 stub 到 6 (tinder 不空, 但 stub 项 source='精选' 标精选)
-    //   RSS 0 → 全 stub 6 (tinder 不空, 但 source 标精选告诉用户非真数据)
+    //   RSS 1-5 (国内) → 补中文 stub 到 6 (tinder 不空, 但 stub 项 source='精选' 标精选)
+    //   RSS 1-5 (国际) → 不补 _allContent 中文 stub (会污染英文体验), 直接返 1-5 条
+    //   RSS 0 → 全 stub 6 (仅国内, 国际版空就让 UI 走空状态卡)
     //   沿用 #188 透明原则: stub 项 source 字段加 '精选' 标识让 UI 可区分 Live/精选
     final stubKey = '${userType.bucketKey}_${scene.bucketKey}';
     final stub = _allContent[stubKey] ?? _fallback(userType, scene);
@@ -47,7 +53,14 @@ class NewsService {
       }
       return picked;
     }
-    // RSS 不足 6: 真数据优先, stub 补齐, 标精选区分
+    // 8/13 升一阶 (沿 SOUL #188 透明 + 国际版语言纯度):
+    //   国际版 _allContent 是中文硬编码, 补进去会污染英文体验
+    //   修: 国际版 RSS 不足 6 → 直接返 1-5 条, UI 显示进度 (tinder widget 自然处理)
+    if (isInternational) {
+      debugPrint('[news prod intl] ${userType.name}_${scene.name}: 真 RSS ${rss.length} (国际版不兑底)');
+      return rss;
+    }
+    // 国内版: RSS 不足 6 → 真数据优先, stub 补齐, 标精选区分
     final combined = <ContentItem>[...rss];
     if (stub.isNotEmpty) {
       final need = 6 - combined.length;

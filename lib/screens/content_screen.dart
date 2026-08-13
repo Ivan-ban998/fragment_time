@@ -236,7 +236,9 @@ class _ContentScreenState extends State<ContentScreen> {
   String _loadFromBucketErr = '';
   Future<void> _loadFromBucket() async {
     try {
-      final items = await NewsService().getRecommendations(widget.userType, widget.scene);
+      final items = await NewsService().getRecommendations(
+        widget.userType, widget.scene, isInternational: widget.isInternational,
+      );
       if (!mounted) return;
       if (items.isEmpty) {
         setState(() {
@@ -295,7 +297,9 @@ class _ContentScreenState extends State<ContentScreen> {
   // 6/25 fallback: LLM 内容错位 → 调 NewsService 假数据桶
   Future<void> _loadFakeContent() async {
     try {
-      final results = await NewsService().getRecommendations(widget.userType, widget.scene);
+      final results = await NewsService().getRecommendations(
+        widget.userType, widget.scene, isInternational: widget.isInternational,
+      );
       if (!mounted || results.isEmpty) return;
       final item = results.first;
       setState(() {
@@ -328,7 +332,9 @@ class _ContentScreenState extends State<ContentScreen> {
     _recRetryCount++;
     // Step 1: 同步立即返 fallback 24 桶 (<100ms) — 用户立刻看到 6 张卡
     // 8/1 加 offset (沿用 SOUL #103): "换 6 张" 不响应真凶 — 每桶只 6 条 + 不 shuffle = 永远同一组
-    final fallback = NewsService().getRecommendations(widget.userType, widget.scene, offset: _recOffset);
+    final fallback = NewsService().getRecommendations(
+      widget.userType, widget.scene, offset: _recOffset, isInternational: widget.isInternational,
+    );
     final fallbackItems = await fallback;
     if (!mounted) return;
     if (fallbackItems.isNotEmpty) {
