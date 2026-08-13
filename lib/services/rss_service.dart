@@ -66,6 +66,10 @@ static const String _proxyBase = '/rss';
   static const String _sspaiFeed = 'https://sspai.com/feed';
   // 国际版: The Verge
   static const String _vergeFeed = 'https://www.theverge.com/rss/index.xml';
+  // 8/13 加 (沿 ROADMAP #D): NPR Top Stories (公开 RSS, 听场景补源, 24 桶都能用)
+  static const String _nprFeed = 'https://feeds.npr.org/1001/rss.xml';
+  // 8/13 加: NPR Music (听场景专属 — 音乐/演出/专辑/歌手都命中)
+  static const String _nprMusicFeed = 'https://feeds.npr.org/1039/rss.xml';
 
   // 8/8 加 (沿 SOUL #189): 持久化 cache (SharedPreferences)
   //   用户痛点: 冷启动 / reload web / 断网 → 28 桶全部 8s×N 慢加载
@@ -139,9 +143,14 @@ static const String _proxyBase = '/rss';
   static const Duration _cacheTtl = Duration(minutes: 5);
 
   /// 7/29 加: 多 RSS 源 fallback 链
+  /// 8/13 升一阶 (沿 SOUL #137 真凶链): 国际版 + 国内版都加 NPR 公开源
+  ///   - 国内: sspai(主) + NPR(英文新闻补 listen/relax) + 36kr(fallback 经常 WAF)
+  ///   - 国际: Verge(主,atom) + NPR(补充英文新闻)
+  ///   - NPR Music (1039): 听场景专属, 含音乐/演出/专辑/歌手, 命中 listen 主题词
+  ///     注: _fetchFeed 走同一个 _parse, RSS 2.0 标准 + itunes:duration 都兼容
   List<String> get _feedUrls => isInternational
-      ? [_vergeFeed]
-      : [_sspaiFeed, _kr36Feed]; // 8/5 修: 36kr 触发火山引擎 WAF 挑战 (返 17KB HTML 不是 RSS), sspai 提到主源, 36kr 留 fallback
+      ? [_vergeFeed, _nprFeed]
+      : [_sspaiFeed, _nprFeed, _nprMusicFeed, _kr36Feed];
 
   String get _sourceName => isInternational ? 'The Verge' : '36氪';
 
