@@ -458,6 +458,21 @@ class _TinderRecommendationStackState extends State<TinderRecommendationStack> {
                           ),
                         ),
                       ],
+                      // 8/13 加 (沿 SOUL #188 透明原则): curated_* 标"精选"灰底 (非真 RSS)
+                      if (item.id.startsWith('curated_')) ...[
+                        const SizedBox(width: 4),
+                        Container(
+                          padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                          decoration: BoxDecoration(
+                            color: const Color(0xFF94A3B8), // slate-400 灰
+                            borderRadius: BorderRadius.circular(4),
+                          ),
+                          child: Text(
+                            widget.isEn ? 'Curated' : '精选',
+                            style: const TextStyle(color: Colors.white, fontSize: 10, fontWeight: FontWeight.w700),
+                          ),
+                        ),
+                      ],
                       const SizedBox(width: 8),
                       Icon(Icons.access_time, size: 11, color: textColor.withOpacity(0.6)),
                       const SizedBox(width: 3),
