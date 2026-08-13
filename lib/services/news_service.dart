@@ -32,8 +32,14 @@ class NewsService {
 
     // prod: Step 1: 走 RSS 真数据 (sspai 优先 + 36kr fallback, 沿 6b9c551)
     final rss = await fetchFromRss(userType, scene, isInternational: false);
-    if (rss.isNotEmpty && rss.length >= 6) {
-      // 够 6 条: 按 offset 错位切 (不同 bucket + 换 6 张 拿不同切片)
+    // 8/13 升一阶 (沿 SOUL #119 不撒谎 + 真用户体验):
+    //   RSS ≥ 6 → 纯真数据 (沿宪法 §1.1)
+    //   RSS 1-5 → 补 stub 到 6 (tinder 不空, 但 stub 项 source='精选' 标精选)
+    //   RSS 0 → 全 stub 6 (tinder 不空, 但 source 标精选告诉用户非真数据)
+    //   沿用 #188 透明原则: stub 项 source 字段加 '精选' 标识让 UI 可区分 Live/精选
+    final stubKey = '${userType.bucketKey}_${scene.bucketKey}';
+    final stub = _allContent[stubKey] ?? _fallback(userType, scene);
+    if (rss.length >= 6) {
       final start = (offset + userType.index * 5 + scene.index * 3) % rss.length;
       final picked = <ContentItem>[];
       for (var i = 0; i < 6; i++) {
@@ -41,10 +47,42 @@ class NewsService {
       }
       return picked;
     }
-    // RSS 拉空 < 6 条: 返能拿到的真数据 (不强凑 6 张)
-    if (rss.isNotEmpty) return rss;
-    // 拉空返 [] (UI 走空状态, 不再 fallback _allContent 假数据)
-    return [];
+    // RSS 不足 6: 真数据优先, stub 补齐, 标精选区分
+    final combined = <ContentItem>[...rss];
+    if (stub.isNotEmpty) {
+      final need = 6 - combined.length;
+      final stubStart = (offset + userType.index * 7 + scene.index * 5) % stub.length;
+      for (var i = 0; i < need && i < stub.length; i++) {
+        final s = stub[(stubStart + i) % stub.length];
+        combined.add(_markAsCurated(s));
+      }
+    }
+    debugPrint('[news prod] ${userType.name}_${scene.name}: 真 RSS ${rss.length} + 精选 ${combined.length - rss.length} = ${combined.length}');
+    return combined;
+  }
+
+  // 8/13 加 (沿 SOUL #188 透明原则): stub 项标"精选"让 UI 区分 Live vs 精选
+  // ContentItem 无 copyWith, 重构整个对象 (immutable)
+  ContentItem _markAsCurated(ContentItem orig) {
+    final newId = orig.id.startsWith('curated_') ? orig.id : 'curated_${orig.id}';
+    return ContentItem(
+      id: newId,
+      title: orig.title,
+      description: orig.description,
+      duration: orig.duration,
+      source: '精选',
+      imageUrl: orig.imageUrl,
+      audioUrl: orig.audioUrl,
+      externalUrl: orig.externalUrl,
+      sourceType: orig.sourceType,
+      contentType: orig.contentType,
+      videoId: orig.videoId,
+      videoPlatform: orig.videoPlatform,
+      progress: orig.progress,
+      lastReadAt: orig.lastReadAt,
+      priceType: orig.priceType,
+      priceNote: orig.priceNote,
+    );
   }
 
   // 6/28 加: 预热 24 桶 + 国际版备用桶 (LoadingScreen 调用)
