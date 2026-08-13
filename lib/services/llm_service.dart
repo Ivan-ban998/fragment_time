@@ -168,12 +168,15 @@ class LlmService {
 
     // 6/11 修复：30s → 120s，Ollama 7B 冷启动 27s + 出 800 token 70s，30s 不够
     // 8/3 修 #127+#130 follow-up: 抽 client 出来, 5s 早退时主动 close, 避免 socket 复用堵后续 send
+    // 8/13 治本 (沿 SOUL #103): 走 NAS 反代 (minimax) 正常 1-3s 首 token, 120s 太长
+    //   真凶: 之前 MiniMax 反代进程丢了 LLM_API_KEY (env 隔离) → 30s+ 超时
+    //   修: timeout 120s → 15s, 让坏路径快速失败 (fail fast) 走兜底
     final client = http.Client();
     final response = await client.send(req).timeout(
-      const Duration(seconds: 120),
+      const Duration(seconds: 15),
       onTimeout: () {
         client.close(); // 关键: 释放 socket, 下次 send 不排队同 host
-        throw LlmException('timeout 120s: $endpoint');
+        throw LlmException('timeout 15s: $endpoint');
       },
     );
     if (response.statusCode != 200) {
@@ -275,10 +278,16 @@ class LlmService {
     if (useRemote) headers['Authorization'] = 'Bearer $_apiKey';
 
     try {
+      // 8/13: 120s → 15s (沿 SOUL #103 治本)
       final response = await http
           .post(Uri.parse(endpoint), headers: headers, body: jsonEncode(body))
-          .timeout(const Duration(seconds: 120));
+          .timeout(const Duration(seconds: 15));
       if (response.statusCode != 200) {
+        // 8/13: 失败 fallback 到本地 Ollama 7b (慢但可用, 沿 SOUL #8 不抢用户注意力)
+        if (!useRemote && useProxy) {
+          debugPrint('[llm generateRaw] proxy fail ${response.statusCode}, fallback to ollama');
+          return await _ollamaFallbackRaw(prompt, isEn: isEn);
+        }
         return isEn ? '(LLM unavailable)' : '（LLM 不可用）';
       }
       final json = jsonDecode(response.body) as Map<String, dynamic>;
@@ -287,7 +296,49 @@ class LlmService {
       // 18:26 MiniMax reasoning strip
       return useRemote ? stripThinkTags(rawContent) : rawContent;
     } catch (e) {
+      // 8/13: 异常 fallback
+      if (!useRemote && useProxy) {
+        debugPrint('[llm generateRaw] proxy exception, fallback to ollama: $e');
+        try {
+          return await _ollamaFallbackRaw(prompt, isEn: isEn);
+        } catch (e2) {
+          debugPrint('[llm generateRaw] ollama fallback also failed: $e2');
+        }
+      }
       return isEn ? '(LLM error: $e)' : '（LLM 错误）';
+    }
+  }
+
+  /// 8/13 加: 本地 Ollama 7b fallback (沿 SOUL #8 不抢用户注意力)
+  /// 真凶链: NAS 没 GPU, 7b CPU 推理 ~5-10 token/s, 250 token 要 25-50s
+  ///   但比完全不可用好, 老人/儿童场景勉强够用
+  /// 8/13 限制 num_predict=120 + 30s timeout 控制最差延迟
+  static Future<String> _ollamaFallbackRaw(String prompt, {bool isEn = true}) async {
+    try {
+      final response = await http
+          .post(
+            Uri.parse(_ollamaEndpoint),
+            headers: {'Content-Type': 'application/json'},
+            body: jsonEncode({
+              'model': _model,
+              'stream': false,
+              'messages': [
+                {'role': 'system', 'content': isEn ? 'You are a concise assistant.' : '你是简洁的助手.'},
+                {'role': 'user', 'content': prompt},
+              ],
+              'options': {'temperature': 0.7, 'num_predict': 120},
+              'keep_alive': '10m', // 8/13: 常驻内存, 避免冷启动 30s
+            }),
+          )
+          .timeout(const Duration(seconds: 30));
+      if (response.statusCode != 200) {
+        return isEn ? '(LLM unavailable)' : '（LLM 不可用）';
+      }
+      final json = jsonDecode(response.body) as Map<String, dynamic>;
+      final msg = json['message'] as Map<String, dynamic>?;
+      return (msg?['content'] as String?) ?? (isEn ? '(no response)' : '（无回复）');
+    } catch (e) {
+      return isEn ? '(LLM error)' : '（LLM 错误）';
     }
   }
 
@@ -343,7 +394,8 @@ class LlmService {
       if (useRemote) request.headers['Accept'] = 'text/event-stream'; // 6/29 20:25: 云端 SSE
       request.body = jsonEncode(body);
       debugPrint('[chatStream] BEFORE send body_len=${request.body.length}');
-      final response = await request.send().timeout(const Duration(seconds: 120));
+      // 8/13: 120s → 15s (沿 SOUL #103 治本, fail fast)
+      final response = await request.send().timeout(const Duration(seconds: 15));
       debugPrint('[chatStream] AFTER send status=${response.statusCode} content_length=${response.contentLength}');
       if (response.statusCode != 200) {
         debugPrint('[chatStream] NON-200 status, yielding LLM unavailable');
@@ -631,8 +683,9 @@ class LlmService {
       Uri.parse(endpoint),
       headers: headers,
       body: jsonEncode(body),
-    ).timeout(const Duration(seconds: 120), onTimeout: () {
-      throw LlmException('timeout 120s: $endpoint');
+    // 8/13: 120s → 15s (沿 SOUL #103 治本)
+    ).timeout(const Duration(seconds: 15), onTimeout: () {
+      throw LlmException('timeout 15s: $endpoint');
     });
 
     if (response.statusCode != 200) {
