@@ -25,19 +25,12 @@ class ContentAggregator {
   }) async {
     try {
       // 7/29 重构: 只走真 RSS (36 氪 / 少数派 / The Verge), 拉空返 []
-      // 之前的 fallback _allContent 假数据已移除 — 上线后访客应看真内容
-      // _allContent 保留仅供 dev 演示 (news._fetchFakeForDev)
-      final rssResults = await news.fetchFromRss(userType, scene, isInternational: isInternational);
-      if (rssResults.isNotEmpty) {
-        // 按 offset 错位切 6 条 (跟 getRecommendations Step 1 一致)
-        if (rssResults.length >= 6) {
-          final start = (offset + userType.index * 5 + scene.index * 3) % rssResults.length;
-          return [for (int i = 0; i < 6; i++) rssResults[(start + i) % rssResults.length]];
-        }
-        return rssResults;
-      }
-      // RSS 拉空 -> 返 [] (UI 走空状态)
-      return [];
+      // 8/13 升一阶 (沿 SOUL #119): 真 RSS 不足 6 → NewsService 兑底精选到 6 (避免 tinder 半空)
+      //   实际逻辑都在 NewsService.getRecommendations 内部, 这里直接复用
+      final result = await NewsService().getRecommendations(
+        userType, scene, offset: offset,
+      );
+      return result;
     } catch (e) {
       debugPrint('ContentAggregator error: $e');
       return [];
