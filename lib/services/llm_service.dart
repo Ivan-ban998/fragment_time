@@ -44,21 +44,17 @@ class LlmService {
     ];
   }
 
-// 18:26 Thinking strip: MiniMax 输出 ... 块, 我们只 yield 答案部分
-    // 18:26 Thinking strip helper (MiniMax 'reasoning model')
-
-  // 18:26 Thinking strip: MiniMax 输出  ... 块, 我们只 yield 答案部分
-  // 简单实现: 接到 chunk 后 strip 完整块, 然后 yield
+// 18:26 Thinking strip: MiniMax reasoning model 输出  ... 块
+  // 我们只 yield 答案部分给用户 — strip 掉 thinking 块
+  // (也兜底 strip Markdown 代码栅栏 ```...```, 因 6/26 feedback 1.5b 偶尔把代码块当 thinking)
   static String stripThinkTags(String s) {
     var result = s;
-    // 简单 regex: 删除  ...  块 (可以跨 chunk, 但 99% 完整)
-    while (true) {
-      final m = RegExp(r'```').firstMatch(result);
-      if (m == null) break;
-      final end = RegExp(r'```').firstMatch(result.substring(m.end));
-      if (end == null) break;
-      result = result.substring(0, m.start) + result.substring(m.end + end.end);
-    }
+    // 1. 完整  ...  块 (多行, 跨 chunk 拼好后 99% 完整)
+    result = result.replaceAll(RegExp(r'.*?\n', dotAll: true), '');
+    // 2. 未关闭的  块 (LLM 在 chunk 边界被截断) — strip 到字符串末尾
+    result = result.replaceAll(RegExp(r'.*$', dotAll: true), '');
+    // 3. 兜底: Markdown 代码栅栏 ```...``` (1.5b 偶尔混淆)
+    result = result.replaceAll(RegExp(r'```[\s\S]*?```', multiLine: true), '');
     return result.trim();
   }
 
@@ -340,23 +336,24 @@ class LlmService {
           };
 
     try {
-      print('[chatStream] BEFORE request.send endpoint=$endpoint messages_count=${messages.length}');
+      // 8/8 升一阶 (沿 SOUL #25 #27): print → debugPrint (release 模式自动剥, web stdout 不被截)
+      debugPrint('[chatStream] BEFORE request.send endpoint=$endpoint messages_count=${messages.length}');
       final request = http.Request('POST', Uri.parse(endpoint));
       request.headers.addAll(headers);
       if (useRemote) request.headers['Accept'] = 'text/event-stream'; // 6/29 20:25: 云端 SSE
       request.body = jsonEncode(body);
-      print('[chatStream] BEFORE send body_len=${request.body.length}');
+      debugPrint('[chatStream] BEFORE send body_len=${request.body.length}');
       final response = await request.send().timeout(const Duration(seconds: 120));
-      print('[chatStream] AFTER send status=${response.statusCode} content_length=${response.contentLength}');
+      debugPrint('[chatStream] AFTER send status=${response.statusCode} content_length=${response.contentLength}');
       if (response.statusCode != 200) {
-        print('[chatStream] NON-200 status, yielding LLM unavailable');
+        debugPrint('[chatStream] NON-200 status, yielding LLM unavailable');
         yield '(LLM unavailable)';
         return;
       }
       // 6/29 20:25: 云端走 MiniMax /chat SSE 格式, 本地走 Ollama 格式
-      print('[chatStream] stream loop START');
+      debugPrint('[chatStream] stream loop START');
       await for (final chunk in response.stream.transform(utf8.decoder).transform(const LineSplitter())) {
-        print('[chatStream] raw line len=${chunk.length} preview=${chunk.substring(0, chunk.length.clamp(0, 30))}');
+        debugPrint('[chatStream] raw line len=${chunk.length} preview=${chunk.substring(0, chunk.length.clamp(0, 30))}');
         if (chunk.isEmpty) continue;
         try {
           if (useRemote) {
@@ -380,8 +377,8 @@ class LlmService {
         } catch (_) {}
       }
     } catch (e, st) {
-      print('[chatStream] CATCH ERROR: $e');
-      print('[chatStream] STACK: $st');
+      debugPrint('[chatStream] CATCH ERROR: $e');
+      debugPrint('[chatStream] STACK: $st');
       yield '(LLM error: $e)';
     }
   }
