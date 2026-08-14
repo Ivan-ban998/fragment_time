@@ -83,6 +83,13 @@ class _ContentScreenState extends State<ContentScreen> {
   bool _recLoading = false;
   // 7/30 B: 推荐重试计数器 (避免 _recItems 一直空时无限重试)
   int _recRetryCount = 0;
+  // 8/14 治本 (沿 SOUL #18 真改没改对 第 N+11 次): _recGeneration 守卫 race condition
+  //   真凶: 之前 _recLoading boolean 守卫 race condition:
+  //     - force=true 已 setState(_recLoading=true) 在 await
+  //     - 旧 force=false await 拿到 fallback, 走 setState(_recLoading=false) 破守卫
+  //     - 第 3 次 force=true 进入, _recLoading=false → 走通, race 累积
+  //   修: 用 _recGeneration int, 每轮 +1, await 后检查 gen 是否变 (变就丢弃结果)
+  int _recGeneration = 0;
   bool _showCompletionBanner = false;
   // 8/8 加 (沿 SOUL #188 透明原则): 离线状态
   bool _isOffline = false;
@@ -344,15 +351,21 @@ class _ContentScreenState extends State<ContentScreen> {
     //     → Step 1 设 _recItems 覆盖第 1 次 Step 2 的新结果
     //   修: 用 _recLoading=true 守卫直到 Step 2 完成 (force=true 才 bypass)
     //   副作用: force=true "换 6 张" 显示 1s loading → UX OK (Step 1 仍 < 100ms 返 fallback)
+    // 8/14 治本 N+11: 用 _recGeneration 替代 _recLoading boolean 守卫
+    //   真凶: _recLoading 是 boolean, race condition 累积:
+    //     - 旧 await 完成时 setState(_recLoading=false) 破了 force=true 的 setState(true) 守卫
+    //     - 第 3 次 force=true 进入时 _recLoading=false → 走通, race 累积
+    //   修: 每轮 _recGeneration++, await 后检查 _recGeneration 是否仍是本轮 (变就丢弃)
+    final myGen = ++_recGeneration;
     if (force) {
       _recLoading = false;
       _recRetryCount = 0;
     }
-    if (_recLoading) return; // 关键: 这里 _recLoading=true 表示上一轮 Step 2 还在, 跳过
-    if (_recRetryCount >= 3 && !force) {
+    if (!force && _recLoading) return; // 非 force 时仍守 _recLoading 守卫 (UX: 不显示多个 loading)
+    if (!force && _recRetryCount >= 3) {
       return;
     }
-    _recRetryCount++;
+    if (!force) _recRetryCount++;
     // Step 1: 同步立即返 fallback 24 桶 (<100ms) — 用户立刻看到 6 张卡
     // 8/1 加 offset (沿用 SOUL #103): "换 6 张" 不响应真凶 — 每桶只 6 条 + 不 shuffle = 永远同一组
     // 8/13 升一阶 (沿 SOUL #190 真改没改对 第 N+3 次): 排除已 dismiss 的 item
@@ -368,12 +381,14 @@ class _ContentScreenState extends State<ContentScreen> {
       });
     }
     final dismissedIds = await UserPreferenceService.instance.getDismissedIds();
+    if (_recGeneration != myGen) return; // race: 已被新 force 覆盖
     final fallback = NewsService().getRecommendations(
       widget.userType, widget.scene,
       offset: _recOffset, isInternational: widget.isInternational,
       excludeIds: dismissedIds, forceFresh: force,
     );
     final fallbackItems = await fallback;
+    if (_recGeneration != myGen) return; // race: 已被新 force 覆盖
     if (!mounted) return;
     if (fallbackItems.isNotEmpty) {
       setState(() {
@@ -401,6 +416,7 @@ class _ContentScreenState extends State<ContentScreen> {
         forceFresh: force, // 8/14 透传 force → Step 2 跟 Step 1 同样跳过 in-memory cache
         excludeIds: dismissedIds, // 8/14 透传 dismissedIds → Step 2 也排除 ❌ 过的
       );
+      if (_recGeneration != myGen) return; // race: 已被新 force 覆盖
       if (!mounted) return;
       if (rec.isNotEmpty) {
         // 真 RSS 拿到, 覆盖 fallback
@@ -417,6 +433,7 @@ class _ContentScreenState extends State<ContentScreen> {
         });
       }
     } catch (e) {
+      if (_recGeneration != myGen) return;
       if (!mounted) return;
       setState(() {
         _recLoading = false;

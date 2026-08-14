@@ -670,6 +670,8 @@ static const String _proxyBase = '/rss';
       // 8/13 加: 知乎/HN 健身/效率英文关键词
       'fitness', 'exercise', 'workout', 'training', 'health', 'run',
       'meditation', 'mindfulness', 'wellness', 'productivity', 'habit',
+      // 8/14 加 (沿 SOUL #198): 让 Engadget 命中 (Engadget 是科技/穿戴设备, 跟 workout 'wearable'/'device' 匹配)
+      'wearable', 'device', 'gadget', 'smart', 'battery', 'screen',
     ],
   };
 
