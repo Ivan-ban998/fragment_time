@@ -332,8 +332,17 @@ class _ContentScreenState extends State<ContentScreen> {
     _recRetryCount++;
     // Step 1: 同步立即返 fallback 24 桶 (<100ms) — 用户立刻看到 6 张卡
     // 8/1 加 offset (沿用 SOUL #103): "换 6 张" 不响应真凶 — 每桶只 6 条 + 不 shuffle = 永远同一组
+    // 8/13 升一阶 (沿 SOUL #190 真改没改对 第 N+3 次): 排除已 dismiss 的 item
+    //   真凶: 之前不排除 dismissed → "换 6 张" 仍有 ❌ 过的老卡
+    //   修: 拉 UserPreferenceService.getDismissedIds() 传给 getRecommendations
+    // 8/13 升一阶 (沿 SOUL #190 第 N+4 次): 重载时 forceFresh=true 跳过 in-memory cache
+    //   真凶: 5min cache + shuffle 仍同组 → "换 6 张" 老卡
+    //   修: force=true (换 6 张) → forceFresh=true 跳过 cache
+    final dismissedIds = await UserPreferenceService.instance.getDismissedIds();
     final fallback = NewsService().getRecommendations(
-      widget.userType, widget.scene, offset: _recOffset, isInternational: widget.isInternational,
+      widget.userType, widget.scene,
+      offset: _recOffset, isInternational: widget.isInternational,
+      excludeIds: dismissedIds, forceFresh: force,
     );
     final fallbackItems = await fallback;
     if (!mounted) return;

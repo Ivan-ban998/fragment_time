@@ -142,6 +142,15 @@ class UserPreferenceService {
     return int.tryParse(raw.split('|').last) ?? 0;
   }
 
+  /// 8/13 加 (沿 SOUL #190 真改没改对 第 N+3 次):
+  /// 读已 dismiss (不喜欢) 的 item.id 列表
+  /// 真凶: 之前 _loadRecommendations 不排除 dismissed → 重载 6 张有老 dismissed item
+  /// 修法: 公开此 API 给 NewsService.getRecommendations 排除
+  Future<Set<String>> getDismissedIds() async {
+    final prefs = await SharedPreferences.getInstance();
+    return (prefs.getStringList(_kDismissed) ?? <String>[]).toSet();
+  }
+
   String _todayKey() {
     final d = DateTime.now();
     return '${d.year}-${d.month.toString().padLeft(2, '0')}-${d.day.toString().padLeft(2, '0')}';
