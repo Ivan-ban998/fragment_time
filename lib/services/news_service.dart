@@ -12,7 +12,7 @@ class NewsService {
   /// - RSS 拉空返 [] (访客看空状态, 不再被骗 24 桶假数据)
   /// - 24 桶假数据 _allContent 保留仅供 dev 演示 (需显式 useFakeContent flag, 还没接)
   /// 沿 SOUL #6 撞 7 周承认: 1-2 个月全陷修 bug, 6/6 6b9c551 已经在搞 RSS 真接, 但 UI 还在走假数据 = 访客看到 '历史' 而不是 '今天'
-  Future<List<ContentItem>> getRecommendations(UserType userType, Scene scene, {int offset = 0, bool isInternational = false}) async {
+  Future<List<ContentItem>> getRecommendations(UserType userType, Scene scene, {int offset = 0, bool isInternational = false, Set<String> excludeIds = const {}, bool forceFresh = false}) async {
     // 8/10 改 (沿 SOUL #125 #188 + Brien '生产/运营切换'):
     //   - staging / dev 模式 → _allContent stub (24 桶假数据, 不连外网)
     //   - prod 模式 → RSS 真接 (sspai 优先 + 36kr fallback, 宪法 §1.1 严)
@@ -20,6 +20,13 @@ class NewsService {
     //   真凶: 之前 getRecommendations 不接 isInternational 参数 → 国际版用户走国内 RSS (sspai+36kr)
     //   后果: 国际版用户看到中文 RSS → 文不对题
     //   修: 加 isInternational 参数, 透传到 fetchFromRss → RssService 走 The Verge + NPR
+    // 8/13 升一阶 (沿 SOUL #190 真改没改对 第 N+2 次):
+    //   真凶: 之前 getRecommendations 不用 offset 调 shuffleSeed → 重载 6 张完全一样
+    //   修: offset -> shuffleSeed (offset ~/ 6 = 页码, 不同页 = 不同 seed)
+    // 8/13 升一阶 (沿 SOUL #190 真改没改对 第 N+3 次):
+    //   真凶: 之前 getRecommendations 不排除已 dismiss 的 item → 重载看到 ❌ 过的老卡
+    //   修: 接受 excludeIds 参数, 内部从 RSS 过滤
+    final shuffleSeed = offset ~/ 6;
     final key = '${userType.bucketKey}_${scene.bucketKey}';
     if (RuntimeMode.current.useStub) {
       debugPrint('[news staging] 返 stub 24 桶 key=$key intl=$isInternational');
@@ -36,7 +43,17 @@ class NewsService {
 
     // prod: Step 1: 走 RSS 真数据 (国内 sspai+36kr / 国际 The Verge+NPR, 沿 6b9c551 + 8/13)
     // 8/13 修: 透传 isInternational → RssService 走正确源链
-    final rss = await fetchFromRss(userType, scene, isInternational: isInternational);
+    // 8/13 升一阶 (沿 SOUL #198): 用 rssService.fetchByBucket 接 scene 参数
+    //   修法: 之前用 rssService.currentScene = scene (instance field)
+    //   → 但 _feedUrlsForScene 在 fetchTop 内读, 跨场景调用串扰
+    //   修: 改用 fetchByBucket(userType, scene, scene: scene) 显式传 scene
+    var rss = await fetchFromRss(userType, scene, isInternational: isInternational, shuffleSeed: shuffleSeed, forceFresh: forceFresh);
+    // 8/13 升一阶 (沿 SOUL #190): 过滤掉已 dismiss 的 item (避免重载看到 ❌ 过的)
+    if (excludeIds.isNotEmpty) {
+      final before = rss.length;
+      rss = rss.where((it) => !excludeIds.contains(it.id)).toList();
+      debugPrint('[news] excludeIds 过滤: $before → ${rss.length} (排除 ${before - rss.length} 条已 dismiss)');
+    }
     // 8/13 升一阶 (沿 SOUL #119 不撒谎 + 真用户体验):
     //   RSS ≥ 6 → 纯真数据 (沿宪法 §1.1)
     //   RSS 1-5 (国内) → 补中文 stub 到 6 (tinder 不空, 但 stub 项 source='精选' 标精选)
@@ -156,11 +173,14 @@ class NewsService {
   // 7/29 修复: 真正接 RssService.fetchByBucket (有 fallback 源链: 36氪 → 少数派).
   // 拉空返 [], 不再返 _allContent 假数据 (不撒谎 — 上线后访客应该看真内容).
   // _allContent 保留仅供 dev/演示 (需显式 useFakeContent flag).
-  Future<List<ContentItem>> fetchFromRss(UserType userType, Scene scene, {bool isInternational = false}) async {
+  Future<List<ContentItem>> fetchFromRss(UserType userType, Scene scene, {bool isInternational = false, int shuffleSeed = 0, bool forceFresh = false}) async {
     // 7/29: 真接 RssService (多源 fallback: 36 氪 → 少数派 / The Verge)
+    // 8/13 升一阶: 透传 shuffleSeed 让 "换 6 张" 真换 (沿 SOUL #190)
+    // 8/13 升一阶: 透传 forceFresh 让重载跳过 in-memory cache (沿 SOUL #190 第 N+4 次)
+    // 8/13 治本 (沿 SOUL #198): scene 也要传 fetchByBucket 让 4 场景偏不同源
     final rss = RssService(isInternational: isInternational);
     try {
-      final items = await rss.fetchByBucket(userType, scene);
+      final items = await rss.fetchByBucket(userType, scene, shuffleSeed: shuffleSeed, forceFresh: forceFresh, sceneOverride: scene);
       // 8/4 修 #169: 成功/拉空都打 log (沿 #25 #26 #27), 让 "没感变化" 根因可查
       debugPrint('[news] fetchFromRss userType=$userType scene=$scene international=$isInternational → ${items.length} 条');
       if (items.isNotEmpty) return items;

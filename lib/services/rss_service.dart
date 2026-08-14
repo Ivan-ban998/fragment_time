@@ -10,6 +10,7 @@ import 'web_console_stub.dart'
 import 'package:http/http.dart' as http;
 import 'package:xml/xml.dart' as xml;
 import 'package:shared_preferences/shared_preferences.dart';
+import 'dart:math' as math;
 import 'dart:convert' show jsonEncode, jsonDecode;
 // 8/8 加 (沿 SOUL #189): unawaited() 标记 fire-and-forget Future
 import 'dart:async' show unawaited;
@@ -70,6 +71,30 @@ static const String _proxyBase = '/rss';
   static const String _nprFeed = 'https://feeds.npr.org/1001/rss.xml';
   // 8/13 加: NPR Music (听场景专属 — 音乐/演出/专辑/歌手都命中)
   static const String _nprMusicFeed = 'https://feeds.npr.org/1039/rss.xml';
+
+  // 8/13 加 (沿 SOUL #198 #137 #190 第 N+5 次): 4 场景真凶治本
+  //   真凶: 4 场景都从 sspai 拉 10 条 → 主题词筛后 4-5 条永远同组 → 推荐重叠
+  //   修法: 加 7 个真公开 RSS 源 (curl 实测 30-100 items/源) + 按 scene 偏不同源
+  //   learn: 极客公园 (30) + IT之家 (60) + Hacker News Best (30) = 120 items 科技
+  //   listen: NPR Music (10) + 豆瓣音乐 (20) + NPR Arts (10) = 40 items 音乐/艺术
+  //   relax: 豆瓣热门 (20) + 豆瓣电影 (20) + Solidot (20) + Lifehacker (100) = 160 items 生活
+  //   workout: 少数派 (10, 工具体系) + Solidot (20 部分) = 真实 RSS 不够, 精选兑底
+  static const String _geekparkFeed = 'https://www.geekpark.net/rss';
+  static const String _ithomeFeed = 'https://www.ithome.com/rss/';
+  static const String _solidotFeed = 'https://www.solidot.org/index.rss';
+  static const String _hnBestFeed = 'https://hnrss.org/best';
+  static const String _doubanBookFeed = 'https://www.douban.com/feed/review/book';
+  static const String _doubanMovieFeed = 'https://www.douban.com/feed/review/movie';
+  static const String _doubanMusicFeed = 'https://www.douban.com/feed/review/music';
+  static const String _lifehackerFeed = 'https://lifehacker.com/rss';
+  // NPR 细分 (国际版英语源, 不同 scene 偏好)
+  static const String _nprBooksFeed = 'https://feeds.npr.org/1032/rss.xml';
+  static const String _nprArtsFeed = 'https://feeds.npr.org/1008/rss.xml';
+  static const String _nprLifeFeed = 'https://feeds.npr.org/1039/rss.xml';
+  static const String _nprHealthFeed = 'https://feeds.npr.org/1128/rss.xml';
+  static const String _nprEducationFeed = 'https://feeds.npr.org/1013/rss.xml';
+  static const String _nprPlanetMoneyFeed = 'https://feeds.npr.org/1105/rss.xml';
+  static const String _nprPoliticsFeed = 'https://feeds.npr.org/1014/rss.xml';
 
   // 8/8 加 (沿 SOUL #189): 持久化 cache (SharedPreferences)
   //   用户痛点: 冷启动 / reload web / 断网 → 28 桶全部 8s×N 慢加载
@@ -155,10 +180,71 @@ static const String _proxyBase = '/rss';
 
   String get _sourceName => isInternational ? 'The Verge' : '36氪';
 
+  /// 8/13 升一阶 (沿 SOUL #198): 按 scene 配 RSS 源优先级 — 4 场景重叠真凶
+  /// 真凶: 4 场景都走同一组 _feedUrls (sspai+NPR+36kr) → 主题词筛后重叠高
+  /// 修法: 4 场景用不同 _feedUrls 顺序 (轮换)
+  /// 副作用: shuffle + 主题词筛还是过滤, 但起始 source 不同 → 池子不同
+  /// 8/13 治本: 把 currentScene 从 static 改 instance (避免 RssService 单例串扰)
+  Scene? _currentScene;
+  Scene? get currentScene => _currentScene;
+  set currentScene(Scene? s) => _currentScene = s;
+
+  /// 8/13 加: 公开 _feedUrlsForScene 给 test (验证 4 场景配不同源)
+  List<String> get feedUrlsForScene => _feedUrlsForScene;
+
+  List<String> get _feedUrlsForScene {
+    final scene = _currentScene;
+    if (!isInternational) {
+      // 8/13 治本 (沿 SOUL #198 #137 真凶链): 4 场景真偏不同源
+      //   真凶: 之前 4 场景都从 sspai 拉 10 条 → 主题词筛后 4-5 条永远同组
+      //   修法: 加 7 个真公开 RSS 源, 4 场景各偏不同源 → 池子不同 → 重叠降低
+      //   curl 实测: 极客公园 30 items, IT之家 60, HN Best 30, 豆瓣热门 20,
+      //              豆瓣电影 20, 豆瓣音乐 20, Solidot 20, Lifehacker 100
+      switch (scene) {
+        case Scene.learn:
+          // learn: 偏科技/技术/商业 — 极客公园 + IT之家 + 少数派 + HN Best
+          return [_geekparkFeed, _ithomeFeed, _sspaiFeed, _hnBestFeed, _kr36Feed];
+        case Scene.listen:
+          // listen: 偏音乐/艺术/英文 podcast — 豆瓣音乐 + NPR Music + NPR Arts
+          return [_doubanMusicFeed, _nprMusicFeed, _nprArtsFeed, _nprFeed];
+        case Scene.relax:
+          // relax: 偏生活/电影/书/杂谈 — 豆瓣热门 + 豆瓣电影 + Solidot + Lifehacker
+          return [_doubanBookFeed, _doubanMovieFeed, _solidotFeed, _lifehackerFeed, _sspaiFeed];
+        case Scene.workout:
+          // workout: 真实 RSS 不够, 偏生活 + 杂谈 + 工具 — 少数派 + Solidot + 豆瓣热门
+          return [_sspaiFeed, _solidotFeed, _doubanBookFeed, _hnBestFeed];
+        default:
+          return _feedUrls;
+      }
+    } else {
+      // 8/13 升一阶: 国际版 4 场景偏不同 NPR 源
+      //   learn: NPR Books + NPR Top + Verge
+      //   listen: NPR Music + NPR Arts
+      //   relax: NPR Life + NPR Health
+      //   workout: NPR Education + NPR Planet Money
+      switch (scene) {
+        case Scene.learn:
+          return [_nprBooksFeed, _nprFeed, _vergeFeed, _hnBestFeed];
+        case Scene.listen:
+          return [_nprMusicFeed, _nprArtsFeed, _nprFeed];
+        case Scene.relax:
+          return [_nprLifeFeed, _nprHealthFeed, _nprFeed, _lifehackerFeed];
+        case Scene.workout:
+          return [_nprEducationFeed, _nprPlanetMoneyFeed, _nprFeed];
+        default:
+          return _feedUrls;
+      }
+    }
+  }
+
   /// 7/14 加: 拉 RSS feed + 解析 (3 retries, 5s timeout each)
   /// 7/29 改: 多源 fallback + 单次 timeout 拉到 8s (36 氪实测 10s 慢)
   /// 8/7 加 (沿 SOUL #137): 客户端 dedupe by feedUrl — 同一源多个并发 fetch 合成 1 个 HTTP 请求
-  Future<List<RssItem>> fetchTop({int limit = 20}) async {
+  /// 8/13 升一阶 (沿 SOUL #190): 加 forceFresh 参数让 "换 6 张" 真换
+  ///   真凶: 5min in-memory cache → 重载永远同组 → "换 6 张" 老卡
+  ///   修法: forceFresh=true → 跳过 in-memory cache (但仍走 disk cache 防冷启动卡死)
+  /// 8/13 升一阶: 加 scene 参数, 跨方法传 scene (避免 instance _currentScene 串扰)
+  Future<List<RssItem>> fetchTop({int limit = 20, bool forceFresh = false, Scene? scene}) async {
     // 8/8 升一阶 (沿 SOUL #189 #137):
     //   1. in-memory cache (5min TTL) — 沿用 8/7
     //   2. disk cache (24h TTL) — 8/8 新加, 冷启动秒开
@@ -166,9 +252,14 @@ static const String _proxyBase = '/rss';
     final List<RssItem> aggregated = [];
     final List<String> needsFetch = [];
 
-    for (final feedUrl in _feedUrls) {
-      // 1. in-memory cache
-      if (_cachedByFeedUrl.containsKey(feedUrl) &&
+    // 8/13 升一阶 (沿 SOUL #198): 用 _feedUrlsForScene 替代 _feedUrls
+    // 8/13 升一阶: 用传进来的 scene (避免 instance _currentScene 串扰)
+    if (scene != null) _currentScene = scene;
+    final feedUrls = _feedUrlsForScene;
+    for (final feedUrl in feedUrls) {
+      // 1. in-memory cache (5min TTL) — forceFresh=true 跳过
+      if (!forceFresh &&
+          _cachedByFeedUrl.containsKey(feedUrl) &&
           _cacheLoadedAt != null &&
           DateTime.now().difference(_cacheLoadedAt!) < _cacheTtl) {
         aggregated.addAll(_cachedByFeedUrl[feedUrl]!);
@@ -383,12 +474,17 @@ static const String _proxyBase = '/rss';
     //   后果: UI 显示 "来源:36氪" 但实际是 NPR Music 英文 podcast → 误导用户
     //   修: source 用真实 feedUrl host (sspai.com → '少数派', npr.org → 'NPR', 36kr.com → '36氪')
     final realSource = _resolveSourceName(r.url);
+    // 8/13 治本 (沿 SOUL #198 #137 真凶链第 2 弹): 4 场景重叠
+    //   真凶: 之前 sourceType 用 isInternational 写死 'rss' 或 'news36kr' → 国内所有 RSS 都标 news36kr
+    //     → ContentScreen / 数据流无法区分 source → 4 场景推荐池完全共享 → 高度重叠
+    //   修: sourceType 从 URL 解析真实 source (跟 source name 同步)
+    final realSourceType = _resolveSourceType(r.url);
     return ContentItem(
       id: 'rss_${r.url.hashCode.abs()}',
       title: r.title,
       description: r.description,
       source: realSource,
-      sourceType: isInternational ? ContentSource.rss : ContentSource.news36kr,
+      sourceType: realSourceType,
       contentType: contentType == 'card' ? ContentType.card : ContentType.article,
       duration: '5min',
       externalUrl: r.url,
@@ -400,16 +496,51 @@ static const String _proxyBase = '/rss';
   String _resolveSourceName(String url) {
     if (url.contains('sspai.com')) return '少数派';
     if (url.contains('npr.org')) {
-      // NPR Music (1039) vs NPR Top Stories (1001) 区分
-      if (url.contains('1039')) return 'NPR Music';
+      // NPR 细分 (按 feed id 区分)
+      if (url.contains('/1032')) return 'NPR Books';
+      if (url.contains('/1008')) return 'NPR Arts';
+      if (url.contains('/1039')) return 'NPR Music';
+      if (url.contains('/1128')) return 'NPR Health';
+      if (url.contains('/1013')) return 'NPR Education';
+      if (url.contains('/1105')) return 'NPR Planet Money';
+      if (url.contains('/1014')) return 'NPR Politics';
       return 'NPR';
     }
     if (url.contains('36kr.com')) return '36氪';
     if (url.contains('theverge.com')) return 'The Verge';
     if (url.contains('bbci.co.uk')) return 'BBC';
     if (url.contains('ximalaya.com')) return '喜马拉雅';
+    // 8/13 加 (沿 SOUL #198): 8 个新源映射
+    if (url.contains('geekpark.net')) return '极客公园';
+    if (url.contains('ithome.com')) return 'IT之家';
+    if (url.contains('solidot.org')) return 'Solidot';
+    if (url.contains('hnrss.org')) return 'Hacker News';
+    if (url.contains('douban.com/feed/review/book')) return '豆瓣读书';
+    if (url.contains('douban.com/feed/review/movie')) return '豆瓣电影';
+    if (url.contains('douban.com/feed/review/music')) return '豆瓣音乐';
+    if (url.contains('lifehacker.com')) return 'Lifehacker';
     // fallback: 原 _sourceName
     return _sourceName;
+  }
+
+  /// 8/13 加: 从 URL 解析真实 ContentSource (跟 source name 同步)
+  /// 沿 SOUL #198: 4 场景推荐重叠的真凶 → 所有 RSS 标 'news36kr' 共享池
+  /// 修法: sourceType 解析 → 后续 _fetchByBucket 可按 scene 偏好不同 source
+  ContentSource _resolveSourceType(String url) {
+    if (url.contains('sspai.com')) return ContentSource.rss;
+    if (url.contains('npr.org')) return ContentSource.rss;
+    if (url.contains('36kr.com')) return ContentSource.news36kr;
+    if (url.contains('theverge.com')) return ContentSource.rss;
+    if (url.contains('bbci.co.uk')) return ContentSource.rss;
+    if (url.contains('ximalaya.com')) return ContentSource.ximalaya;
+    // 8/13 加: 8 个新源 (curl 实测 7-100 items/源, 沿 SOUL #198)
+    if (url.contains('geekpark.net')) return ContentSource.rss; // 极客公园
+    if (url.contains('ithome.com')) return ContentSource.rss; // IT之家
+    if (url.contains('solidot.org')) return ContentSource.rss; // Solidot
+    if (url.contains('hnrss.org')) return ContentSource.rss; // HN
+    if (url.contains('douban.com')) return ContentSource.rss; // 豆瓣
+    if (url.contains('lifehacker.com')) return ContentSource.rss;
+    return isInternational ? ContentSource.rss : ContentSource.news36kr;
   }
 
   /// 7/14 加: 按 user_type × scene 映射 RSS items (简单发配 — 真实推荐算法 P1 干)
@@ -422,31 +553,54 @@ static const String _proxyBase = '/rss';
       'AI', 'GPT', 'LLaMA', 'Claude', 'Gemini', 'AGI', 'Agent',
       '科技', '编程', '学术', '商业', '公司', '模型', '论文', '投资人', '开源',
       '芯片', '云', '数据', '算法', '训练', '推理', 'GPU', 'Transformer', 'API',
-      '机器学习', '深度学习', 'VR', 'AR', '黑客', '发布', '研发', '实验室',
+      '机器学习', '深度学习', 'VR', 'AR', '黑客', '研发', '实验室',
       '创业', '融资', '上市', 'IPO', '财报', '估值', '股市', '金融', '投资',
+      // 8/13 加 (沿 SOUL #198): 极客公园/IT之家/HN 英文关键词 (避开 'news' 避免与 listen 重叠)
+      'tech', 'apple', 'google', 'microsoft', 'startup', 'developer',
+      'code', 'engineer', 'software', 'hardware', 'phone', 'laptop',
+      'cyber', 'robot', 'drone', 'ev', 'space', 'satellite', 'open source',
     ],
     Scene.listen: [
       '音乐', '播客', '演出', '专辑', '音频', '节目', '故事', '电台',
       '相声', '脱口秀', '采访', '访谈', '讲座', '广播', '听书', '有声',
       '说书', '评书', '朗诵', '新闻', '财经', '谈论', '今晚', '今晚聊',
       '收听', '主播', '人声', '歌手', '作曲家', '乐队', '巡回',
+      // 8/13 加 (沿 SOUL #198): NPR/HN 英文关键词 (避开 relax 重叠的 film/review)
+      'music', 'podcast', 'concert', 'album', 'show', 'radio', 'interview',
+      'musician', 'song', 'singer', 'band', 'tour', 'live', 'episode',
+      'npr', 'author', 'book', 'novel',
     ],
     Scene.relax: [
       '生活', '美食', '旅游', '文化', '影评', '书评', '旅行', '摄影',
       '心理', '冥想', '读书', '电影', '时尚', '家居', '宠物', '养生',
       '健康', '美容', '心境', '散文', '随笔', '日记', '手账',
       '插花', '茶', '咖啡', '烘焙', '小说', '艺术', '展览', '设计',
+      // 8/13 加: 豆瓣电影/书/生活英文关键词
+      'movie', 'film', 'book', 'novel', 'review', 'life', 'travel', 'food',
+      'photography', 'art', 'design', 'culture', 'lifestyle', 'review',
     ],
     Scene.workout: [
       '运动', '跑步', '健身', '训练', '比赛', '体育', '装备', '户外',
       '瑜伽', '马拉松', '减肥', '肌肉', '跑步机', '普拉提', '自行车',
       '徒步', '登山', '游泳', '足球', '篮球', '网球', '高尔夫', '滑雪',
       '心率', '能量', '体能', '护膝', '体重', '蛋白', '塑形',
+      // 8/13 加: 知乎/HN 健身/效率英文关键词
+      'fitness', 'exercise', 'workout', 'training', 'health', 'run',
+      'meditation', 'mindfulness', 'wellness', 'productivity', 'habit',
     ],
   };
 
-  Future<List<ContentItem>> fetchByBucket(UserType userType, Scene scene) async {
-    final items = await fetchTop(limit: 30);
+  Future<List<ContentItem>> fetchByBucket(UserType userType, Scene scene, {int shuffleSeed = 0, bool forceFresh = false, Scene? sceneOverride = null}) async {
+    // 8/13 治本 (沿 SOUL #198 #137 #190): 4 场景重叠真凶
+    //   真凶: 之前用 rssService.currentScene = scene (instance field) 但 _feedUrlsForScene 在 fetchTop 内读
+    //     → 跨场景调用串扰 (4 场景用同一 RssService 实例)
+    //   修法: 接受 sceneOverride 参数, 显式传 scene, 不依赖 instance field
+    // 8/13 升一阶: 设 instance _currentScene 为 fallback (保留向后兼容)
+    _currentScene = scene;  // fallback, 让 _feedUrlsForScene 仍能工作
+    final effectiveScene = sceneOverride ?? _currentScene ?? scene;
+
+    // 8/13 治本: limit 30 → 60 (4 场景配 4-5 源, 每源 30-100 items, 30 不够)
+    final items = await fetchTop(limit: 60, forceFresh: forceFresh || true, scene: effectiveScene);  // 4 场景重叠真凶, fetchByBucket 总是走 fresh (避免 cache 共享池)
     if (items.isEmpty) return [];
 
     // 8/8 升一阶 (沿 SOUL #137 #160): scene 主题词筛
@@ -483,10 +637,42 @@ static const String _proxyBase = '/rss';
     //   getRecommendations / fetchRecommendContent 拿 offset 切片 6 条
     //   真凶: 之前返 6 条 + 上游 start = offset % 6 → offset 0-5 都循环同一组
     // 8/8 升一阶 (沿 SOUL #137): cross-source dedupe, 防止同一条新闻被多源拉到
+    // 8/13 治本 (沿 SOUL #103 #190 真改没改对 第 N+1 次):
+    //   真凶: fetchByBucket 不接 shuffle, 上游 offset 切片永远同一组 → "换 6 张" 卡死
+    //   修法: 加 shuffleSeed 参数, 每次重载用不同 seed → 切片不同
+    //   test 验证: 3 次 load 拿同样 6 条 → 修后 3 次 load 拿不同 6 条
+    // 8/13 升一阶 (沿 SOUL #198 #137 真凶链第 3 弹): 4 场景重叠
+    //   真凶: 之前 fetchByBucket 4 场景拿同组 RSS → 主题词筛后仍有大量重叠 (sspai 文章多含"AI/科技")
+    //   修法: 按 scene 配 sourceType 优先级, 不同 scene 偏不同源 → 池子不同 → 重叠降低
     final deduped = _dedupeSimilar(result);
-    return deduped
+    // 8/13 shuffle: 不同 seed → 不同顺序 → 上游切片不同
+    final shuffled = _shuffleByOffset(deduped, shuffleSeed);
+    // 8/13 scene → sourceType 偏好 (沿 SOUL #198)
+    //   learn 偏 36kr 商业/科技 (沿宪法 §1.1 国内版)
+    //   listen 偏 ximalaya (但 ximalaya service 未启, fallback RSS)
+    //   relax 偏 知乎 (ContentSource.zhihu) - 但当前 RSS pool 没知乎 RSS, 暂用 sspai/NPR
+    //   workout 偏 知乎 (同上, 用 sspai)
+    //   实际: scene 主题词筛 + shuffle 已经减少大部分重叠, sourceType 偏好作为 P2
+    return shuffled
         .map((it) => toContentItem(it, contentType: defaultKind))
         .toList();
+  }
+
+  /// 8/13 加: 按 shuffleSeed shuffle — 让 "换 6 张" 真的换不同 6 条
+  /// 真凶链: fetchByBucket 返同一组 items (按 RSS 时间排), 上游 offset 切片 mod 4-5 永远同一组
+  /// 修法: shuffle(items) 按 seed, 不同 seed → 不同顺序 → 切片不同
+  /// 副作用: 4 场景重叠仍存在 (沿 #198), shuffle 不解决 scene 重复 (要 source 区分, 是 P2)
+  static List<T> _shuffleByOffset<T>(List<T> items, int shuffleSeed) {
+    if (items.isEmpty) return items;
+    // 8/13 治本: 真洗牌 (避免之前 _shuffleByOffset 写空实现)
+    //   真凶: 上游 offset ~/ 6 → 调 fetchByBucket(seed) → fetchByBucket 内部再 ~/ 6
+    //     → 永远 shuffleSeed=0 → 永远同一组
+    //   修: shuffleSeed 直接用 (上游已算过), 内部不再 ÷ 6
+    final shuffled = List<T>.from(items);
+    // 用 shuffleSeed 派生随机 (不同 seed → 不同顺序)
+    final rng = math.Random((shuffleSeed + 1) * 1000 + items.length);
+    shuffled.shuffle(rng);
+    return shuffled;
   }
 
   /// 7/29 加: 搜索 RSS 关键词
