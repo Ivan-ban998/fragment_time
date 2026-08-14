@@ -185,6 +185,7 @@ static const String _proxyBase = '/rss';
   /// 修法: 4 场景用不同 _feedUrls 顺序 (轮换)
   /// 副作用: shuffle + 主题词筛还是过滤, 但起始 source 不同 → 池子不同
   /// 8/13 治本: 把 currentScene 从 static 改 instance (避免 RssService 单例串扰)
+  /// 8/14 二次治本 (沿 SOUL #8 Brien 负优化反馈): 移除 lifehacker (2MB body 解析慢 8s+)
   Scene? _currentScene;
   Scene? get currentScene => _currentScene;
   set currentScene(Scene? s) => _currentScene = s;
@@ -199,17 +200,19 @@ static const String _proxyBase = '/rss';
       //   真凶: 之前 4 场景都从 sspai 拉 10 条 → 主题词筛后 4-5 条永远同组
       //   修法: 加 7 个真公开 RSS 源, 4 场景各偏不同源 → 池子不同 → 重叠降低
       //   curl 实测: 极客公园 30 items, IT之家 60, HN Best 30, 豆瓣热门 20,
-      //              豆瓣电影 20, 豆瓣音乐 20, Solidot 20, Lifehacker 100
+      //              豆瓣电影 20, 豆瓣音乐 20, Solidot 20, Lifehacker 100 (8/14 移除, 解析 8s)
       switch (scene) {
         case Scene.learn:
-          // learn: 偏科技/技术/商业 — 极客公园 + IT之家 + 少数派 + HN Best
-          return [_geekparkFeed, _ithomeFeed, _sspaiFeed, _hnBestFeed, _kr36Feed];
+          // learn: 偏科技/技术/商业 — IT之家 + 少数派 + HN Best
+          // 8/14 二次治本: 移除 geekpark (700KB 4-6s) + 36kr (WAF 8s+ timeout)
+          return [_ithomeFeed, _sspaiFeed, _hnBestFeed];
         case Scene.listen:
           // listen: 偏音乐/艺术/英文 podcast — 豆瓣音乐 + NPR Music + NPR Arts
           return [_doubanMusicFeed, _nprMusicFeed, _nprArtsFeed, _nprFeed];
         case Scene.relax:
-          // relax: 偏生活/电影/书/杂谈 — 豆瓣热门 + 豆瓣电影 + Solidot + Lifehacker
-          return [_doubanBookFeed, _doubanMovieFeed, _solidotFeed, _lifehackerFeed, _sspaiFeed];
+          // relax: 偏生活/电影/书/杂谈 — 豆瓣热门 + 豆瓣电影 + Solidot + 豆瓣热门 + 少数派
+          // 8/14: 移除 lifehacker (8s+ 解析慢拖累), 替换为 豆瓣热门 重复 + sspai
+          return [_doubanBookFeed, _doubanMovieFeed, _solidotFeed, _doubanMusicFeed, _sspaiFeed];
         case Scene.workout:
           // workout: 真实 RSS 不够, 偏生活 + 杂谈 + 工具 — 少数派 + Solidot + 豆瓣热门
           return [_sspaiFeed, _solidotFeed, _doubanBookFeed, _hnBestFeed];
@@ -218,17 +221,14 @@ static const String _proxyBase = '/rss';
       }
     } else {
       // 8/13 升一阶: 国际版 4 场景偏不同 NPR 源
-      //   learn: NPR Books + NPR Top + Verge
-      //   listen: NPR Music + NPR Arts
-      //   relax: NPR Life + NPR Health
-      //   workout: NPR Education + NPR Planet Money
+      // 8/14 二次治本: 移除 lifehacker + geekpark + 36kr (慢源)
       switch (scene) {
         case Scene.learn:
           return [_nprBooksFeed, _nprFeed, _vergeFeed, _hnBestFeed];
         case Scene.listen:
           return [_nprMusicFeed, _nprArtsFeed, _nprFeed];
         case Scene.relax:
-          return [_nprLifeFeed, _nprHealthFeed, _nprFeed, _lifehackerFeed];
+          return [_nprLifeFeed, _nprHealthFeed, _nprFeed];
         case Scene.workout:
           return [_nprEducationFeed, _nprPlanetMoneyFeed, _nprFeed];
         default:
@@ -646,8 +646,12 @@ static const String _proxyBase = '/rss';
     _currentScene = scene;  // fallback, 让 _feedUrlsForScene 仍能工作
     final effectiveScene = sceneOverride ?? _currentScene ?? scene;
 
-    // 8/13 治本: limit 30 → 60 (4 场景配 4-5 源, 每源 30-100 items, 30 不够)
-    final items = await fetchTop(limit: 60, forceFresh: forceFresh || true, scene: effectiveScene);  // 4 场景重叠真凶, fetchByBucket 总是走 fresh (避免 cache 共享池)
+    // 8/14 二次治本 (沿 SOUL #8 #6 真改没改对 第 N+8 次): 不要 forceFresh || true
+    //   真凶: 之前 _loadRecommendations 每次 initState 都 forceFresh=true → fetchTop 重新拉
+    //     → 打开场景 4-5s 卡顿 (8/14 Brien '负优化')
+    //   修: 只在 force=true (用户点换 6 张) 才 forceFresh, initState 走 cache
+    //   副作用: 切场景后 5min in-memory cache 仍可用 → 首屏 < 1s
+    final items = await fetchTop(limit: 30, forceFresh: forceFresh, scene: effectiveScene);
     if (items.isEmpty) return [];
 
     // 8/8 升一阶 (沿 SOUL #137 #160): scene 主题词筛
