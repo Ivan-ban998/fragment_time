@@ -10,8 +10,10 @@
 //   widgets/iframe_video_view.dart (B 站 / YouTube / 跳原站)
 //   widgets/tinder_recommendation_stack.dart (3 卡叠 + IgnorePointer + 36Kr 卡内视觉)
 //
-// 5 个核心状态: _buf (流式 buffer), _llmGotFirstChunk (是否收到首 chunk), _llmFallbackTimer (30s 兑底),
+// 5 个核心状态: _buf (流式 buffer), _llmGotFirstChunk (是否收到首 chunk), _llmFallbackTimer (10s 兑底),
 // _summary (TL;DR 精要), _recItems (推荐 6 条, 来自 ContentAggregator)
+// 8/14 注: _startLlm() 当前未在 initState 调用 (沿 6/26 Brien '要真实数据' 决策),
+//   _llmFallbackTimer 10s 备用 timer 等未来 AI assistant 启用 LLM 时再跑
 
 import 'dart:async';
 import 'dart:ui';
@@ -199,9 +201,13 @@ class _ContentScreenState extends State<ContentScreen> {
   // 启动 LLM 流式
   Future<void> _startLlm() async {
     // 6/14 v3: 30s 兑底 timer (首 chunk 到达关 / onError onDone 关 / dispose 关)
-    _llmFallbackTimer = Timer(const Duration(seconds: 30), () {
+    // 8/14 治本 (沿 SOUL #8 真改没改对 第 N+12 次): 30s → 10s
+    //   真凶: 之前 30s fallback timer, 但实际 MiniMax 1.3s 首 token (8/13 修后)
+    //     → 30s 远大于实际生成时间, 用户等很久才看到内容
+    //   修: 30s → 10s, fail fast 显示兜底 (实际 99% 情况 < 3s)
+    _llmFallbackTimer = Timer(const Duration(seconds: 10), () {
       if (!_llmGotFirstChunk && mounted) {
-        _showStub(reason: 'timeout_30s');
+        _showStub(reason: 'timeout_10s');
       }
     });
 
@@ -614,6 +620,10 @@ class _ContentScreenState extends State<ContentScreen> {
     });
     await showDialog(
       context: context,
+      // 8/14 加 (沿 SOUL #188 透明原则 + Brien UX): dialog dismiss 时自动加载下一批
+      //   真凶: 之前 dialog 必须等用户点"换 6 张"才 load, 用户关掉 dialog (按返回键) → 没换 → UX 卡住
+      //   修: barrierDismissible=true, dialog 关闭自动 force load
+      barrierDismissible: true,
       builder: (ctx) => Dialog(
         backgroundColor: Colors.transparent,
         child: Container(
@@ -665,6 +675,11 @@ class _ContentScreenState extends State<ContentScreen> {
         ),
       ),
     );
+    // 8/14 加 (沿 SOUL #188 透明 + Brien UX): dialog 关闭后 (无论用户点哪个按钮) 自动 force load
+    //   修法: 如果 _recItems 仍空 (说明用户没点 "换 6 张"), 自动 force load
+    if (mounted && _recItems.isEmpty) {
+      _loadRecommendations(force: true);
+    }
   }
 
   // ============== UI ==============
@@ -1809,15 +1824,33 @@ class _ContentScreenState extends State<ContentScreen> {
     );
   }
 
+  // 8/14 加 (沿 SOUL #169 不撒谎): 统计 _recItems 最频繁 source 标签, 真实显示
+  //   真凶: 之前 _buildRecommendationHeader 写死 'Live from 36氪' / 'The Verge'
+  //     → 实际可能是 TechCrunch/IT之家/Solidot/豆瓣 等 → 用户看到误导
+  //   修: 统计 _recItems 里出现最多的 source (rss_ prefix 的 item) → 显示真实来源
+  String? _getRealSourceLabel() {
+    final sourceCounts = <String, int>{};
+    for (final r in _recItems) {
+      if (!r.id.startsWith('rss_')) continue; // 只统计真 RSS, 不算精选兑底
+      // source 已带前缀 (如 'TechCrunch', 'IT之家', '豆瓣音乐' 等, 8/14 三次治本 fix)
+      final s = r.source;
+      if (s.isNotEmpty) sourceCounts[s] = (sourceCounts[s] ?? 0) + 1;
+    }
+    if (sourceCounts.isEmpty) return null; // 全是精选兑底, 不显示 Live 标签
+    // 找最频繁
+    final sorted = sourceCounts.entries.toList()
+      ..sort((a, b) => b.value.compareTo(a.value));
+    final topSource = sorted.first.key;
+    return isEn ? 'Live from $topSource' : '$topSource 实时';
+  }
+
   Widget _buildRecommendationHeader() {
     // 7/14 加: 显示 RSS 真数据来源 (国内 36 氪 / 国际 The Verge)
-    final hasRss = _recItems.any((r) => r.id.startsWith('rss_'));
-    final isIntl = widget.isInternational;
-    final sourceLabel = hasRss
-        ? (isIntl
-            ? 'Live from The Verge'
-            : 'Live from 36氪')
-        : null;
+    // 8/14 治本 (沿 SOUL #169 不撒谎): 写死 '36氪' 是错的
+    //   真凶: 之前写死 sourceLabel='Live from 36氪' / 'Live from The Verge'
+    //     → 实际可能 TechCrunch/IT之家/Solidot/豆瓣 等 → 用户看到误导
+    //   修: 统计 _recItems 最频繁的 source 标签, 真实显示
+    final sourceLabel = _getRealSourceLabel();
     return Row(
       mainAxisAlignment: MainAxisAlignment.spaceBetween,
       children: [

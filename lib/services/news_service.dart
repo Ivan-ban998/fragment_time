@@ -1,3 +1,4 @@
+import 'dart:math' as math;
 import 'package:flutter/foundation.dart';
 import '../config/runtime_mode.dart';
 import '../models/models.dart';
@@ -77,20 +78,25 @@ class NewsService {
       debugPrint('[news prod intl] ${userType.name}_${scene.name}: 真 RSS ${rss.length} (国际版不兑底)');
       return rss;
     }
+
     // 国内版: RSS 不足 6 → 真数据优先, stub 补齐, 标精选区分
     final combined = <ContentItem>[...rss];
     if (stub.isNotEmpty) {
       final need = 6 - combined.length;
-      final stubStart = (offset + userType.index * 7 + scene.index * 5) % stub.length;
-      for (var i = 0; i < need && i < stub.length; i++) {
-        final s = stub[(stubStart + i) % stub.length];
-        combined.add(_markAsCurated(s));
+      // 8/14 治本 (沿 SOUL #190 真改没改对 第 N+13 次): stub 切片用 shuffleSeed
+      //   真凶: 之前 (offset + userType.index * 7 + scene.index * 5) % stub.length
+      //     → stub 6 条 mod 6 = 永远同位置 (offset 0/6/12 都 = 0)
+      //     → "换 6 张" stub 4 条精选总是 4,5,6,1 (永远同)
+      //   修: 用 shuffleSeed (跟 rss 一致, force=true 不同 seed → 不同 stub 切片)
+      final shuffledStub = List<ContentItem>.from(stub);
+      shuffledStub.shuffle(math.Random(shuffleSeed * 1000 + userType.index * 7 + scene.index * 5));
+      for (var i = 0; i < need && i < shuffledStub.length; i++) {
+        combined.add(_markAsCurated(shuffledStub[i]));
       }
     }
     debugPrint('[news prod] ${userType.name}_${scene.name}: 真 RSS ${rss.length} + 精选 ${combined.length - rss.length} = ${combined.length}');
     return combined;
   }
-
   // 8/13 加 (沿 SOUL #188 透明原则): stub 项标"精选"让 UI 区分 Live vs 精选
   // ContentItem 无 copyWith, 重构整个对象 (immutable)
   ContentItem _markAsCurated(ContentItem orig) {
