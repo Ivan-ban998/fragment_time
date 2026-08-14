@@ -397,8 +397,11 @@ static const String _proxyBase = '/rss';
         final minLen = normTitle.length < seen.length ? normTitle.length : seen.length;
         final maxLen = normTitle.length > seen.length ? normTitle.length : seen.length;
         if (maxLen == 0) continue;
-        // 8/8 简化: 80% 长度比 (不象 KMP / Levenshtein, 但足以 catch 转发标题)
-        if (minLen / maxLen > 0.8) {
+        // 8/14 三次治本 (沿 SOUL #190): 阈值 0.8 → 0.95 (避免杀掉 NPR Music vs 豆瓣音乐 评同一专辑)
+        //   真凶: 之前 0.8 太宽, NPR "Kessel Plays Standards" 跟 豆瓣 "linernotes (评论: Kessel Plays Standards)"
+        //     → normalize 后长度比 > 0.8 → 被杀 → listen 5 真 RSS 变 4 (漏了一张)
+        //   修: 阈值 0.95, 只杀真重复 (转载/标题几乎一致)
+        if (minLen / maxLen > 0.95) {
           tooSimilar = true;
           break;
         }
