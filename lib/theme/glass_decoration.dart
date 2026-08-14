@@ -65,23 +65,23 @@ class GlassStyle {
   }) {
     if (dark) opacity = 0.5;
     return BoxDecoration(
-      color: Colors.white.withOpacity(opacity),
+      color: Colors.white.withValues(alpha: opacity),
       borderRadius: BorderRadius.circular(radius),
       // 6/14 双层边框：外圈细亮 + 内层柔
       border: Border.all(
-        color: borderColor ?? Colors.white.withOpacity(0.6),
+        color: borderColor ?? Colors.white.withValues(alpha: 0.6),
         width: 1.5,
       ),
       boxShadow: [
         // 主阴影
         BoxShadow(
-          color: Colors.black.withOpacity(0.12),
+          color: Colors.black.withValues(alpha: 0.12),
           blurRadius: 32,
           offset: const Offset(0, 8),
         ),
         // 6/14 高光：顶部细窄白边（模拟光打在玻璃上沿）
         BoxShadow(
-          color: Colors.white.withOpacity(0.5),
+          color: Colors.white.withValues(alpha: 0.5),
           blurRadius: 0.5,
           offset: const Offset(0, -0.5),
           spreadRadius: -0.5,
@@ -97,16 +97,16 @@ class GlassStyle {
     double radius = 20,
   }) {
     return BoxDecoration(
-      color: Colors.white.withOpacity(opacity),
+      color: Colors.white.withValues(alpha: opacity),
       borderRadius: BorderRadius.circular(radius),
       border: Border.all(
-        color: Colors.white.withOpacity(0.55),
+        color: Colors.white.withValues(alpha: 0.55),
         width: 1.5,
       ),
       // 7/19 fix v2: LinearGradient 全量清除 (shader null 真凶)
       boxShadow: [
         BoxShadow(
-          color: Colors.black.withOpacity(0.1),
+          color: Colors.black.withValues(alpha: 0.1),
           blurRadius: 24,
           offset: const Offset(0, 6),
         ),
@@ -121,10 +121,10 @@ class GlassStyle {
     double radius = 16,
   }) {
     return BoxDecoration(
-      color: Colors.white.withOpacity(opacity),
+      color: Colors.white.withValues(alpha: opacity),
       borderRadius: BorderRadius.circular(radius),
       border: Border.all(
-        color: Colors.white.withOpacity(0.4),
+        color: Colors.white.withValues(alpha: 0.4),
         width: 1.2,
       ),
     );
@@ -136,10 +136,10 @@ class GlassStyle {
     double radius = 20,
   }) {
     return BoxDecoration(
-      color: Colors.white.withOpacity(opacity),
+      color: Colors.white.withValues(alpha: opacity),
       borderRadius: BorderRadius.circular(radius),
       border: Border.all(
-        color: Colors.white.withOpacity(0.2),
+        color: Colors.white.withValues(alpha: 0.2),
         width: 1,
       ),
     );
@@ -177,8 +177,8 @@ class GlassStyle {
   static Color sheetBg(BuildContext c) {
     final isDark = Theme.of(c).brightness == Brightness.dark;
     return isDark
-        ? const Color(0xFF1F1F2E).withOpacity(0.96)
-        : Colors.white.withOpacity(0.96);
+        ? const Color(0xFF1F1F2E).withValues(alpha: 0.96)
+        : Colors.white.withValues(alpha: 0.96);
   }
 
   // 6/29: 聊天 sheet 输入区背景
@@ -201,22 +201,22 @@ class GlassStyle {
   // 胶囊底部导航背景 (全宽,圆角 28)
   static BoxDecoration glassCapsule({double radius = 28}) {
     return BoxDecoration(
-      color: Colors.white.withOpacity(0.4),
+      color: Colors.white.withValues(alpha: 0.4),
       borderRadius: BorderRadius.circular(radius),
       border: Border.all(
-        color: Colors.white.withOpacity(0.55),
+        color: Colors.white.withValues(alpha: 0.55),
         width: 1.2,
       ),
       boxShadow: [
         // 接触阴影
         BoxShadow(
-          color: Colors.black.withOpacity(0.12),
+          color: Colors.black.withValues(alpha: 0.12),
           blurRadius: 24,
           offset: const Offset(0, 8),
         ),
         // 顶部高光
         BoxShadow(
-          color: Colors.white.withOpacity(0.6),
+          color: Colors.white.withValues(alpha: 0.6),
           blurRadius: 0.5,
           offset: const Offset(0, -0.5),
           spreadRadius: -0.5,
@@ -230,23 +230,23 @@ class GlassStyle {
     final c = base ?? accent;
     return BoxDecoration(
       // 7/19 fix v2: LinearGradient 全量清除
-      color: c.withOpacity(0.75),
+      color: c.withValues(alpha: 0.75),
       borderRadius: BorderRadius.circular(radius),
       border: Border.all(
-        color: Colors.white.withOpacity(0.4),
+        color: Colors.white.withValues(alpha: 0.4),
         width: 1.2,
       ),
       boxShadow: [
         // 外发光
         BoxShadow(
-          color: c.withOpacity(0.4),
+          color: c.withValues(alpha: 0.4),
           blurRadius: 16,
           spreadRadius: 0,
           offset: const Offset(0, 4),
         ),
         // 顶部高光
         BoxShadow(
-          color: Colors.white.withOpacity(0.5),
+          color: Colors.white.withValues(alpha: 0.5),
           blurRadius: 0.5,
           offset: const Offset(0, -0.5),
         ),
@@ -262,21 +262,21 @@ class GlassStyle {
   }) {
     return BoxDecoration(
       // 7/19 fix v2: LinearGradient 全量清除
-      color: Colors.white.withOpacity(opacity + 0.05),
+      color: Colors.white.withValues(alpha: opacity + 0.05),
       borderRadius: BorderRadius.circular(radius),
       border: Border.all(
-        color: borderColor ?? Colors.white.withOpacity(0.5),
+        color: borderColor ?? Colors.white.withValues(alpha: 0.5),
         width: 1.5,
       ),
       boxShadow: [
         BoxShadow(
-          color: Colors.black.withOpacity(0.15),
+          color: Colors.black.withValues(alpha: 0.15),
           blurRadius: 12,
           offset: const Offset(0, 4),
         ),
         // 顶高光
         BoxShadow(
-          color: Colors.white.withOpacity(0.7),
+          color: Colors.white.withValues(alpha: 0.7),
           blurRadius: 0.5,
           offset: const Offset(0, -0.5),
           spreadRadius: -0.5,
@@ -288,17 +288,17 @@ class GlassStyle {
   // 顶部弧形高光（贴 Liquid 玻璃上沿）
   // 7/19 fix v2: LinearGradient 全量清除, 改返兑底半透明色
   static Color liquidTopHighlight({double opacity = 0.5}) {
-    return Colors.white.withOpacity(opacity * 0.6);
+    return Colors.white.withValues(alpha: opacity * 0.6);
   }
 
   // 6/15 场景背景柔化 (LinearGradient 全量清除 → 改兑底半透明色)
   // 8/7 改 (沿 SOUL #137 真凶): 亮背景兑白 + 暗背景兑黑 (theme-aware)
-  //   真凶: sceneBackgroundOverlay 永远返 Colors.white.withOpacity(0.18)
+  //   真凶: sceneBackgroundOverlay 永远返 Colors.white.withValues(alpha: 0.18)
   //     → dark theme 下叠上去仍近黑 (沿 #137 #160 撞: 6/28 Brien 反馈 '手机总是黑黑')
   //   修法: 加 dark 参数 → SceneScreen 传 Theme.of(c).brightness == dark
   static Color sceneBackgroundOverlay({double opacity = 0.18, bool dark = false}) {
-    if (dark) return Colors.black.withOpacity(opacity);
-    return Colors.white.withOpacity(opacity);
+    if (dark) return Colors.black.withValues(alpha: opacity);
+    return Colors.white.withValues(alpha: opacity);
   }
 
   // 6/14 v5: 亮背景下玻璃卡 (暗边框 + 深阴影, 玻璃感靠轮廓不是白度)
@@ -306,18 +306,18 @@ class GlassStyle {
   static BoxDecoration glassCardOnLight({double opacity = 0.65, double radius = 20, bool dark = false}) {
     if (dark) {
       // 8/7 暗色版: 深灰叠 + 亮边 + 蓝低阴影, 兑底 surface=0xFF1C1B1F (深黑灰)
-      //   真凶: 之前在暗色下永远返 Colors.white.withOpacity(0.65) 浅白糊在黑底 = 看上去像 "贴白纸"
+      //   真凶: 之前在暗色下永远返 Colors.white.withValues(alpha: 0.65) 浅白糊在黑底 = 看上去像 "贴白纸"
       //   修法: 暗色下用深灰叠 + 浅蓝边框, 兑底颜色更和谐
       return BoxDecoration(
-        color: const Color(0xFF2A2830).withOpacity(opacity * 0.9),
+        color: const Color(0xFF2A2830).withValues(alpha: opacity * 0.9),
         borderRadius: BorderRadius.circular(radius),
         border: Border.all(
-          color: Colors.white.withOpacity(0.16),
+          color: Colors.white.withValues(alpha: 0.16),
           width: 1.0,
         ),
         boxShadow: [
           BoxShadow(
-            color: Colors.black.withOpacity(0.40),
+            color: Colors.black.withValues(alpha: 0.40),
             blurRadius: 24,
             offset: const Offset(0, 6),
           ),
@@ -325,20 +325,20 @@ class GlassStyle {
       );
     }
     return BoxDecoration(
-      color: Colors.white.withOpacity(opacity),
+      color: Colors.white.withValues(alpha: opacity),
       borderRadius: BorderRadius.circular(radius),
       border: Border.all(
-        color: Colors.black.withOpacity(0.06),
+        color: Colors.black.withValues(alpha: 0.06),
         width: 1.0,
       ),
       boxShadow: [
         BoxShadow(
-          color: Colors.black.withOpacity(0.10),
+          color: Colors.black.withValues(alpha: 0.10),
           blurRadius: 24,
           offset: const Offset(0, 6),
         ),
         BoxShadow(
-          color: Colors.white.withOpacity(0.8),
+          color: Colors.white.withValues(alpha: 0.8),
           blurRadius: 0.5,
           offset: const Offset(0, -0.5),
           spreadRadius: -0.5,
@@ -351,7 +351,7 @@ class GlassStyle {
   // 之前 AppBar 无 backgroundColor/foregroundColor = 透明 + theme 默认色
   // 在杏橘/content 背景下 leading Icons.arrow_back 几乎不可见
   // 用法: AppBar(backgroundColor: GlassStyle.glassAppBarBg(), foregroundColor: GlassStyle.glassAppBarFg(), elevation: 0.5, leading: ...)
-  static Color get glassAppBarBg => Colors.white.withOpacity(0.85);
+  static Color get glassAppBarBg => Colors.white.withValues(alpha: 0.85);
   static Color get glassAppBarFg => AppTheme.primary;  // #6750A4 紫
   static double get glassAppBarElevation => 0.5;
 }

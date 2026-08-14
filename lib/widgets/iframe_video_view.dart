@@ -74,7 +74,7 @@ class _IframeVideoViewState extends State<IframeVideoView> {
             const SizedBox(height: 8),
             Text(
               'Opening in browser...',
-              style: TextStyle(color: Colors.white.withOpacity(0.7), fontSize: 12),
+              style: TextStyle(color: Colors.white.withValues(alpha: 0.7), fontSize: 12),
             ),
           ],
         ),

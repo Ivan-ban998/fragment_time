@@ -111,7 +111,7 @@ class _HistoryScreenState extends State<HistoryScreen> {
                     child: Column(
                       mainAxisAlignment: MainAxisAlignment.center,
                       children: [
-                        Icon(Icons.history, size: 64 * scale, color: AppTheme.textLight.withOpacity(0.4)),
+                        Icon(Icons.history, size: 64 * scale, color: AppTheme.textLight.withValues(alpha: 0.4)),
                         SizedBox(height: 16 * scale),
                         Text(
                           isEn ? 'No history yet' : '还没有阅读记录',

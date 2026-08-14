@@ -248,8 +248,8 @@ class _MySubscriptionsScreenState extends State<MySubscriptionsScreen>
     return Container(
       padding: EdgeInsets.fromLTRB(16 * scale, 8 * scale, 16 * scale, 8 * scale),
       decoration: BoxDecoration(
-        color: Colors.white.withOpacity(0.85),
-        border: Border(bottom: BorderSide(color: AppTheme.textLight.withOpacity(0.15), width: 0.5)),
+        color: Colors.white.withValues(alpha: 0.85),
+        border: Border(bottom: BorderSide(color: AppTheme.textLight.withValues(alpha: 0.15), width: 0.5)),
       ),
       child: TextField(
         controller: _searchCtrl,
@@ -273,7 +273,7 @@ class _MySubscriptionsScreenState extends State<MySubscriptionsScreen>
           isDense: true,
           contentPadding: EdgeInsets.symmetric(horizontal: 12 * scale, vertical: 8 * scale),
           filled: true,
-          fillColor: AppTheme.textLight.withOpacity(0.06),
+          fillColor: AppTheme.textLight.withValues(alpha: 0.06),
           border: OutlineInputBorder(
             borderRadius: BorderRadius.circular(20),
             borderSide: BorderSide.none,
@@ -651,7 +651,7 @@ class _MySubscriptionsScreenState extends State<MySubscriptionsScreen>
   }) {
     final c = _sourceColor(source);
     return Material(
-      color: c.withOpacity(0.12),
+      color: c.withValues(alpha: 0.12),
       borderRadius: BorderRadius.circular(20),
       child: InkWell(
         borderRadius: BorderRadius.circular(20),
@@ -660,7 +660,7 @@ class _MySubscriptionsScreenState extends State<MySubscriptionsScreen>
           padding: EdgeInsets.symmetric(horizontal: 12 * scale, vertical: 7 * scale),
           decoration: BoxDecoration(
             borderRadius: BorderRadius.circular(20),
-            border: Border.all(color: c.withOpacity(0.35), width: 1),
+            border: Border.all(color: c.withValues(alpha: 0.35), width: 1),
           ),
           child: Row(
             mainAxisSize: MainAxisSize.min,
@@ -702,7 +702,7 @@ class _MySubscriptionsScreenState extends State<MySubscriptionsScreen>
   }) {
     const c = AppTheme.secondary;
     return Material(
-      color: c.withOpacity(0.10),
+      color: c.withValues(alpha: 0.10),
       borderRadius: BorderRadius.circular(20),
       child: InkWell(
         borderRadius: BorderRadius.circular(20),
@@ -711,7 +711,7 @@ class _MySubscriptionsScreenState extends State<MySubscriptionsScreen>
           padding: EdgeInsets.symmetric(horizontal: 12 * scale, vertical: 7 * scale),
           decoration: BoxDecoration(
             borderRadius: BorderRadius.circular(20),
-            border: Border.all(color: c.withOpacity(0.35), width: 1),
+            border: Border.all(color: c.withValues(alpha: 0.35), width: 1),
           ),
           child: Row(
             mainAxisSize: MainAxisSize.min,
@@ -759,7 +759,7 @@ class _MySubscriptionsScreenState extends State<MySubscriptionsScreen>
         borderRadius: BorderRadius.circular(24),
         boxShadow: [
           BoxShadow(
-            color: const Color(0xFF7C5CFC).withOpacity(0.25),
+            color: const Color(0xFF7C5CFC).withValues(alpha: 0.25),
             blurRadius: 16,
             offset: const Offset(0, 4),
           ),
@@ -772,9 +772,9 @@ class _MySubscriptionsScreenState extends State<MySubscriptionsScreen>
             width: 56 * s,
             height: 56 * s,
             decoration: BoxDecoration(
-              color: Colors.white.withOpacity(0.2),
+              color: Colors.white.withValues(alpha: 0.2),
               shape: BoxShape.circle,
-              border: Border.all(color: Colors.white.withOpacity(0.5), width: 2),
+              border: Border.all(color: Colors.white.withValues(alpha: 0.5), width: 2),
             ),
             alignment: Alignment.center,
             child: Icon(Icons.notifications_active, color: Colors.white, size: 24 * s),
@@ -787,7 +787,7 @@ class _MySubscriptionsScreenState extends State<MySubscriptionsScreen>
                 Text(
                   isEn ? 'My Following' : '我关注了',
                   style: TextStyle(
-                    color: Colors.white.withOpacity(0.92),
+                    color: Colors.white.withValues(alpha: 0.92),
                     fontSize: 12 * s,
                     fontWeight: FontWeight.w600,
                   ),
@@ -806,7 +806,7 @@ class _MySubscriptionsScreenState extends State<MySubscriptionsScreen>
                     SizedBox(width: 4 * s),
                     Text(
                       isEn ? 'platforms' : '个平台',
-                      style: TextStyle(color: Colors.white.withOpacity(0.85), fontSize: 13 * s),
+                      style: TextStyle(color: Colors.white.withValues(alpha: 0.85), fontSize: 13 * s),
                     ),
                     SizedBox(width: 14 * s),
                     Text(
@@ -820,7 +820,7 @@ class _MySubscriptionsScreenState extends State<MySubscriptionsScreen>
                     SizedBox(width: 4 * s),
                     Text(
                       isEn ? 'categories' : '个类目',
-                      style: TextStyle(color: Colors.white.withOpacity(0.85), fontSize: 13 * s),
+                      style: TextStyle(color: Colors.white.withValues(alpha: 0.85), fontSize: 13 * s),
                     ),
                   ],
                 ),
@@ -902,9 +902,9 @@ class _MySubscriptionsScreenState extends State<MySubscriptionsScreen>
       margin: EdgeInsets.only(bottom: 8 * s),
       padding: EdgeInsets.symmetric(vertical: 12 * s, horizontal: 8 * s),
       decoration: BoxDecoration(
-        color: AppTheme.primary.withOpacity(0.04),
+        color: AppTheme.primary.withValues(alpha: 0.04),
         borderRadius: BorderRadius.circular(14),
-        border: Border.all(color: AppTheme.primary.withOpacity(0.12)),
+        border: Border.all(color: AppTheme.primary.withValues(alpha: 0.12)),
       ),
       child: Row(
         children: [
@@ -914,7 +914,7 @@ class _MySubscriptionsScreenState extends State<MySubscriptionsScreen>
             decoration: BoxDecoration(
               color: Colors.white,
               shape: BoxShape.circle,
-              border: Border.all(color: sourceColor.withOpacity(0.4), width: 1.5),
+              border: Border.all(color: sourceColor.withValues(alpha: 0.4), width: 1.5),
             ),
             alignment: Alignment.center,
             child: Icon(sourceObj.icon, color: sourceColor, size: 18 * s),
@@ -952,9 +952,9 @@ class _MySubscriptionsScreenState extends State<MySubscriptionsScreen>
       margin: EdgeInsets.only(bottom: 8 * s),
       padding: EdgeInsets.symmetric(vertical: 12 * s, horizontal: 8 * s),
       decoration: BoxDecoration(
-        color: AppTheme.primary.withOpacity(0.04),
+        color: AppTheme.primary.withValues(alpha: 0.04),
         borderRadius: BorderRadius.circular(14),
-        border: Border.all(color: AppTheme.primary.withOpacity(0.12)),
+        border: Border.all(color: AppTheme.primary.withValues(alpha: 0.12)),
       ),
       child: Row(
         children: [
@@ -964,7 +964,7 @@ class _MySubscriptionsScreenState extends State<MySubscriptionsScreen>
             decoration: BoxDecoration(
               color: Colors.white,
               shape: BoxShape.circle,
-              border: Border.all(color: AppTheme.primary.withOpacity(0.4), width: 1.5),
+              border: Border.all(color: AppTheme.primary.withValues(alpha: 0.4), width: 1.5),
             ),
             alignment: Alignment.center,
             child: Icon(Icons.local_offer, color: AppTheme.primary, size: 18 * s),
@@ -997,7 +997,7 @@ class _MySubscriptionsScreenState extends State<MySubscriptionsScreen>
         child: Column(
           mainAxisAlignment: MainAxisAlignment.center,
           children: [
-            Icon(Icons.subscriptions_outlined, size: 80 * scale, color: AppTheme.textLight.withOpacity(0.4)),
+            Icon(Icons.subscriptions_outlined, size: 80 * scale, color: AppTheme.textLight.withValues(alpha: 0.4)),
             SizedBox(height: 24 * scale),
             Text(
               isEn ? 'No platforms or categories followed yet' : '还没有关注任何平台 / 类目',
@@ -1074,7 +1074,7 @@ class _MySubscriptionsScreenState extends State<MySubscriptionsScreen>
         child: Column(
           mainAxisAlignment: MainAxisAlignment.center,
           children: [
-            Icon(Icons.search_off, size: 48 * scale, color: AppTheme.textLight.withOpacity(0.5)),
+            Icon(Icons.search_off, size: 48 * scale, color: AppTheme.textLight.withValues(alpha: 0.5)),
             SizedBox(height: 12 * scale),
             Text(
               isEn ? 'No matches for "${_searchQuery}"' : '没找到包含 "${_searchQuery}" 的收藏',
@@ -1104,7 +1104,7 @@ class _MySubscriptionsScreenState extends State<MySubscriptionsScreen>
         child: Column(
           mainAxisAlignment: MainAxisAlignment.center,
           children: [
-            Icon(Icons.bookmark_border, size: 64 * scale, color: AppTheme.textLight.withOpacity(0.4)),
+            Icon(Icons.bookmark_border, size: 64 * scale, color: AppTheme.textLight.withValues(alpha: 0.4)),
             SizedBox(height: 16 * scale),
             Text(
               msg,
@@ -1180,7 +1180,7 @@ class _SubscribedCard extends StatelessWidget {
                   Container(
                     padding: EdgeInsets.symmetric(horizontal: 6, vertical: 2),
                     decoration: BoxDecoration(
-                      color: item.priceType.color.withOpacity(0.1),
+                      color: item.priceType.color.withValues(alpha: 0.1),
                       borderRadius: BorderRadius.circular(4),
                     ),
                     child: Text(
@@ -1277,7 +1277,7 @@ class _QuoteHeroCard extends StatelessWidget {
           borderRadius: BorderRadius.circular(24),
           boxShadow: [
             BoxShadow(
-              color: const Color(0xFF7C5CFC).withOpacity(0.25),
+              color: const Color(0xFF7C5CFC).withValues(alpha: 0.25),
               blurRadius: 16,
               offset: const Offset(0, 4),
             ),
@@ -1296,7 +1296,7 @@ class _QuoteHeroCard extends StatelessWidget {
                 Text(
                   isEn ? 'Latest saved quote' : '刚收藏的名言',
                   style: TextStyle(
-                    color: Colors.white.withOpacity(0.92),
+                    color: Colors.white.withValues(alpha: 0.92),
                     fontSize: 11 * scale,
                     fontWeight: FontWeight.w600,
                   ),
@@ -1305,7 +1305,7 @@ class _QuoteHeroCard extends StatelessWidget {
                 Container(
                   padding: EdgeInsets.symmetric(horizontal: 8 * scale, vertical: 2 * scale),
                   decoration: BoxDecoration(
-                    color: Colors.white.withOpacity(0.18),
+                    color: Colors.white.withValues(alpha: 0.18),
                     borderRadius: BorderRadius.circular(12),
                   ),
                   child: Text(
@@ -1334,9 +1334,9 @@ class _QuoteHeroCard extends StatelessWidget {
                   width: 44 * scale,
                   height: 44 * scale,
                   decoration: BoxDecoration(
-                    color: Colors.white.withOpacity(0.2),
+                    color: Colors.white.withValues(alpha: 0.2),
                     shape: BoxShape.circle,
-                    border: Border.all(color: Colors.white.withOpacity(0.5), width: 2),
+                    border: Border.all(color: Colors.white.withValues(alpha: 0.5), width: 2),
                   ),
                   alignment: Alignment.center,
                   child: Text(
@@ -1371,7 +1371,7 @@ class _QuoteHeroCard extends StatelessWidget {
                           child: Text(
                             latest.description!,
                             style: TextStyle(
-                              color: Colors.white.withOpacity(0.95),
+                              color: Colors.white.withValues(alpha: 0.95),
                               fontSize: 13 * scale,
                               fontStyle: FontStyle.italic,
                               height: 1.4,
@@ -1389,16 +1389,16 @@ class _QuoteHeroCard extends StatelessWidget {
             // 底部: 日期 + 阅读时长
             Row(
               children: [
-                Icon(Icons.access_time, color: Colors.white.withOpacity(0.7), size: 12 * scale),
+                Icon(Icons.access_time, color: Colors.white.withValues(alpha: 0.7), size: 12 * scale),
                 SizedBox(width: 4 * scale),
                 Text(
                   '《收藏于 ${d.month}月${d.day}日》',
-                  style: TextStyle(color: Colors.white.withOpacity(0.7), fontSize: 10 * scale),
+                  style: TextStyle(color: Colors.white.withValues(alpha: 0.7), fontSize: 10 * scale),
                 ),
                 const Spacer(),
                 Text(
                   '“${latest.duration}”',
-                  style: TextStyle(color: Colors.white.withOpacity(0.65), fontSize: 10 * scale),
+                  style: TextStyle(color: Colors.white.withValues(alpha: 0.65), fontSize: 10 * scale),
                 ),
               ],
             ),
@@ -1456,9 +1456,9 @@ class _QuoteTimelineItem extends StatelessWidget {
               width: 40 * scale,
               height: 40 * scale,
               decoration: BoxDecoration(
-                color: const Color(0xFF7C5CFC).withOpacity(0.12),
+                color: const Color(0xFF7C5CFC).withValues(alpha: 0.12),
                 shape: BoxShape.circle,
-                border: Border.all(color: const Color(0xFF7C5CFC).withOpacity(0.3), width: 1),
+                border: Border.all(color: const Color(0xFF7C5CFC).withValues(alpha: 0.3), width: 1),
               ),
               alignment: Alignment.center,
               child: Text(
@@ -1491,7 +1491,7 @@ class _QuoteTimelineItem extends StatelessWidget {
                         padding: EdgeInsets.symmetric(horizontal: 6 * scale, vertical: 2 * scale),
                         margin: EdgeInsets.only(right: 6 * scale),
                         decoration: BoxDecoration(
-                          color: const Color(0xFF7C5CFC).withOpacity(0.12),
+                          color: const Color(0xFF7C5CFC).withValues(alpha: 0.12),
                           borderRadius: BorderRadius.circular(8),
                         ),
                         child: Row(
@@ -1581,7 +1581,7 @@ class _ContentHeroCard extends StatelessWidget {
             borderRadius: BorderRadius.circular(24),
             boxShadow: [
               BoxShadow(
-                color: const Color(0xFF7C5CFC).withOpacity(0.25),
+                color: const Color(0xFF7C5CFC).withValues(alpha: 0.25),
                 blurRadius: 16,
                 offset: const Offset(0, 4),
               ),
@@ -1599,7 +1599,7 @@ class _ContentHeroCard extends StatelessWidget {
                   Text(
                     isEn ? 'Latest saved content' : '刚收藏的内容',
                     style: TextStyle(
-                      color: Colors.white.withOpacity(0.92),
+                      color: Colors.white.withValues(alpha: 0.92),
                       fontSize: 11 * s,
                       fontWeight: FontWeight.w600,
                     ),
@@ -1608,7 +1608,7 @@ class _ContentHeroCard extends StatelessWidget {
                   Container(
                     padding: EdgeInsets.symmetric(horizontal: 8 * s, vertical: 2 * s),
                     decoration: BoxDecoration(
-                      color: Colors.white.withOpacity(0.18),
+                      color: Colors.white.withValues(alpha: 0.18),
                       borderRadius: BorderRadius.circular(12),
                     ),
                     child: Text(
@@ -1640,7 +1640,7 @@ class _ContentHeroCard extends StatelessWidget {
                       shape: BoxShape.circle,
                       boxShadow: [
                         BoxShadow(
-                          color: sourceColor.withOpacity(0.4),
+                          color: sourceColor.withValues(alpha: 0.4),
                           blurRadius: 8,
                           offset: const Offset(0, 2),
                         ),
@@ -1670,22 +1670,22 @@ class _ContentHeroCard extends StatelessWidget {
                         // 副: 时长 + source + 内容类型
                         Row(
                           children: [
-                            Icon(Icons.access_time, color: Colors.white.withOpacity(0.7), size: 11 * s),
+                            Icon(Icons.access_time, color: Colors.white.withValues(alpha: 0.7), size: 11 * s),
                             SizedBox(width: 3 * s),
                             Text(
                               latest.duration,
-                              style: TextStyle(color: Colors.white.withOpacity(0.85), fontSize: 10 * s),
+                              style: TextStyle(color: Colors.white.withValues(alpha: 0.85), fontSize: 10 * s),
                             ),
                             SizedBox(width: 6 * s),
                             Text(
                               '• ${latest.source}',
-                              style: TextStyle(color: Colors.white.withOpacity(0.85), fontSize: 10 * s),
+                              style: TextStyle(color: Colors.white.withValues(alpha: 0.85), fontSize: 10 * s),
                             ),
                             SizedBox(width: 6 * s),
                             Container(
                               padding: EdgeInsets.symmetric(horizontal: 6 * s, vertical: 1 * s),
                               decoration: BoxDecoration(
-                                color: Colors.white.withOpacity(0.18),
+                                color: Colors.white.withValues(alpha: 0.18),
                                 borderRadius: BorderRadius.circular(6),
                               ),
                               child: Text(
@@ -1704,11 +1704,11 @@ class _ContentHeroCard extends StatelessWidget {
               // 底部: 收藏日期
               Row(
                 children: [
-                  Icon(Icons.bookmark, color: Colors.white.withOpacity(0.7), size: 13 * s),
+                  Icon(Icons.bookmark, color: Colors.white.withValues(alpha: 0.7), size: 13 * s),
                   SizedBox(width: 4 * s),
                   Text(
                     '《收藏于 ${d.month}月${d.day}日》',
-                    style: TextStyle(color: Colors.white.withOpacity(0.7), fontSize: 11 * s),
+                    style: TextStyle(color: Colors.white.withValues(alpha: 0.7), fontSize: 11 * s),
                   ),
                 ],
               ),
@@ -1763,9 +1763,9 @@ class _ContentTimelineItem extends StatelessWidget {
         margin: EdgeInsets.only(bottom: 8 * s),
         padding: EdgeInsets.symmetric(vertical: 12 * s, horizontal: 8 * s),
         decoration: BoxDecoration(
-          color: AppTheme.primary.withOpacity(0.04),
+          color: AppTheme.primary.withValues(alpha: 0.04),
           borderRadius: BorderRadius.circular(14),
-          border: Border.all(color: AppTheme.primary.withOpacity(0.12)),
+          border: Border.all(color: AppTheme.primary.withValues(alpha: 0.12)),
         ),
         child: Row(
           crossAxisAlignment: CrossAxisAlignment.start,
@@ -1777,7 +1777,7 @@ class _ContentTimelineItem extends StatelessWidget {
               decoration: BoxDecoration(
                 color: Colors.white,
                 shape: BoxShape.circle,
-                border: Border.all(color: sourceColor.withOpacity(0.4), width: 1.5),
+                border: Border.all(color: sourceColor.withValues(alpha: 0.4), width: 1.5),
               ),
               alignment: Alignment.center,
               child: Icon(item.sourceType.icon, color: sourceColor, size: 18 * s),
@@ -1802,7 +1802,7 @@ class _ContentTimelineItem extends StatelessWidget {
                         padding: EdgeInsets.symmetric(horizontal: 6 * s, vertical: 2 * s),
                         margin: EdgeInsets.only(right: 6 * s),
                         decoration: BoxDecoration(
-                          color: AppTheme.primary.withOpacity(0.12),
+                          color: AppTheme.primary.withValues(alpha: 0.12),
                           borderRadius: BorderRadius.circular(8),
                         ),
                         child: Row(

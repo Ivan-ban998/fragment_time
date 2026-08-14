@@ -484,12 +484,12 @@ class _ContentReaderScreenState extends State<ContentReaderScreen> {
     return Scaffold(
       appBar: AppBar(
         // 6/19 修: AppBar 玻璃背景 + 0.8 elevation, 返 回头箭头能看清
-        backgroundColor: Colors.white.withOpacity(0.85),
+        backgroundColor: Colors.white.withValues(alpha: 0.85),
         foregroundColor: AppTheme.primary,
         elevation: 0.5,
         // 6/19 修: leading 返 回头加圆形背景 + 深色, 杏橘背景下能看见
         leading: Material(
-          color: Colors.white.withOpacity(0.6),
+          color: Colors.white.withValues(alpha: 0.6),
           shape: const CircleBorder(),
           child: IconButton(
             icon: Icon(Icons.arrow_back, size: 24 * scale, color: AppTheme.primary),
@@ -595,9 +595,9 @@ class _ContentReaderScreenState extends State<ContentReaderScreen> {
                 margin: const EdgeInsets.only(bottom: 12),
                 padding: const EdgeInsets.all(10),
                 decoration: BoxDecoration(
-                  color: Colors.amber.withOpacity(0.12),
+                  color: Colors.amber.withValues(alpha: 0.12),
                   borderRadius: BorderRadius.circular(8),
-                  border: Border.all(color: Colors.amber.withOpacity(0.4)),
+                  border: Border.all(color: Colors.amber.withValues(alpha: 0.4)),
                 ),
                 child: Row(
                   children: [
@@ -620,9 +620,9 @@ class _ContentReaderScreenState extends State<ContentReaderScreen> {
                 margin: const EdgeInsets.only(bottom: 12),
                 padding: const EdgeInsets.all(10),
                 decoration: BoxDecoration(
-                  color: Colors.blue.withOpacity(0.08),
+                  color: Colors.blue.withValues(alpha: 0.08),
                   borderRadius: BorderRadius.circular(8),
-                  border: Border.all(color: Colors.blue.withOpacity(0.3)),
+                  border: Border.all(color: Colors.blue.withValues(alpha: 0.3)),
                 ),
                 child: Row(
                   children: [
@@ -655,7 +655,7 @@ class _ContentReaderScreenState extends State<ContentReaderScreen> {
                 Container(
                   padding: EdgeInsets.symmetric(horizontal: 8 * scale, vertical: 4 * scale),
                   decoration: BoxDecoration(
-                    color: AppTheme.primary.withOpacity(0.1),
+                    color: AppTheme.primary.withValues(alpha: 0.1),
                     borderRadius: BorderRadius.circular(6),
                   ),
                   child: Text(
@@ -687,7 +687,7 @@ class _ContentReaderScreenState extends State<ContentReaderScreen> {
                     child: Container(
                       padding: EdgeInsets.symmetric(horizontal: 6 * scale, vertical: 2 * scale),
                       decoration: BoxDecoration(
-                        color: AppTheme.primary.withOpacity(0.1),
+                        color: AppTheme.primary.withValues(alpha: 0.1),
                         borderRadius: BorderRadius.circular(6),
                       ),
                       child: Row(
@@ -730,9 +730,9 @@ class _ContentReaderScreenState extends State<ContentReaderScreen> {
             Container(
               padding: EdgeInsets.all(16 * scale),
               decoration: BoxDecoration(
-                color: AppTheme.primary.withOpacity(0.06),
+                color: AppTheme.primary.withValues(alpha: 0.06),
                 borderRadius: BorderRadius.circular(12),
-                border: Border.all(color: AppTheme.primary.withOpacity(0.15)),
+                border: Border.all(color: AppTheme.primary.withValues(alpha: 0.15)),
               ),
               child: Row(
                 crossAxisAlignment: CrossAxisAlignment.start,
@@ -740,7 +740,7 @@ class _ContentReaderScreenState extends State<ContentReaderScreen> {
                   Container(
                     padding: EdgeInsets.all(8 * scale),
                     decoration: BoxDecoration(
-                      color: AppTheme.primary.withOpacity(0.2),
+                      color: AppTheme.primary.withValues(alpha: 0.2),
                       shape: BoxShape.circle,
                     ),
                     child: Icon(Icons.auto_awesome, size: 20 * scale, color: AppTheme.primary),
@@ -792,9 +792,9 @@ class _ContentReaderScreenState extends State<ContentReaderScreen> {
             Container(
               padding: EdgeInsets.all(14 * scale),
               decoration: BoxDecoration(
-                color: AppTheme.primary.withOpacity(0.04),
+                color: AppTheme.primary.withValues(alpha: 0.04),
                 borderRadius: BorderRadius.circular(12),
-                border: Border.all(color: AppTheme.primary.withOpacity(0.15)),
+                border: Border.all(color: AppTheme.primary.withValues(alpha: 0.15)),
               ),
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
@@ -835,9 +835,9 @@ class _ContentReaderScreenState extends State<ContentReaderScreen> {
               Container(
                 padding: EdgeInsets.all(12 * scale),
                 decoration: BoxDecoration(
-                  color: AppTheme.primary.withOpacity(0.05),
+                  color: AppTheme.primary.withValues(alpha: 0.05),
                   borderRadius: BorderRadius.circular(12),
-                  border: Border.all(color: AppTheme.primary.withOpacity(0.2)),
+                  border: Border.all(color: AppTheme.primary.withValues(alpha: 0.2)),
                 ),
                 child: Row(
                   children: [
@@ -896,8 +896,8 @@ class _ContentReaderScreenState extends State<ContentReaderScreen> {
                 child: LinearProgressIndicator(
                   value: _isSpeaking ? value : 0,
                   minHeight: 4 * scale,
-                  backgroundColor: AppTheme.primary.withOpacity(0.1),
-                  valueColor: AlwaysStoppedAnimation<Color>(AppTheme.primary.withOpacity(0.7)),
+                  backgroundColor: AppTheme.primary.withValues(alpha: 0.1),
+                  valueColor: AlwaysStoppedAnimation<Color>(AppTheme.primary.withValues(alpha: 0.7)),
                 ),
               ),
             ),
@@ -908,9 +908,9 @@ class _ContentReaderScreenState extends State<ContentReaderScreen> {
                 padding: EdgeInsets.all(16 * scale),
                 margin: EdgeInsets.only(bottom: 16 * scale),
                 decoration: BoxDecoration(
-                  color: item.priceType.color.withOpacity(0.08),
+                  color: item.priceType.color.withValues(alpha: 0.08),
                   borderRadius: BorderRadius.circular(12),
-                  border: Border.all(color: item.priceType.color.withOpacity(0.3)),
+                  border: Border.all(color: item.priceType.color.withValues(alpha: 0.3)),
                 ),
                 child: Row(
                   children: [
@@ -1012,11 +1012,11 @@ class _ContentReaderScreenState extends State<ContentReaderScreen> {
       child: Container(
         padding: EdgeInsets.symmetric(horizontal: 10 * scale, vertical: 4 * scale),
         decoration: BoxDecoration(
-          color: AppTheme.primary.withOpacity(0.9),
+          color: AppTheme.primary.withValues(alpha: 0.9),
           borderRadius: BorderRadius.circular(12),
           boxShadow: [
             BoxShadow(
-              color: Colors.black.withOpacity(0.1),
+              color: Colors.black.withValues(alpha: 0.1),
               blurRadius: 6,
               offset: const Offset(0, 2),
             ),
@@ -1064,7 +1064,7 @@ class _ContentReaderScreenState extends State<ContentReaderScreen> {
           }
         },
         style: OutlinedButton.styleFrom(
-          side: BorderSide(color: AppTheme.primary.withOpacity(0.5)),
+          side: BorderSide(color: AppTheme.primary.withValues(alpha: 0.5)),
           padding: EdgeInsets.symmetric(vertical: 12 * scale),
           shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
         ),
@@ -1088,9 +1088,9 @@ class _ContentReaderScreenState extends State<ContentReaderScreen> {
       return Container(
         padding: EdgeInsets.all(16 * scale),
         decoration: BoxDecoration(
-          color: Colors.orange.withOpacity(0.08),
+          color: Colors.orange.withValues(alpha: 0.08),
           borderRadius: BorderRadius.circular(12),
-          border: Border.all(color: Colors.orange.withOpacity(0.3)),
+          border: Border.all(color: Colors.orange.withValues(alpha: 0.3)),
         ),
         child: Row(
           children: [
@@ -1163,9 +1163,9 @@ class _ContentReaderScreenState extends State<ContentReaderScreen> {
     return Container(
       padding: EdgeInsets.all(14 * scale),
       decoration: BoxDecoration(
-        color: AppTheme.primary.withOpacity(0.04),
+        color: AppTheme.primary.withValues(alpha: 0.04),
         borderRadius: BorderRadius.circular(12),
-        border: Border.all(color: AppTheme.primary.withOpacity(0.15)),
+        border: Border.all(color: AppTheme.primary.withValues(alpha: 0.15)),
       ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
@@ -1241,7 +1241,7 @@ class _ContentReaderScreenState extends State<ContentReaderScreen> {
             OutlinedButton.icon(
               onPressed: _generateAiSummary,
               style: OutlinedButton.styleFrom(
-                side: BorderSide(color: AppTheme.primary.withOpacity(0.4)),
+                side: BorderSide(color: AppTheme.primary.withValues(alpha: 0.4)),
                 padding: EdgeInsets.symmetric(horizontal: 12 * scale, vertical: 6 * scale),
                 minimumSize: Size.zero,
                 tapTargetSize: MaterialTapTargetSize.shrinkWrap,
@@ -1313,11 +1313,11 @@ class _ContentReaderScreenState extends State<ContentReaderScreen> {
     return Container(
       padding: EdgeInsets.symmetric(horizontal: 14 * scale, vertical: 10 * scale),
       decoration: BoxDecoration(
-        color: Colors.white.withOpacity(0.92),
+        color: Colors.white.withValues(alpha: 0.92),
         borderRadius: BorderRadius.circular(14),
-        border: Border.all(color: Colors.white.withOpacity(0.6), width: 1.2),
+        border: Border.all(color: Colors.white.withValues(alpha: 0.6), width: 1.2),
         boxShadow: [
-          BoxShadow(color: Colors.black.withOpacity(0.04), blurRadius: 8, offset: const Offset(0, 2)),
+          BoxShadow(color: Colors.black.withValues(alpha: 0.04), blurRadius: 8, offset: const Offset(0, 2)),
         ],
       ),
       child: Row(
@@ -1341,11 +1341,11 @@ class _ContentReaderScreenState extends State<ContentReaderScreen> {
     return Container(
       padding: EdgeInsets.symmetric(horizontal: 14 * scale, vertical: 10 * scale),
       decoration: BoxDecoration(
-        color: Colors.white.withOpacity(0.92),
+        color: Colors.white.withValues(alpha: 0.92),
         borderRadius: BorderRadius.circular(14),
-        border: Border.all(color: Colors.white.withOpacity(0.6), width: 1.2),
+        border: Border.all(color: Colors.white.withValues(alpha: 0.6), width: 1.2),
         boxShadow: [
-          BoxShadow(color: Colors.black.withOpacity(0.04), blurRadius: 8, offset: const Offset(0, 2)),
+          BoxShadow(color: Colors.black.withValues(alpha: 0.04), blurRadius: 8, offset: const Offset(0, 2)),
         ],
       ),
       child: Row(
@@ -1417,7 +1417,7 @@ class _ContentReaderScreenState extends State<ContentReaderScreen> {
         // 7/19 fix v2: LinearGradient 全量清除
         color: Colors.white,
         borderRadius: BorderRadius.circular(12),
-        border: Border.all(color: AppTheme.primary.withOpacity(0.3)),
+        border: Border.all(color: AppTheme.primary.withValues(alpha: 0.3)),
       ),
       child: Column(
         children: [
@@ -1462,7 +1462,7 @@ class _PriceBadgeWidget extends StatelessWidget {
     return Container(
       padding: EdgeInsets.symmetric(horizontal: 8 * scale, vertical: 4 * scale),
       decoration: BoxDecoration(
-        color: item.priceType.color.withOpacity(0.1),
+        color: item.priceType.color.withValues(alpha: 0.1),
         borderRadius: BorderRadius.circular(6),
       ),
       child: Text(
@@ -1542,7 +1542,7 @@ class _QuoteReadLayout extends StatelessWidget {
               borderRadius: BorderRadius.circular(24),
               boxShadow: [
                 BoxShadow(
-                  color: const Color(0xFF7C5CFC).withOpacity(0.25),
+                  color: const Color(0xFF7C5CFC).withValues(alpha: 0.25),
                   blurRadius: 16,
                   offset: const Offset(0, 4),
                 ),
@@ -1559,9 +1559,9 @@ class _QuoteReadLayout extends StatelessWidget {
                       width: 72 * scale,
                       height: 72 * scale,
                       decoration: BoxDecoration(
-                        color: Colors.white.withOpacity(0.2),
+                        color: Colors.white.withValues(alpha: 0.2),
                         shape: BoxShape.circle,
-                        border: Border.all(color: Colors.white.withOpacity(0.5), width: 2),
+                        border: Border.all(color: Colors.white.withValues(alpha: 0.5), width: 2),
                       ),
                       alignment: Alignment.center,
                       child: Text(
@@ -1586,7 +1586,7 @@ class _QuoteReadLayout extends StatelessWidget {
                               padding: EdgeInsets.only(top: 4 * scale),
                               child: Text(
                                 '《${source}》',
-                                style: TextStyle(color: Colors.white.withOpacity(0.85), fontSize: 14 * scale),
+                                style: TextStyle(color: Colors.white.withValues(alpha: 0.85), fontSize: 14 * scale),
                               ),
                             ),
                         ],
@@ -1610,11 +1610,11 @@ class _QuoteReadLayout extends StatelessWidget {
                 // 底部: 收藏时间
                 Row(
                   children: [
-                    Icon(Icons.bookmark, color: Colors.white.withOpacity(0.7), size: 14 * scale),
+                    Icon(Icons.bookmark, color: Colors.white.withValues(alpha: 0.7), size: 14 * scale),
                     SizedBox(width: 6 * scale),
                     Text(
                       '《收藏于 ${d.year}-${d.month.toString().padLeft(2, '0')}-${d.day.toString().padLeft(2, '0')}》',
-                      style: TextStyle(color: Colors.white.withOpacity(0.7), fontSize: 11 * scale),
+                      style: TextStyle(color: Colors.white.withValues(alpha: 0.7), fontSize: 11 * scale),
                     ),
                   ],
                 ),
@@ -1626,9 +1626,9 @@ class _QuoteReadLayout extends StatelessWidget {
           Container(
             padding: EdgeInsets.all(16 * scale),
             decoration: BoxDecoration(
-              color: AppTheme.primary.withOpacity(0.04),
+              color: AppTheme.primary.withValues(alpha: 0.04),
               borderRadius: BorderRadius.circular(12),
-              border: Border.all(color: AppTheme.primary.withOpacity(0.15)),
+              border: Border.all(color: AppTheme.primary.withValues(alpha: 0.15)),
             ),
             child: Row(
               children: [
@@ -1711,7 +1711,7 @@ class _QuoteReadLayout extends StatelessWidget {
               ),
               style: OutlinedButton.styleFrom(
                 padding: EdgeInsets.symmetric(vertical: 12 * scale),
-                side: BorderSide(color: const Color(0xFF7C5CFC).withOpacity(0.4)),
+                side: BorderSide(color: const Color(0xFF7C5CFC).withValues(alpha: 0.4)),
                 shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
               ),
             ),
@@ -1769,9 +1769,9 @@ class _QuoteTtsSectionState extends State<_QuoteTtsSection> {
     return Container(
       padding: EdgeInsets.all(12 * widget.scale),
       decoration: BoxDecoration(
-        color: AppTheme.primary.withOpacity(0.05),
+        color: AppTheme.primary.withValues(alpha: 0.05),
         borderRadius: BorderRadius.circular(12),
-        border: Border.all(color: AppTheme.primary.withOpacity(0.2)),
+        border: Border.all(color: AppTheme.primary.withValues(alpha: 0.2)),
       ),
       child: Row(
         children: [
@@ -1864,9 +1864,9 @@ class _QuoteHistorySectionState extends State<_QuoteHistorySection> {
     return Container(
       padding: EdgeInsets.all(14 * s),
       decoration: BoxDecoration(
-        color: AppTheme.secondary.withOpacity(0.04),
+        color: AppTheme.secondary.withValues(alpha: 0.04),
         borderRadius: BorderRadius.circular(12),
-        border: Border.all(color: AppTheme.secondary.withOpacity(0.15)),
+        border: Border.all(color: AppTheme.secondary.withValues(alpha: 0.15)),
       ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
@@ -1948,9 +1948,9 @@ class _QuoteExtendedSectionState extends State<_QuoteExtendedSection> {
     return Container(
       padding: EdgeInsets.all(14 * s),
       decoration: BoxDecoration(
-        color: Colors.amber.withOpacity(0.05),
+        color: Colors.amber.withValues(alpha: 0.05),
         borderRadius: BorderRadius.circular(12),
-        border: Border.all(color: Colors.amber.withOpacity(0.25)),
+        border: Border.all(color: Colors.amber.withValues(alpha: 0.25)),
       ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
@@ -2036,9 +2036,9 @@ class _QuoteH3VideoSectionState extends State<_QuoteH3VideoSection> {
     return Container(
       padding: EdgeInsets.all(14 * s),
       decoration: BoxDecoration(
-        color: const Color(0xFF7C5CFC).withOpacity(0.04),
+        color: const Color(0xFF7C5CFC).withValues(alpha: 0.04),
         borderRadius: BorderRadius.circular(12),
-        border: Border.all(color: const Color(0xFF7C5CFC).withOpacity(0.25)),
+        border: Border.all(color: const Color(0xFF7C5CFC).withValues(alpha: 0.25)),
       ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
@@ -2085,7 +2085,7 @@ class _QuoteH3VideoSectionState extends State<_QuoteH3VideoSection> {
                 : (widget.isEn ? 'Preview (placeholder)' : '预览 (占位)')),
             style: OutlinedButton.styleFrom(
               foregroundColor: const Color(0xFF7C5CFC),
-              side: BorderSide(color: const Color(0xFF7C5CFC).withOpacity(0.4)),
+              side: BorderSide(color: const Color(0xFF7C5CFC).withValues(alpha: 0.4)),
               padding: EdgeInsets.symmetric(vertical: 8 * s),
               shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
             ),
@@ -2136,9 +2136,9 @@ class _QuoteAiSummarySectionState extends State<_QuoteAiSummarySection> {
     return Container(
       padding: EdgeInsets.all(14 * widget.scale),
       decoration: BoxDecoration(
-        color: AppTheme.primary.withOpacity(0.04),
+        color: AppTheme.primary.withValues(alpha: 0.04),
         borderRadius: BorderRadius.circular(12),
-        border: Border.all(color: AppTheme.primary.withOpacity(0.15)),
+        border: Border.all(color: AppTheme.primary.withValues(alpha: 0.15)),
       ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
@@ -2290,7 +2290,7 @@ class _QuoteRelatedSectionState extends State<_QuoteRelatedSection> {
               return Container(
                 padding: EdgeInsets.all(16 * s),
                 decoration: BoxDecoration(
-                  color: AppTheme.textLight.withOpacity(0.04),
+                  color: AppTheme.textLight.withValues(alpha: 0.04),
                   borderRadius: BorderRadius.circular(12),
                 ),
                 child: Row(
@@ -2351,7 +2351,7 @@ class _RelatedHitCard extends StatelessWidget {
     return Padding(
       padding: EdgeInsets.only(bottom: 8 * s),
       child: Material(
-        color: AppTheme.primary.withOpacity(0.04),
+        color: AppTheme.primary.withValues(alpha: 0.04),
         borderRadius: BorderRadius.circular(12),
         child: InkWell(
           borderRadius: BorderRadius.circular(12),

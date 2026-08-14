@@ -333,7 +333,7 @@ class _TinderRecommendationStackState extends State<TinderRecommendationStack> {
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
       decoration: BoxDecoration(
-        color: color.withOpacity(0.15),
+        color: color.withValues(alpha: 0.15),
         border: Border.all(color: color, width: 2),
         borderRadius: BorderRadius.circular(8),
       ),
@@ -389,7 +389,7 @@ class _TinderRecommendationStackState extends State<TinderRecommendationStack> {
                     child: Icon(
                       item.contentType.icon,
                       size: 44, // 6/23 封面变薄,icon 72→56→44
-                      color: Colors.white.withOpacity(0.5),
+                      color: Colors.white.withValues(alpha: 0.5),
                     ),
                   ),
                   Positioned(
@@ -398,7 +398,7 @@ class _TinderRecommendationStackState extends State<TinderRecommendationStack> {
                     child: Container(
                       padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
                       decoration: BoxDecoration(
-                        color: Colors.white.withOpacity(0.25),
+                        color: Colors.white.withValues(alpha: 0.25),
                         borderRadius: BorderRadius.circular(20),
                       ),
                       child: Text(
@@ -474,11 +474,11 @@ class _TinderRecommendationStackState extends State<TinderRecommendationStack> {
                         ),
                       ],
                       const SizedBox(width: 8),
-                      Icon(Icons.access_time, size: 11, color: textColor.withOpacity(0.6)),
+                      Icon(Icons.access_time, size: 11, color: textColor.withValues(alpha: 0.6)),
                       const SizedBox(width: 3),
                       Text(
                         item.duration,
-                        style: TextStyle(fontSize: 11, color: textColor.withOpacity(0.6)),
+                        style: TextStyle(fontSize: 11, color: textColor.withValues(alpha: 0.6)),
                       ),
                       const Spacer(),
                       if (isTop)
@@ -581,10 +581,10 @@ class _TinderRecommendationStackState extends State<TinderRecommendationStack> {
             decoration: BoxDecoration(
               shape: BoxShape.circle,
               color: Colors.white,
-              border: Border.all(color: color.withOpacity(0.4), width: 2),
+              border: Border.all(color: color.withValues(alpha: 0.4), width: 2),
               boxShadow: [
                 BoxShadow(
-                  color: color.withOpacity(0.15),
+                  color: color.withValues(alpha: 0.15),
                   blurRadius: 8,
                   offset: const Offset(0, 3),
                 ),
@@ -605,7 +605,7 @@ class _TinderRecommendationStackState extends State<TinderRecommendationStack> {
       child: Column(
         mainAxisSize: MainAxisSize.min,
         children: [
-          Icon(Icons.check_circle_outline, size: 64, color: Colors.indigo.withOpacity(0.4)),
+          Icon(Icons.check_circle_outline, size: 64, color: Colors.indigo.withValues(alpha: 0.4)),
           const SizedBox(height: 12),
           Text(
             widget.isEn ? '🎉 All done!' : '🎉 看完啦！',
@@ -649,7 +649,7 @@ class _TinderRecommendationStackState extends State<TinderRecommendationStack> {
               margin: const EdgeInsets.symmetric(horizontal: 48),
               padding: const EdgeInsets.all(20),
               decoration: BoxDecoration(
-                color: Colors.white.withOpacity(0.85),
+                color: Colors.white.withValues(alpha: 0.85),
                 borderRadius: BorderRadius.circular(20),
                 border: Border.all(color: Colors.black12),
               ),
@@ -657,7 +657,7 @@ class _TinderRecommendationStackState extends State<TinderRecommendationStack> {
                 mainAxisAlignment: MainAxisAlignment.center,
                 mainAxisSize: MainAxisSize.min,
                 children: [
-                  Icon(Icons.inbox_outlined, size: 48, color: Colors.indigo.withOpacity(0.5)),
+                  Icon(Icons.inbox_outlined, size: 48, color: Colors.indigo.withValues(alpha: 0.5)),
                   const SizedBox(height: 12),
                   Text(
                     widget.isEn ? 'No recommendations yet' : '暂无推荐内容',
@@ -696,7 +696,7 @@ class _TinderRecommendationStackState extends State<TinderRecommendationStack> {
 
   // 7/30 A: 占位卡下方的 3 按钮 (灰显, 不可点)
   Widget _buildActionBarPlaceholder() {
-    final disabled = Colors.grey.withOpacity(0.4);
+    final disabled = Colors.grey.withValues(alpha: 0.4);
     Widget btn(IconData icon, String label) {
       return Expanded(
         child: Column(
@@ -707,7 +707,7 @@ class _TinderRecommendationStackState extends State<TinderRecommendationStack> {
               height: 56,
               decoration: BoxDecoration(
                 shape: BoxShape.circle,
-                color: Colors.white.withOpacity(0.5),
+                color: Colors.white.withValues(alpha: 0.5),
                 border: Border.all(color: disabled, width: 1),
               ),
               child: Icon(icon, size: 28, color: disabled),

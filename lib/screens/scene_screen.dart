@@ -201,9 +201,9 @@ class _SceneScreenState extends State<SceneScreen> {
                               width: widget.isElderlyMode ? 44 : 36,
                               height: widget.isElderlyMode ? 44 : 36,
                               decoration: BoxDecoration(
-                                color: const Color(0xFF7C5CFC).withOpacity(0.12),
+                                color: const Color(0xFF7C5CFC).withValues(alpha: 0.12),
                                 shape: BoxShape.circle,
-                                border: Border.all(color: const Color(0xFF7C5CFC).withOpacity(0.4), width: 1),
+                                border: Border.all(color: const Color(0xFF7C5CFC).withValues(alpha: 0.4), width: 1),
                               ),
                               child: Icon(Icons.shuffle, color: const Color(0xFF7C5CFC), size: widget.isElderlyMode ? 22 : 18),
                             ),
@@ -398,7 +398,7 @@ class _SceneCard extends StatelessWidget {
         child: Container(
           decoration: BoxDecoration(
             borderRadius: BorderRadius.circular(20),
-            color: scene.color.withOpacity(0.1),
+            color: scene.color.withValues(alpha: 0.1),
           ),
           child: Column(
             mainAxisAlignment: MainAxisAlignment.center,
@@ -406,7 +406,7 @@ class _SceneCard extends StatelessWidget {
               Container(
                 padding: EdgeInsets.all(12 * scale),
                 decoration: BoxDecoration(
-                  color: scene.color.withOpacity(0.2),
+                  color: scene.color.withValues(alpha: 0.2),
                   shape: BoxShape.circle,
                 ),
                 child: Icon(scene.type.icon, size: 32 * scale),
@@ -514,10 +514,10 @@ class _TimeRecommendBanner extends StatelessWidget {
         margin: EdgeInsets.only(bottom: 4 * scale),
         padding: EdgeInsets.symmetric(horizontal: 14 * scale, vertical: 10 * scale),
         decoration: BoxDecoration(
-          color: color.withOpacity(0.08),
+          color: color.withValues(alpha: 0.08),
           // 7/20 18:49: 圆角 12 → 20 (跟下面两卡统一)
           borderRadius: BorderRadius.circular(20),
-          border: Border.all(color: color.withOpacity(0.2)),
+          border: Border.all(color: color.withValues(alpha: 0.2)),
         ),
         child: Row(children: [
           Icon(Icons.auto_awesome, size: 14 * scale, color: color),
@@ -575,7 +575,7 @@ class _TodayPickCard extends StatelessWidget {
           borderRadius: BorderRadius.circular(20),
           boxShadow: [
             BoxShadow(
-              color: const Color(0xFF7C5CFC).withOpacity(0.3),
+              color: const Color(0xFF7C5CFC).withValues(alpha: 0.3),
               blurRadius: 12,
               offset: const Offset(0, 4),
             ),
@@ -592,7 +592,7 @@ class _TodayPickCard extends StatelessWidget {
                   Text(
                     isEn ? '"What should I read now?"' : '"现在看什么？"',
                     style: TextStyle(
-                      color: Colors.white.withOpacity(0.85),
+                      color: Colors.white.withValues(alpha: 0.85),
                       fontSize: 11 * scale,
                       fontStyle: FontStyle.italic,
                     ),
@@ -666,7 +666,7 @@ class _WeatherHintChipState extends State<_WeatherHintChip> {
       return Container(
         padding: EdgeInsets.symmetric(horizontal: 10 * s, vertical: 6 * s),
         decoration: BoxDecoration(
-          color: AppTheme.primary.withOpacity(0.06),
+          color: AppTheme.primary.withValues(alpha: 0.06),
           borderRadius: BorderRadius.circular(16),
         ),
         child: Row(
@@ -685,7 +685,7 @@ class _WeatherHintChipState extends State<_WeatherHintChip> {
     return Container(
       padding: EdgeInsets.symmetric(horizontal: 10 * s, vertical: 6 * s),
       decoration: BoxDecoration(
-        color: AppTheme.primary.withOpacity(0.08),
+        color: AppTheme.primary.withValues(alpha: 0.08),
         borderRadius: BorderRadius.circular(16),
       ),
       child: Row(
@@ -883,7 +883,7 @@ class _DailyEncouragementBannerState extends State<DailyEncouragementBanner> {
           borderRadius: BorderRadius.circular(20),
           boxShadow: [
             BoxShadow(
-              color: const Color(0xFF7C5CFC).withOpacity(0.25),
+              color: const Color(0xFF7C5CFC).withValues(alpha: 0.25),
               blurRadius: 10,
               offset: const Offset(0, 3),
             ),
@@ -898,9 +898,9 @@ class _DailyEncouragementBannerState extends State<DailyEncouragementBanner> {
                     width: 44 * scale,
                     height: 44 * scale,
                     decoration: BoxDecoration(
-                      color: Colors.white.withOpacity(0.18),
+                      color: Colors.white.withValues(alpha: 0.18),
                       shape: BoxShape.circle,
-                      border: Border.all(color: Colors.white.withOpacity(0.45), width: 1.5),
+                      border: Border.all(color: Colors.white.withValues(alpha: 0.45), width: 1.5),
                     ),
                     alignment: Alignment.center,
                     child: Text(
@@ -923,7 +923,7 @@ class _DailyEncouragementBannerState extends State<DailyEncouragementBanner> {
                           maxLines: 2,
                           overflow: TextOverflow.ellipsis,
                           style: TextStyle(
-                            color: Colors.white.withOpacity(0.98),
+                            color: Colors.white.withValues(alpha: 0.98),
                             fontSize: 14 * scale,
                             fontWeight: FontWeight.w600,
                             fontStyle: FontStyle.italic,
@@ -944,7 +944,7 @@ class _DailyEncouragementBannerState extends State<DailyEncouragementBanner> {
                                     maxLines: 1,
                                     overflow: TextOverflow.ellipsis,
                                     style: TextStyle(
-                                      color: Colors.white.withOpacity(0.78),
+                                      color: Colors.white.withValues(alpha: 0.78),
                                       fontSize: 11 * scale,
                                       fontWeight: FontWeight.w500,
                                     ),
@@ -1011,9 +1011,9 @@ class _DailyEncouragementBannerState extends State<DailyEncouragementBanner> {
                                       child: Container(
                                         padding: EdgeInsets.all(4 * scale),
                                         decoration: BoxDecoration(
-                                          color: Colors.white.withOpacity(0.12),
+                                          color: Colors.white.withValues(alpha: 0.12),
                                           shape: BoxShape.circle,
-                                          border: Border.all(color: Colors.white.withOpacity(0.4), width: 1),
+                                          border: Border.all(color: Colors.white.withValues(alpha: 0.4), width: 1),
                                         ),
                                         child: Icon(Icons.shuffle, color: Colors.white, size: 16 * scale),
                                       ),
@@ -1038,7 +1038,7 @@ class _DailyEncouragementBannerState extends State<DailyEncouragementBanner> {
                       maxLines: 1,
                       overflow: TextOverflow.ellipsis,
                       style: TextStyle(
-                        color: Colors.white.withOpacity(0.95),
+                        color: Colors.white.withValues(alpha: 0.95),
                         fontSize: 13 * scale,
                         fontWeight: FontWeight.w500,
                         fontStyle: FontStyle.italic,

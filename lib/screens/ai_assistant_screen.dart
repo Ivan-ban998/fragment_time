@@ -977,7 +977,7 @@ Rules:
           borderRadius: const BorderRadius.vertical(top: Radius.circular(24)),
           boxShadow: [
             BoxShadow(
-              color: Colors.black.withOpacity(0.1),
+              color: Colors.black.withValues(alpha: 0.1),
               blurRadius: 20,
               offset: const Offset(0, -4),
             ),
@@ -991,7 +991,7 @@ Rules:
               width: 40,
               height: 4,
               decoration: BoxDecoration(
-                color: Colors.grey.withOpacity(0.4),
+                color: Colors.grey.withValues(alpha: 0.4),
                 borderRadius: BorderRadius.circular(2),
               ),
             ),
@@ -1082,8 +1082,8 @@ Rules:
                           s,
                           style: TextStyle(fontSize: 12 * scale),
                         ),
-                        backgroundColor: const Color(0xFF7C5CFC).withOpacity(0.08),
-                        side: BorderSide(color: const Color(0xFF7C5CFC).withOpacity(0.3)),
+                        backgroundColor: const Color(0xFF7C5CFC).withValues(alpha: 0.08),
+                        side: BorderSide(color: const Color(0xFF7C5CFC).withValues(alpha: 0.3)),
                         onPressed: () {
                           // 点 chip → 直接送到输入框 (用户可改后再发)
                           _controller.text = s;
@@ -1130,10 +1130,10 @@ Rules:
                 margin: EdgeInsets.symmetric(horizontal: 16 * scale),
                 padding: EdgeInsets.all(10 * scale),
                 decoration: BoxDecoration(
-                  color: const Color(0xFF7C5CFC).withOpacity(0.08),
+                  color: const Color(0xFF7C5CFC).withValues(alpha: 0.08),
                   borderRadius: BorderRadius.circular(12),
                   border: Border.all(
-                    color: const Color(0xFF7C5CFC).withOpacity(0.2),
+                    color: const Color(0xFF7C5CFC).withValues(alpha: 0.2),
                   ),
                 ),
                 child: Row(
@@ -1159,7 +1159,7 @@ Rules:
               padding: EdgeInsets.symmetric(horizontal: 12 * scale, vertical: 6 * scale),
               decoration: BoxDecoration(
                 border: Border(
-                  top: BorderSide(color: Colors.grey.withOpacity(0.15)),
+                  top: BorderSide(color: Colors.grey.withValues(alpha: 0.15)),
                 ),
               ),
               child: SingleChildScrollView(
@@ -1171,9 +1171,9 @@ Rules:
                       child: ActionChip(
                         avatar: Text(p.emoji, style: const TextStyle(fontSize: 14)),
                         label: Text(p.label, style: TextStyle(fontSize: 13 * scale)),
-                        backgroundColor: const Color(0xFF7C5CFC).withOpacity(0.08),
+                        backgroundColor: const Color(0xFF7C5CFC).withValues(alpha: 0.08),
                         side: BorderSide(
-                          color: const Color(0xFF7C5CFC).withOpacity(0.3),
+                          color: const Color(0xFF7C5CFC).withValues(alpha: 0.3),
                         ),
                         onPressed: () => _sendQuick(p),
                       ),
@@ -1188,7 +1188,7 @@ Rules:
               decoration: BoxDecoration(
                 color: GlassStyle.sheetInputBg(context),
                 border: Border(
-                  top: BorderSide(color: Colors.grey.withOpacity(0.2)),
+                  top: BorderSide(color: Colors.grey.withValues(alpha: 0.2)),
                 ),
               ),
               child: SafeArea(
@@ -1234,7 +1234,7 @@ Rules:
                             borderSide: BorderSide.none,
                           ),
                           filled: true,
-                          fillColor: Colors.grey.withOpacity(0.1),
+                          fillColor: Colors.grey.withValues(alpha: 0.1),
                           contentPadding: EdgeInsets.symmetric(
                             horizontal: 16 * scale,
                             vertical: 10 * scale,
@@ -1331,10 +1331,10 @@ class _AbilityChip extends StatelessWidget {
             width: size,
             height: size,
             decoration: BoxDecoration(
-              color: const Color(0xFF7C5CFC).withOpacity(0.08),
+              color: const Color(0xFF7C5CFC).withValues(alpha: 0.08),
               shape: BoxShape.circle,
               border: Border.all(
-                color: const Color(0xFF7C5CFC).withOpacity(0.3),
+                color: const Color(0xFF7C5CFC).withValues(alpha: 0.3),
                 width: 1,
               ),
             ),
@@ -1423,7 +1423,7 @@ class _MessageBubble extends StatelessWidget {
         decoration: BoxDecoration(
           color: isUser
               ? const Color(0xFF7C5CFC)
-              : Colors.grey.withOpacity(0.15),
+              : Colors.grey.withValues(alpha: 0.15),
           borderRadius: BorderRadius.only(
             topLeft: Radius.circular(18 * scale),
             topRight: Radius.circular(18 * scale),
@@ -1465,10 +1465,10 @@ class _CardTile extends StatelessWidget {
       decoration: BoxDecoration(
         color: Colors.white,
         borderRadius: BorderRadius.circular(12),
-        border: Border.all(color: const Color(0xFF7C5CFC).withOpacity(0.2)),
+        border: Border.all(color: const Color(0xFF7C5CFC).withValues(alpha: 0.2)),
         boxShadow: [
           BoxShadow(
-            color: Colors.black.withOpacity(0.04),
+            color: Colors.black.withValues(alpha: 0.04),
             blurRadius: 6,
             offset: const Offset(0, 2),
           ),
@@ -1566,7 +1566,7 @@ class _CardTile extends StatelessWidget {
                   width: 36 * scale,
                   height: 36 * scale,
                   decoration: BoxDecoration(
-                    color: const Color(0xFF7C5CFC).withOpacity(0.1),
+                    color: const Color(0xFF7C5CFC).withValues(alpha: 0.1),
                     borderRadius: BorderRadius.circular(8),
                   ),
                   child: Icon(_typeIcon, size: 18 * scale, color: const Color(0xFF7C5CFC)),

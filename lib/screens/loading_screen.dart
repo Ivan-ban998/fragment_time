@@ -286,7 +286,7 @@ class _LoadingScreenState extends State<LoadingScreen>
                   child: LinearProgressIndicator(
                     value: _progress,
                     minHeight: 10 * scale,
-                    backgroundColor: greetingColor.withOpacity(0.15),
+                    backgroundColor: greetingColor.withValues(alpha: 0.15),
                     valueColor: AlwaysStoppedAnimation(primaryColor),
                   ),
                 ),
@@ -308,7 +308,7 @@ class _LoadingScreenState extends State<LoadingScreen>
                               size: 22 * scale,
                               color: done
                                   ? primaryColor
-                                  : greetingColor.withOpacity(0.5),
+                                  : greetingColor.withValues(alpha: 0.5),
                             ),
                             SizedBox(width: 12 * scale),
                             Expanded(

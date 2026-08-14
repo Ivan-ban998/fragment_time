@@ -46,7 +46,7 @@ class _TopicOnboardingScreenState extends State<TopicOnboardingScreen> {
     final categories = SubscriptionService.getAllCategories(isEn: isEn);
     return Scaffold(
       appBar: AppBar(
-        backgroundColor: Colors.white.withOpacity(0.85),
+        backgroundColor: Colors.white.withValues(alpha: 0.85),
         foregroundColor: AppTheme.primary,
         elevation: 0.5,
         leading: IconButton(
@@ -111,7 +111,7 @@ class _TopicOnboardingScreenState extends State<TopicOnboardingScreen> {
                             boxShadow: isSelected
                                 ? [
                                     BoxShadow(
-                                      color: AppTheme.primary.withOpacity(0.25),
+                                      color: AppTheme.primary.withValues(alpha: 0.25),
                                       blurRadius: 6,
                                       offset: const Offset(0, 2),
                                     ),

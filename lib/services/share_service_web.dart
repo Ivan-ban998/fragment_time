@@ -119,7 +119,7 @@ class ShareService {
       canvas,
       isEn ? '$handle · Shared via Fragment Time' : '$handle · 分享自 碎片时间',
       Offset(cardPadding, h - 180),
-      color: Colors.white.withOpacity(0.95),
+      color: Colors.white.withValues(alpha: 0.95),
       size: 30,
       weight: FontWeight.w600,
     );
@@ -127,7 +127,7 @@ class ShareService {
       canvas,
       isEn ? 'Fragment Time · fragmenttime.app' : '碎片时间 · fragmenttime.app',
       Offset(cardPadding, h - 130),
-      color: Colors.white.withOpacity(0.9),
+      color: Colors.white.withValues(alpha: 0.9),
       size: 30,
       weight: FontWeight.w500,
     );
@@ -135,7 +135,7 @@ class ShareService {
       canvas,
       isEn ? '5-minute reads, on the go.' : '碎片时间，5分钟读完。',
       Offset(cardPadding, h - 80),
-      color: Colors.white.withOpacity(0.7),
+      color: Colors.white.withValues(alpha: 0.7),
       size: 24,
       weight: FontWeight.w400,
     );

@@ -62,9 +62,9 @@ class _QuizPanelState extends State<QuizPanel> {
     return Container(
       padding: EdgeInsets.all(16 * scale),
       decoration: BoxDecoration(
-        color: Colors.amber.withOpacity(0.08),
+        color: Colors.amber.withValues(alpha: 0.08),
         borderRadius: BorderRadius.circular(12),
-        border: Border.all(color: Colors.amber.withOpacity(0.3)),
+        border: Border.all(color: Colors.amber.withValues(alpha: 0.3)),
       ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
@@ -158,7 +158,7 @@ class _QuizPanelState extends State<QuizPanel> {
       margin: EdgeInsets.only(bottom: 12 * scale),
       padding: EdgeInsets.all(12 * scale),
       decoration: BoxDecoration(
-        color: Colors.white.withOpacity(0.5),
+        color: Colors.white.withValues(alpha: 0.5),
         borderRadius: BorderRadius.circular(8),
       ),
       child: Column(
@@ -180,7 +180,7 @@ class _QuizPanelState extends State<QuizPanel> {
             Container(
               padding: EdgeInsets.all(8 * scale),
               decoration: BoxDecoration(
-                color: Colors.green.withOpacity(0.08),
+                color: Colors.green.withValues(alpha: 0.08),
                 borderRadius: BorderRadius.circular(6),
               ),
               child: Row(
@@ -210,7 +210,7 @@ class _QuizPanelState extends State<QuizPanel> {
     Widget? trailing;
     if (revealed) {
       if (isCorrect) {
-        bg = Colors.green.withOpacity(0.1);
+        bg = Colors.green.withValues(alpha: 0.1);
         borderColor = Colors.green;
         trailing = Icon(Icons.check_circle, size: 18 * scale, color: Colors.green);
       } else {

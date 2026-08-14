@@ -2,13 +2,17 @@
 // 6/8 自用看板
 // 入口：设置页底部"📊 数据看板（自用）"按钮
 // 展示：app 打开数 / 6 userType 偏好 / 4 scene 偏好 / 24 桶组合 top8 / TTS/视频点击 / 搜索词
-
+// 8/14 升一阶 (沿 SOUL #125 推动正式应用): 加服务端 /metrics 实时状态
+//   - 总请求数 (last 1h) + /rss 平均耗时 + /rss 错误数
+//   - 帮 Brien 监控服务健康 (替代外部 Uptime Kuma)
 import 'package:flutter/material.dart';
 import '../theme/app_theme.dart';
 import '../services/analytics_service.dart';
 import '../services/motivation_service.dart';
 import '../services/llm_service.dart';
 import '../services/weekly_recap_service.dart';
+// 8/14 加 (沿 SOUL #125): 拉 ft_server /metrics 端点
+import 'package:http/http.dart' as http;
 
 class AnalyticsDashboardScreen extends StatefulWidget {
   const AnalyticsDashboardScreen({super.key});
@@ -22,11 +26,41 @@ class _AnalyticsDashboardScreenState extends State<AnalyticsDashboardScreen> {
   bool _loading = true;
   String? _aiRecap; // 6/11 加: AI 私教回顾文本
   bool _aiRecapLoading = false;
+  // 8/14 加 (沿 SOUL #125): 服务端 /metrics 状态
+  Map<String, String> _serverMetrics = {}; // key: label, value: number/text
+  String? _serverMetricsError;
 
   @override
   void initState() {
     super.initState();
     _load();
+    _loadServerMetrics();
+  }
+
+  // 8/14 加 (沿 SOUL #125): 拉 ft_server /metrics 端点
+  //   真凶: 之前 dashboard 只看客户端事件, 服务端 RSS / LLM 健康盲
+  //   修: dashboard 顶部加 '服务端状态' 卡 (总请求/rss avg/rss 错误)
+  Future<void> _loadServerMetrics() async {
+    try {
+      // web 端走 /metrics (同源), 移动端走 11435 直连 (避免 CORS)
+      final url = Uri.parse('/metrics');
+      final resp = await http.get(url).timeout(const Duration(seconds: 5));
+      if (resp.statusCode != 200) {
+        if (mounted) setState(() => _serverMetricsError = 'HTTP ${resp.statusCode}');
+        return;
+      }
+      final body = resp.body;
+      final metrics = <String, String>{};
+      for (final line in body.split('\n')) {
+        if (line.startsWith('#') || line.trim().isEmpty) continue;
+        final parts = line.split(' ');
+        if (parts.length < 2) continue;
+        metrics[parts[0]] = parts[1];
+      }
+      if (mounted) setState(() => _serverMetrics = metrics);
+    } catch (e) {
+      if (mounted) setState(() => _serverMetricsError = e.toString());
+    }
   }
 
   Future<void> _load() async {
@@ -81,6 +115,9 @@ class _AnalyticsDashboardScreenState extends State<AnalyticsDashboardScreen> {
       body: ListView(
         padding: const EdgeInsets.all(16),
         children: [
+          // 8/14 加 (沿 SOUL #125): 服务端状态卡 (监控用)
+          _buildServerMetricsCard(),
+          const SizedBox(height: 16),
           _stat('总事件数', '${s['totalEvents']}'),
           _stat('App 打开 (24h / 7d / 总)',
               '${s['appOpens1d']} / ${s['appOpens7d']} / ${s['appOpens']}'),
@@ -131,6 +168,93 @@ class _AnalyticsDashboardScreenState extends State<AnalyticsDashboardScreen> {
     );
   }
 
+  // 8/14 加 (沿 SOUL #125): 服务端状态卡 (用 /metrics 数据)
+  Widget _buildServerMetricsCard() {
+    if (_serverMetricsError != null) {
+      return Card(
+        color: Colors.orange.shade50,
+        child: ListTile(
+          leading: const Icon(Icons.warning_amber, color: Colors.orange),
+          title: const Text('服务端状态 (不可用)'),
+          subtitle: Text(_serverMetricsError!, style: const TextStyle(fontSize: 11)),
+          trailing: IconButton(
+            icon: const Icon(Icons.refresh, size: 18),
+            onPressed: _loadServerMetrics,
+          ),
+        ),
+      );
+    }
+    if (_serverMetrics.isEmpty) {
+      return const Card(
+        child: ListTile(
+          leading: SizedBox(width: 16, height: 16, child: CircularProgressIndicator(strokeWidth: 2)),
+          title: Text('服务端状态 (加载中)'),
+        ),
+      );
+    }
+    final total = _serverMetrics['metrics_total_requests'] ?? '0';
+    final rssAvg = _serverMetrics['metrics_avg_ms{path="/rss"}'] ?? '0';
+    final rssErrors = _serverMetrics['metrics_errors{path="/rss"}'] ?? '0';
+    final rssCount = _serverMetrics['metrics_path{path="/rss"}'] ?? '0';
+    final apiCount = _serverMetrics['metrics_path{path="/api/*"}'] ?? '0';
+    final apiErrors = _serverMetrics['metrics_errors{path="/api/*"}'] ?? '0';
+    // 颜色: 错误 > 0 红色, 0 绿色
+    final rssErrorCount = int.tryParse(rssErrors) ?? 0;
+    final apiErrorCount = int.tryParse(apiErrors) ?? 0;
+    final rssColor = rssErrorCount > 0 ? Colors.red : Colors.green;
+    final apiColor = apiErrorCount > 0 ? Colors.red : Colors.green;
+    return Card(
+      color: Colors.blue.shade50,
+      child: Padding(
+        padding: const EdgeInsets.all(12),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Row(
+              children: [
+                const Icon(Icons.cloud, color: Colors.blue, size: 18),
+                const SizedBox(width: 6),
+                const Text('服务端状态 (last 1h)', style: TextStyle(fontWeight: FontWeight.bold)),
+                const Spacer(),
+                IconButton(
+                  icon: const Icon(Icons.refresh, size: 18),
+                  onPressed: _loadServerMetrics,
+                ),
+              ],
+            ),
+            const SizedBox(height: 8),
+            Row(
+              children: [
+                Expanded(child: _miniStat('总请求', total, Colors.blue)),
+                Expanded(child: _miniStat('/rss', rssCount, Colors.green)),
+                Expanded(child: _miniStat('/api/*', apiCount, Colors.purple)),
+              ],
+            ),
+            const SizedBox(height: 6),
+            Row(
+              children: [
+                Expanded(child: _miniStat('/rss avg', '${rssAvg}ms', Colors.orange)),
+                _miniStat('/rss 错误', rssErrors, rssColor),
+                _miniStat('/api 错误', apiErrors, apiColor),
+              ],
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Widget _miniStat(String label, String value, Color color) {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Text(label, style: const TextStyle(fontSize: 11, color: Colors.black54)),
+        const SizedBox(height: 2),
+        Text(value, style: TextStyle(fontSize: 15, fontWeight: FontWeight.bold, color: color)),
+      ],
+    );
+  }
+
   Widget _stat(String label, String value) {
     return Padding(
       padding: const EdgeInsets.symmetric(vertical: 4),
@@ -167,7 +291,7 @@ class _AnalyticsDashboardScreenState extends State<AnalyticsDashboardScreen> {
               Expanded(
                 child: Stack(
                   children: [
-                    Container(height: 14, decoration: BoxDecoration(color: AppTheme.textLight.withOpacity(0.15), borderRadius: BorderRadius.circular(3))),
+                    Container(height: 14, decoration: BoxDecoration(color: AppTheme.textLight.withValues(alpha: 0.15), borderRadius: BorderRadius.circular(3))),
                     FractionallySizedBox(
                       widthFactor: pct,
                       child: Container(height: 14, decoration: BoxDecoration(color: AppTheme.primary, borderRadius: BorderRadius.circular(3))),
@@ -219,8 +343,8 @@ class _AnalyticsDashboardScreenState extends State<AnalyticsDashboardScreen> {
                   children: week.map((d) {
                     final ratio = d.count / maxCount;
                     final color = d.count == 0
-                        ? AppTheme.textLight.withOpacity(0.1)
-                        : AppTheme.primary.withOpacity(0.2 + ratio * 0.8);
+                        ? AppTheme.textLight.withValues(alpha: 0.1)
+                        : AppTheme.primary.withValues(alpha: 0.2 + ratio * 0.8);
                     return Container(
                       width: 12, height: 12, margin: const EdgeInsets.all(1),
                       decoration: BoxDecoration(color: color, borderRadius: BorderRadius.circular(2)),
@@ -301,9 +425,9 @@ class _AnalyticsDashboardScreenState extends State<AnalyticsDashboardScreen> {
       margin: const EdgeInsets.symmetric(vertical: 8),
       padding: const EdgeInsets.all(12),
       decoration: BoxDecoration(
-        color: AppTheme.primary.withOpacity(0.08),
+        color: AppTheme.primary.withValues(alpha: 0.08),
         borderRadius: BorderRadius.circular(12),
-        border: Border.all(color: AppTheme.primary.withOpacity(0.3)),
+        border: Border.all(color: AppTheme.primary.withValues(alpha: 0.3)),
       ),
       child: Row(
         crossAxisAlignment: CrossAxisAlignment.start,

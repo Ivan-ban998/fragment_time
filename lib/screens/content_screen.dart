@@ -241,7 +241,7 @@ class _ContentScreenState extends State<ContentScreen> {
           // 1.5b 质量不够时可能输出学生内容给上班族, 检测后 fallback
           if (_buf.length > 30 && !_isRoleMatch(_buf, widget.userType)) {
             // 内容错位: 重置 buf 并调假数据桶
-            _loadFakeContent();
+            _loadFallbackContent();
           }
         },
       );
@@ -324,8 +324,11 @@ class _ContentScreenState extends State<ContentScreen> {
     return true;
   }
 
-  // 6/25 fallback: LLM 内容错位 → 调 NewsService 假数据桶
-  Future<void> _loadFakeContent() async {
+  // 6/25 fallback: LLM 内容错位 → 调 NewsService 拿一条真内容替代
+  // 8/14 改名 (沿 SOUL #169 不撒谎): _loadFakeContent → _loadFallbackContent
+  //   真凶: 之前叫 _loadFakeContent 误导 (Fake = 假数据) → 实际调 NewsService 拿真 RSS
+  //   修: 改名 _loadFallbackContent 反映 'AI 错位时用真 RSS 替代' 语义
+  Future<void> _loadFallbackContent() async {
     try {
       final results = await NewsService().getRecommendations(
         widget.userType, widget.scene, isInternational: widget.isInternational,
@@ -337,7 +340,7 @@ class _ContentScreenState extends State<ContentScreen> {
         _aiContentItem = item;
       });
     } catch (e) {
-      debugPrint('[LLM] _loadFakeContent error: $e');
+      debugPrint('[LLM] _loadFallbackContent error: $e');
     }
   }
 
@@ -647,7 +650,7 @@ class _ContentScreenState extends State<ContentScreen> {
                 isEn
                     ? 'Today: $_todayCompleteCount completed · keep going'
                     : '今日已完成 $_todayCompleteCount 条 · 继续加油',
-                style: TextStyle(fontSize: 13 * _scale, color: Colors.white.withOpacity(0.9)),
+                style: TextStyle(fontSize: 13 * _scale, color: Colors.white.withValues(alpha: 0.9)),
               ),
               SizedBox(height: 16 * _scale),
               Row(
@@ -736,7 +739,7 @@ class _ContentScreenState extends State<ContentScreen> {
           ],
         ),
         leading: Material(
-          color: Colors.white.withOpacity(0.6),
+          color: Colors.white.withValues(alpha: 0.6),
           shape: const CircleBorder(),
           child: IconButton(
             icon: Icon(Icons.arrow_back, size: 24 * _scale, color: AppTheme.primary),
@@ -752,7 +755,7 @@ class _ContentScreenState extends State<ContentScreen> {
           // TTS 按钮
           if (_hasContent)
             Material(
-              color: Colors.white.withOpacity(0.6),
+              color: Colors.white.withValues(alpha: 0.6),
               shape: const CircleBorder(),
               child: IconButton(
                 tooltip: isEn
@@ -917,7 +920,7 @@ class _ContentScreenState extends State<ContentScreen> {
     Color? color,
   }) {
     return Material(
-      color: Colors.white.withOpacity(0.6),
+      color: Colors.white.withValues(alpha: 0.6),
       borderRadius: BorderRadius.circular(18),
       child: InkWell(
         borderRadius: BorderRadius.circular(18),
@@ -991,7 +994,7 @@ class _ContentScreenState extends State<ContentScreen> {
               height: 4,
               margin: const EdgeInsets.only(bottom: 12),
               decoration: BoxDecoration(
-                color: Colors.black.withOpacity(0.2),
+                color: Colors.black.withValues(alpha: 0.2),
                 borderRadius: BorderRadius.circular(2),
               ),
             ),
@@ -1052,9 +1055,9 @@ class _ContentScreenState extends State<ContentScreen> {
       margin: EdgeInsets.only(bottom: 8 * _scale),
       padding: EdgeInsets.symmetric(horizontal: 12 * _scale, vertical: 8 * _scale),
       decoration: BoxDecoration(
-        color: const Color(0xFF16A34A).withOpacity(0.12),
+        color: const Color(0xFF16A34A).withValues(alpha: 0.12),
         borderRadius: BorderRadius.circular(12),
-        border: Border.all(color: const Color(0xFF16A34A).withOpacity(0.4), width: 1),
+        border: Border.all(color: const Color(0xFF16A34A).withValues(alpha: 0.4), width: 1),
       ),
       child: Row(
         children: [
@@ -1091,9 +1094,9 @@ class _ContentScreenState extends State<ContentScreen> {
       margin: EdgeInsets.only(bottom: 8 * _scale),
       padding: EdgeInsets.symmetric(horizontal: 12 * _scale, vertical: 8 * _scale),
       decoration: BoxDecoration(
-        color: const Color(0xFFF59E0B).withOpacity(0.12),
+        color: const Color(0xFFF59E0B).withValues(alpha: 0.12),
         borderRadius: BorderRadius.circular(12),
-        border: Border.all(color: const Color(0xFFF59E0B).withOpacity(0.4), width: 1),
+        border: Border.all(color: const Color(0xFFF59E0B).withValues(alpha: 0.4), width: 1),
       ),
       child: Row(
         children: [
@@ -1122,7 +1125,7 @@ class _ContentScreenState extends State<ContentScreen> {
       margin: EdgeInsets.only(bottom: 8 * _scale),
       padding: EdgeInsets.all(10 * _scale),
       decoration: BoxDecoration(
-        color: AppTheme.primary.withOpacity(0.08),
+        color: AppTheme.primary.withValues(alpha: 0.08),
         borderRadius: BorderRadius.circular(12),
         border: Border(left: BorderSide(color: AppTheme.primary, width: 3)),
       ),
@@ -1157,7 +1160,7 @@ class _ContentScreenState extends State<ContentScreen> {
             _tlDrText,
             maxLines: _tlDrExpanded ? 3 : 1,
             overflow: TextOverflow.ellipsis,
-            style: TextStyle(fontSize: 12 * _scale, color: AppTheme.primary.withOpacity(0.85), height: 1.4),
+            style: TextStyle(fontSize: 12 * _scale, color: AppTheme.primary.withValues(alpha: 0.85), height: 1.4),
           ),
         ],
       ),
@@ -1217,7 +1220,7 @@ class _ContentScreenState extends State<ContentScreen> {
                           CircularProgressIndicator(
                             value: item.progress / 100,
                             strokeWidth: 2.5 * _scale,
-                            backgroundColor: Colors.black.withOpacity(0.06),
+                            backgroundColor: Colors.black.withValues(alpha: 0.06),
                             valueColor: AlwaysStoppedAnimation(AppTheme.primary),
                           ),
                           Text('${item.progress}', style: TextStyle(fontSize: 9 * _scale, color: AppTheme.primary)),
@@ -1272,9 +1275,9 @@ class _ContentScreenState extends State<ContentScreen> {
       borderRadius: BorderRadius.circular(12),
       child: Container(
         decoration: BoxDecoration(
-          color: AppTheme.primary.withOpacity(0.08),
+          color: AppTheme.primary.withValues(alpha: 0.08),
           borderRadius: BorderRadius.circular(12),
-          border: Border.all(color: AppTheme.primary.withOpacity(0.2), width: 1),
+          border: Border.all(color: AppTheme.primary.withValues(alpha: 0.2), width: 1),
         ),
         clipBehavior: Clip.antiAlias,
         // 横向: 缩略 64x64 + 标题 1 行 + 时长 1 行
@@ -1337,7 +1340,7 @@ class _ContentScreenState extends State<ContentScreen> {
     return Container(
       color: Colors.black12,
       child: Center(
-        child: Icon(Icons.movie, size: 48, color: AppTheme.primary.withOpacity(0.5)),
+        child: Icon(Icons.movie, size: 48, color: AppTheme.primary.withValues(alpha: 0.5)),
       ),
     );
   }
@@ -1354,7 +1357,7 @@ class _ContentScreenState extends State<ContentScreen> {
     final extUrl = item.externalUrl;
     final hasExt = extUrl != null && extUrl.isNotEmpty;
     return Material(
-      color: AppTheme.primary.withOpacity(0.1),
+      color: AppTheme.primary.withValues(alpha: 0.1),
       borderRadius: BorderRadius.circular(16),
       child: Stack(
         children: [
@@ -1415,7 +1418,7 @@ class _ContentScreenState extends State<ContentScreen> {
               bottom: 0,
               child: Center(
                 child: Material(
-                  color: AppTheme.primary.withOpacity(0.15),
+                  color: AppTheme.primary.withValues(alpha: 0.15),
                   borderRadius: BorderRadius.circular(12),
                   child: InkWell(
                     borderRadius: BorderRadius.circular(12),
@@ -1450,7 +1453,7 @@ class _ContentScreenState extends State<ContentScreen> {
   // 6/22 quiz 入口: 推送 ContentReaderScreen 显示 quiz panel
   Widget _buildQuizEntry(ContentItem item) {
     return Material(
-      color: const Color(0xFF16A34A).withOpacity(0.1),
+      color: const Color(0xFF16A34A).withValues(alpha: 0.1),
       borderRadius: BorderRadius.circular(16),
       child: InkWell(
         borderRadius: BorderRadius.circular(16),
@@ -1492,7 +1495,7 @@ class _ContentScreenState extends State<ContentScreen> {
       margin: EdgeInsets.only(bottom: 8 * _scale),
       padding: EdgeInsets.all(12 * _scale),
       decoration: BoxDecoration(
-        color: AppTheme.primary.withOpacity(0.05),
+        color: AppTheme.primary.withValues(alpha: 0.05),
         borderRadius: BorderRadius.circular(12),
       ),
       child: Row(
@@ -1522,9 +1525,9 @@ class _ContentScreenState extends State<ContentScreen> {
       margin: EdgeInsets.only(bottom: 8 * _scale),
       padding: EdgeInsets.all(10 * _scale),
       decoration: BoxDecoration(
-        color: AppTheme.primary.withOpacity(0.04),
+        color: AppTheme.primary.withValues(alpha: 0.04),
         borderRadius: BorderRadius.circular(10),
-        border: Border.all(color: AppTheme.primary.withOpacity(0.15)),
+        border: Border.all(color: AppTheme.primary.withValues(alpha: 0.15)),
       ),
       child: Row(
         children: [
@@ -1551,9 +1554,9 @@ class _ContentScreenState extends State<ContentScreen> {
       margin: EdgeInsets.only(bottom: 8 * _scale),
       padding: EdgeInsets.all(16 * _scale),
       decoration: BoxDecoration(
-        color: AppTheme.primary.withOpacity(0.05),
+        color: AppTheme.primary.withValues(alpha: 0.05),
         borderRadius: BorderRadius.circular(12),
-        border: Border.all(color: AppTheme.primary.withOpacity(0.15)),
+        border: Border.all(color: AppTheme.primary.withValues(alpha: 0.15)),
       ),
       child: Row(
         children: [
@@ -1579,7 +1582,7 @@ class _ContentScreenState extends State<ContentScreen> {
                   SizedBox(height: 4 * _scale),
                   Text(
                     'debug: $_loadFromBucketErr',
-                    style: TextStyle(fontSize: 10 * _scale, color: AppTheme.hintColor(context).withOpacity(0.6)),
+                    style: TextStyle(fontSize: 10 * _scale, color: AppTheme.hintColor(context).withValues(alpha: 0.6)),
                   ),
                 ],
               ],
@@ -1640,7 +1643,7 @@ class _ContentScreenState extends State<ContentScreen> {
             : isDark
                 ? GlassStyle.onGlassPrimaryDark
                 : GlassStyle.onGlassPrimary)
-        .withOpacity(0.15);
+        .withValues(alpha: 0.15);
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: List.generate(
@@ -1664,9 +1667,9 @@ class _ContentScreenState extends State<ContentScreen> {
     return Container(
       padding: EdgeInsets.symmetric(horizontal: 12 * _scale, vertical: 8 * _scale),
       decoration: BoxDecoration(
-        color: AppTheme.primary.withOpacity(0.15),
+        color: AppTheme.primary.withValues(alpha: 0.15),
         borderRadius: BorderRadius.circular(8),
-        border: Border.all(color: AppTheme.primary.withOpacity(0.4), width: 1),
+        border: Border.all(color: AppTheme.primary.withValues(alpha: 0.4), width: 1),
       ),
       child: Row(
         children: [
@@ -1704,7 +1707,7 @@ class _ContentScreenState extends State<ContentScreen> {
 
   Widget _entryButton(IconData icon, String label, VoidCallback onTap) {
     return Material(
-      color: Colors.white.withOpacity(0.6),
+      color: Colors.white.withValues(alpha: 0.6),
       borderRadius: BorderRadius.circular(12),
       child: InkWell(
         borderRadius: BorderRadius.circular(12),
@@ -1963,7 +1966,7 @@ class _ContentScreenState extends State<ContentScreen> {
                 isEn ? '+5 XP · keep the streak going' : '+5 经验 · 继续坚持',
                 style: TextStyle(
                   fontSize: 13 * _scale,
-                  color: Colors.white.withOpacity(0.9),
+                  color: Colors.white.withValues(alpha: 0.9),
                 ),
               ),
               SizedBox(height: 16 * _scale),

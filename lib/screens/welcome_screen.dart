@@ -154,7 +154,7 @@ class _WelcomeScreenState extends State<WelcomeScreen> {
                 isEn
                     ? 'Default name is ${RobotNameService.defaultRobotName}. Skip to keep it.'
                     : '默认叫「${RobotNameService.defaultRobotName}」，可以跳过用默认。',
-                style: TextStyle(fontSize: 13, color: AppTheme.primary.withOpacity(0.7)),
+                style: TextStyle(fontSize: 13, color: AppTheme.primary.withValues(alpha: 0.7)),
               ),
               const SizedBox(height: 12),
               TextField(

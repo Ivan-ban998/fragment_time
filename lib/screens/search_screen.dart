@@ -238,7 +238,7 @@ class _SearchScreenState extends State<SearchScreen> {
       child: Column(
         mainAxisAlignment: MainAxisAlignment.center,
         children: [
-          Icon(Icons.search, size: 48 * scale, color: AppTheme.textLight.withOpacity(0.3)),
+          Icon(Icons.search, size: 48 * scale, color: AppTheme.textLight.withValues(alpha: 0.3)),
           SizedBox(height: 12 * scale),
           // 6/11 加: 搜索历史 (不是 Center, 让顶部有间距)
           if (_history.isNotEmpty) ...[
@@ -320,7 +320,7 @@ class _SearchScreenState extends State<SearchScreen> {
           child: Row(
             children: [
               CircleAvatar(
-                backgroundColor: item.priceType.color.withOpacity(0.1),
+                backgroundColor: item.priceType.color.withValues(alpha: 0.1),
                 child: Icon(
                   item.contentType.icon,
                   size: 20 * scale,
@@ -349,7 +349,7 @@ class _SearchScreenState extends State<SearchScreen> {
                         Container(
                           padding: EdgeInsets.symmetric(horizontal: 6, vertical: 1),
                           decoration: BoxDecoration(
-                            color: item.priceType.color.withOpacity(0.1),
+                            color: item.priceType.color.withValues(alpha: 0.1),
                             borderRadius: BorderRadius.circular(4),
                           ),
                           child: Text(

@@ -102,9 +102,9 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
                         child: Container(
                           padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
                           decoration: BoxDecoration(
-                            color: Colors.white.withOpacity(0.4),
+                            color: Colors.white.withValues(alpha: 0.4),
                             borderRadius: BorderRadius.circular(20),
-                            border: Border.all(color: Colors.white.withOpacity(0.5), width: 1),
+                            border: Border.all(color: Colors.white.withValues(alpha: 0.5), width: 1),
                           ),
                           child: Row(
                             mainAxisSize: MainAxisSize.min,
@@ -118,7 +118,7 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
                                 height: 8,
                                 decoration: BoxDecoration(
                                   // 7/19 fix v2: LinearGradient 全量清除
-                                  color: sel ? GlassStyle.accent : Colors.white.withOpacity(0.5),
+                                  color: sel ? GlassStyle.accent : Colors.white.withValues(alpha: 0.5),
                                   borderRadius: BorderRadius.circular(4),
                                 ),
                               );
@@ -141,12 +141,12 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
                           child: Container(
                             decoration: BoxDecoration(
                               // 7/19 fix v2: LinearGradient 全量清除 (shader null 真凶)
-                              color: GlassStyle.accent.withOpacity(0.85),
+                              color: GlassStyle.accent.withValues(alpha: 0.85),
                               borderRadius: BorderRadius.circular(20),
-                              border: Border.all(color: Colors.white.withOpacity(0.4), width: 1.2),
+                              border: Border.all(color: Colors.white.withValues(alpha: 0.4), width: 1.2),
                               boxShadow: [
                                 BoxShadow(
-                                  color: GlassStyle.accent.withOpacity(0.4),
+                                  color: GlassStyle.accent.withValues(alpha: 0.4),
                                   blurRadius: 16,
                                   offset: const Offset(0, 6),
                                 ),
@@ -248,7 +248,7 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
                 height: 112,
                 decoration: GlassStyle.glassLiquidButton(
                   radius: 40,
-                  borderColor: color.withOpacity(0.4),
+                  borderColor: color.withValues(alpha: 0.4),
                 ),
                 child: Stack(
                   alignment: Alignment.center,
@@ -262,7 +262,7 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
                             height: 45,
                             decoration: BoxDecoration(
                               // 7/19 fix v2: LinearGradient 全量清除
-                              color: Colors.white.withOpacity(0.2),
+                              color: Colors.white.withValues(alpha: 0.2),
                             ),
                           ),
                         ),
@@ -286,7 +286,7 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
             textAlign: TextAlign.center,
             style: TextStyle(
               fontSize: 15,
-              color: AppTheme.textDark.withOpacity(0.75),
+              color: AppTheme.textDark.withValues(alpha: 0.75),
               height: 1.6,
             ),
           ),

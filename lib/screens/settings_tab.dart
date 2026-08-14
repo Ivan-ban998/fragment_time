@@ -216,9 +216,9 @@ class SettingsTab extends StatelessWidget {
               Container(
                 padding: const EdgeInsets.all(12),
                 decoration: BoxDecoration(
-                  color: Colors.purple.withOpacity(0.05),
+                  color: Colors.purple.withValues(alpha: 0.05),
                   borderRadius: BorderRadius.circular(8),
-                  border: Border.all(color: Colors.purple.withOpacity(0.2)),
+                  border: Border.all(color: Colors.purple.withValues(alpha: 0.2)),
                 ),
                 child: Text(
                   recap.summary,
@@ -669,9 +669,9 @@ class _OctopusFeedbackListState extends State<_OctopusFeedbackList> {
     return Container(
       padding: EdgeInsets.all(12 * widget.scale),
       decoration: BoxDecoration(
-        color: Colors.white.withOpacity(0.4),
+        color: Colors.white.withValues(alpha: 0.4),
         borderRadius: BorderRadius.circular(12),
-        border: Border.all(color: Colors.white.withOpacity(0.4), width: 1),
+        border: Border.all(color: Colors.white.withValues(alpha: 0.4), width: 1),
       ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
@@ -693,7 +693,7 @@ class _OctopusFeedbackListState extends State<_OctopusFeedbackList> {
                 Container(
                   padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
                   decoration: BoxDecoration(
-                    color: Colors.orange.withOpacity(0.2),
+                    color: Colors.orange.withValues(alpha: 0.2),
                     borderRadius: BorderRadius.circular(6),
                   ),
                   child: Text(
@@ -783,7 +783,7 @@ class _OctopusFeedbackListState extends State<_OctopusFeedbackList> {
           Expanded(
             child: Text(
               msg,
-              style: TextStyle(fontSize: 11 * widget.scale, color: AppTheme.textDark.withOpacity(0.75)),
+              style: TextStyle(fontSize: 11 * widget.scale, color: AppTheme.textDark.withValues(alpha: 0.75)),
               maxLines: 1,
               overflow: TextOverflow.ellipsis,
             ),
@@ -816,9 +816,9 @@ class _WeeklyRecapCard extends StatelessWidget {
           padding: EdgeInsets.all(16 * scale),
           decoration: BoxDecoration(
             // 7/19 fix v2: LinearGradient 全量清除
-            color: AppTheme.primary.withOpacity(0.05),
+            color: AppTheme.primary.withValues(alpha: 0.05),
             borderRadius: BorderRadius.circular(16),
-            border: Border.all(color: AppTheme.primary.withOpacity(0.2)),
+            border: Border.all(color: AppTheme.primary.withValues(alpha: 0.2)),
           ),
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,

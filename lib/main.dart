@@ -810,7 +810,7 @@ class _MainHomeScreenState extends State<MainHomeScreen> {
                   child: Container(
                     padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 6),
                     decoration: BoxDecoration(
-                      color: isSelected ? AppTheme.primary.withOpacity(0.1) : Colors.grey[100],
+                      color: isSelected ? AppTheme.primary.withValues(alpha: 0.1) : Colors.grey[100],
                       borderRadius: BorderRadius.circular(12),
                       border: Border.all(
                         color: isSelected ? AppTheme.primary : Colors.transparent,
@@ -1040,7 +1040,7 @@ Widget _buildNavItem(
                       Icon(
                         selected ? iconActive : icon,
                         size: 20,
-                        color: selected ? Colors.white : AppTheme.textDark.withOpacity(0.65),
+                        color: selected ? Colors.white : AppTheme.textDark.withValues(alpha: 0.65),
                       ),
                       if (badge > 0)
                         Positioned(
@@ -1329,7 +1329,7 @@ class _DailyEncouragementBannerState extends State<_DailyEncouragementBanner> {
           borderRadius: BorderRadius.circular(16),
           boxShadow: [
             BoxShadow(
-              color: const Color(0xFF7C5CFC).withOpacity(0.25),
+              color: const Color(0xFF7C5CFC).withValues(alpha: 0.25),
               blurRadius: 10,
               offset: const Offset(0, 3),
             ),
@@ -1344,9 +1344,9 @@ class _DailyEncouragementBannerState extends State<_DailyEncouragementBanner> {
                     width: 44 * scale,
                     height: 44 * scale,
                     decoration: BoxDecoration(
-                      color: Colors.white.withOpacity(0.18),
+                      color: Colors.white.withValues(alpha: 0.18),
                       shape: BoxShape.circle,
-                      border: Border.all(color: Colors.white.withOpacity(0.45), width: 1.5),
+                      border: Border.all(color: Colors.white.withValues(alpha: 0.45), width: 1.5),
                     ),
                     alignment: Alignment.center,
                     child: Text(
@@ -1369,7 +1369,7 @@ class _DailyEncouragementBannerState extends State<_DailyEncouragementBanner> {
                           maxLines: 2,
                           overflow: TextOverflow.ellipsis,
                           style: TextStyle(
-                            color: Colors.white.withOpacity(0.98),
+                            color: Colors.white.withValues(alpha: 0.98),
                             fontSize: 14 * scale,
                             fontWeight: FontWeight.w600,
                             fontStyle: FontStyle.italic,
@@ -1390,7 +1390,7 @@ class _DailyEncouragementBannerState extends State<_DailyEncouragementBanner> {
                                     maxLines: 1,
                                     overflow: TextOverflow.ellipsis,
                                     style: TextStyle(
-                                      color: Colors.white.withOpacity(0.78),
+                                      color: Colors.white.withValues(alpha: 0.78),
                                       fontSize: 11 * scale,
                                       fontWeight: FontWeight.w500,
                                     ),
@@ -1458,7 +1458,7 @@ class _DailyEncouragementBannerState extends State<_DailyEncouragementBanner> {
                       maxLines: 1,
                       overflow: TextOverflow.ellipsis,
                       style: TextStyle(
-                        color: Colors.white.withOpacity(0.95),
+                        color: Colors.white.withValues(alpha: 0.95),
                         fontSize: 13 * scale,
                         fontWeight: FontWeight.w500,
                         fontStyle: FontStyle.italic,
@@ -1707,7 +1707,7 @@ class _QuoteDetailSheet extends StatelessWidget {
                     ...llmKeywords!.map((kw) => Container(
                       padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
                       decoration: BoxDecoration(
-                        color: const Color(0xFF7C5CFC).withOpacity(0.1),
+                        color: const Color(0xFF7C5CFC).withValues(alpha: 0.1),
                         borderRadius: BorderRadius.circular(8),
                       ),
                       child: Text(
@@ -1726,8 +1726,8 @@ class _QuoteDetailSheet extends StatelessWidget {
                   child: Card(
                     elevation: 0,
                     color: h.fromLlm
-                        ? Colors.amber.withOpacity(0.08)
-                        : const Color(0xFF7C5CFC).withOpacity(0.06),
+                        ? Colors.amber.withValues(alpha: 0.08)
+                        : const Color(0xFF7C5CFC).withValues(alpha: 0.06),
                     shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
                     child: InkWell(
                       borderRadius: BorderRadius.circular(14),
@@ -1774,7 +1774,7 @@ class _QuoteDetailSheet extends StatelessWidget {
                 padding: const EdgeInsets.only(bottom: 10),
                 child: Card(
                   elevation: 0,
-                  color: const Color(0xFF7C5CFC).withOpacity(0.06),
+                  color: const Color(0xFF7C5CFC).withValues(alpha: 0.06),
                   shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
                   child: Padding(
                     padding: const EdgeInsets.all(12),

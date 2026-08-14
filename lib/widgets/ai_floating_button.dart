@@ -33,7 +33,7 @@ class AiFloatingFab extends StatelessWidget {
             shape: BoxShape.circle,
             boxShadow: [
               BoxShadow(
-                color: const Color(0xFF7C5CFC).withOpacity(0.4),
+                color: const Color(0xFF7C5CFC).withValues(alpha: 0.4),
                 blurRadius: 16,
                 offset: const Offset(0, 6),
               ),
@@ -56,7 +56,7 @@ class AiFloatingFab extends StatelessWidget {
                   height: size * 0.25,
                   decoration: BoxDecoration(
                     // 7/19 fix v2: 顶高光弧 LinearGradient 全量清除
-                    color: Colors.white.withOpacity(0.25),
+                    color: Colors.white.withValues(alpha: 0.25),
                     borderRadius: BorderRadius.circular(size / 2),
                   ),
                 ),

@@ -104,12 +104,12 @@ class _AbilityCard extends StatelessWidget {
         child: Container(
           padding: const EdgeInsets.all(20),
           decoration: BoxDecoration(
-            color: Colors.white.withOpacity(0.7),
+            color: Colors.white.withValues(alpha: 0.7),
             borderRadius: BorderRadius.circular(20),
-            border: Border.all(color: Colors.white.withOpacity(0.5), width: 1),
+            border: Border.all(color: Colors.white.withValues(alpha: 0.5), width: 1),
             boxShadow: [
               BoxShadow(
-                color: Colors.black.withOpacity(0.04),
+                color: Colors.black.withValues(alpha: 0.04),
                 blurRadius: 12,
                 offset: const Offset(0, 4),
               ),
@@ -219,8 +219,8 @@ class _ChipButton extends StatelessWidget {
     return ActionChip(
       avatar: Text(def.emoji, style: const TextStyle(fontSize: 14)),
       label: Text(def.label, style: const TextStyle(fontSize: 13)),
-      backgroundColor: const Color(0xFF7C5CFC).withOpacity(0.08),
-      side: BorderSide(color: const Color(0xFF7C5CFC).withOpacity(0.3)),
+      backgroundColor: const Color(0xFF7C5CFC).withValues(alpha: 0.08),
+      side: BorderSide(color: const Color(0xFF7C5CFC).withValues(alpha: 0.3)),
       onPressed: () {
         // 6/30 00:18: chip 简化为弹 chat sheet, 走跟按钮一样的路径
         // 内部用 sheet 内的 25 chip 机制 (0 LLM)

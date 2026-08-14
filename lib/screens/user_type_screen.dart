@@ -138,7 +138,7 @@ class _UserTypeScreenState extends State<UserTypeScreen> {
                     child: Container(
                       padding: EdgeInsets.symmetric(horizontal: 10 * scale, vertical: 6 * scale),
                       decoration: BoxDecoration(
-                        color: AppTheme.primary.withOpacity(0.1),
+                        color: AppTheme.primary.withValues(alpha: 0.1),
                         borderRadius: BorderRadius.circular(16),
                       ),
                       child: Row(
@@ -222,9 +222,9 @@ class _UserTypeScreenState extends State<UserTypeScreen> {
                   margin: EdgeInsets.only(bottom: 12 * scale),
                   padding: EdgeInsets.symmetric(horizontal: 14 * scale, vertical: 10 * scale),
                   decoration: BoxDecoration(
-                    color: AppTheme.primary.withOpacity(0.08),
+                    color: AppTheme.primary.withValues(alpha: 0.08),
                     borderRadius: BorderRadius.circular(12),
-                    border: Border.all(color: AppTheme.primary.withOpacity(0.2)),
+                    border: Border.all(color: AppTheme.primary.withValues(alpha: 0.2)),
                   ),
                   child: Row(children: [
                     Icon(Icons.touch_app, size: 14 * scale, color: AppTheme.primary),
@@ -261,7 +261,7 @@ class _UserTypeScreenState extends State<UserTypeScreen> {
                   child: Container(
                     padding: EdgeInsets.symmetric(horizontal: 16 * scale, vertical: 8 * scale),
                     decoration: BoxDecoration(
-                      color: AppTheme.primary.withOpacity(0.1),
+                      color: AppTheme.primary.withValues(alpha: 0.1),
                       borderRadius: BorderRadius.circular(20),
                     ),
                     child: Row(
@@ -403,8 +403,8 @@ class _UserTypeCard extends StatelessWidget {
             borderRadius: BorderRadius.circular(20),
             // 7/19 fix v2: LinearGradient 全量清除 (shader null)
             color: isSelected
-                ? AppTheme.primary.withOpacity(0.2)
-                : AppTheme.primary.withOpacity(0.08),
+                ? AppTheme.primary.withValues(alpha: 0.2)
+                : AppTheme.primary.withValues(alpha: 0.08),
           ),
           child: Column(
             mainAxisAlignment: MainAxisAlignment.center,
@@ -442,9 +442,9 @@ class _ChooseRoleHint extends StatelessWidget {
     return Container(
       padding: EdgeInsets.symmetric(horizontal: 16 * scale, vertical: 14 * scale),
       decoration: BoxDecoration(
-        color: AppTheme.primary.withOpacity(0.08),
+        color: AppTheme.primary.withValues(alpha: 0.08),
         borderRadius: BorderRadius.circular(20),
-        border: Border.all(color: AppTheme.primary.withOpacity(0.2)),
+        border: Border.all(color: AppTheme.primary.withValues(alpha: 0.2)),
       ),
       child: Row(
         children: [
@@ -491,7 +491,7 @@ class _TodayPickCard extends StatelessWidget {
           borderRadius: BorderRadius.circular(20),
           boxShadow: [
             BoxShadow(
-              color: const Color(0xFF7C5CFC).withOpacity(0.3),
+              color: const Color(0xFF7C5CFC).withValues(alpha: 0.3),
               blurRadius: 12,
               offset: const Offset(0, 4),
             ),
@@ -508,7 +508,7 @@ class _TodayPickCard extends StatelessWidget {
                   Text(
                     isEn ? '"What should I read now?"' : '"现在看什么？"',
                     style: TextStyle(
-                      color: Colors.white.withOpacity(0.85),
+                      color: Colors.white.withValues(alpha: 0.85),
                       fontSize: 11 * scale,
                       fontStyle: FontStyle.italic,
                     ),
@@ -606,10 +606,10 @@ class _InProgressRowState extends State<_InProgressRow> {
               width: 200 * widget.scale,
               padding: EdgeInsets.all(10 * widget.scale),
               decoration: BoxDecoration(
-                color: AppTheme.primary.withOpacity(0.08),
+                color: AppTheme.primary.withValues(alpha: 0.08),
                 borderRadius: BorderRadius.circular(14),
                 border: Border.all(
-                  color: AppTheme.primary.withOpacity(0.2),
+                  color: AppTheme.primary.withValues(alpha: 0.2),
                   width: 1,
                 ),
               ),
@@ -625,7 +625,7 @@ class _InProgressRowState extends State<_InProgressRow> {
                         CircularProgressIndicator(
                           value: item.progress / 100,
                           strokeWidth: 3,
-                          backgroundColor: AppTheme.primary.withOpacity(0.15),
+                          backgroundColor: AppTheme.primary.withValues(alpha: 0.15),
                           valueColor: AlwaysStoppedAnimation(AppTheme.primary),
                         ),
                         Text(
