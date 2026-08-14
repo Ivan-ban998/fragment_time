@@ -67,22 +67,26 @@ static const String _proxyBase = '/rss';
   static const String _sspaiFeed = 'https://sspai.com/feed';
   // 国际版: The Verge
   static const String _vergeFeed = 'https://www.theverge.com/rss/index.xml';
-  // 8/13 加 (沿 ROADMAP #D): NPR Top Stories (公开 RSS, 听场景补源, 24 桶都能用)
-  static const String _nprFeed = 'https://feeds.npr.org/1001/rss.xml';
-  // 8/13 加: NPR Music (听场景专属 — 音乐/演出/专辑/歌手都命中)
-  static const String _nprMusicFeed = 'https://feeds.npr.org/1039/rss.xml';
+  /// 8/13 加 (沿 ROADMAP #D): NPR Top Stories (公开 RSS, 听场景补源, 24 桶都能用)
+    static const String _nprFeed = 'https://feeds.npr.org/1001/rss.xml';
+    // 8/13 加: NPR Music (听场景专属 — 音乐/演出/专辑/歌手都命中)
+    static const String _nprMusicFeed = 'https://feeds.npr.org/1039/rss.xml';
 
-  // 8/13 加 (沿 SOUL #198 #137 #190 第 N+5 次): 4 场景真凶治本
-  //   真凶: 4 场景都从 sspai 拉 10 条 → 主题词筛后 4-5 条永远同组 → 推荐重叠
-  //   修法: 加 7 个真公开 RSS 源 (curl 实测 30-100 items/源) + 按 scene 偏不同源
-  //   learn: 极客公园 (30) + IT之家 (60) + Hacker News Best (30) = 120 items 科技
-  //   listen: NPR Music (10) + 豆瓣音乐 (20) + NPR Arts (10) = 40 items 音乐/艺术
-  //   relax: 豆瓣热门 (20) + 豆瓣电影 (20) + Solidot (20) + Lifehacker (100) = 160 items 生活
-  //   workout: 少数派 (10, 工具体系) + Solidot (20 部分) = 真实 RSS 不够, 精选兑底
-  static const String _geekparkFeed = 'https://www.geekpark.net/rss';
-  static const String _ithomeFeed = 'https://www.ithome.com/rss/';
-  static const String _solidotFeed = 'https://www.solidot.org/index.rss';
-  static const String _hnBestFeed = 'https://hnrss.org/best';
+    // 8/13 加 (沿 SOUL #198 #137 #190 第 N+5 次): 4 场景真凶治本
+    //   真凶: 4 场景都从 sspai 拉 10 条 → 主题词筛后 4-5 条永远同组 → 推荐重叠
+    //   修法: 加 7 个真公开 RSS 源 (curl 实测 30-100 items/源) + 按 scene 偏不同源
+    //   learn: 极客公园 (30) + IT之家 (60) + Hacker News Best (30) = 120 items 科技
+    //   listen: NPR Music (10) + 豆瓣音乐 (20) + NPR Arts (10) = 40 items 音乐/艺术
+    //   relax: 豆瓣热门 (20) + 豆瓣电影 (20) + Solidot (20) + Lifehacker (100) = 160 items 生活
+    //   workout: 少数派 (10, 工具体系) + Solidot (20 部分) = 真实 RSS 不够, 精选兑底
+    static const String _geekparkFeed = 'https://www.geekpark.net/rss';
+    static const String _ithomeFeed = 'https://www.ithome.com/rss/';
+    static const String _solidotFeed = 'https://www.solidot.org/index.rss';
+    static const String _hnBestFeed = 'https://hnrss.org/best';  // 8/14 标记: 慢, 已用 TechCrunch/Ars/Engadget 替代
+    // 8/14 二次治本 (沿 SOUL #8): HN Best 3.7s 慢 → 替换为 TechCrunch + Ars Technica + Engadget (0.25-0.59s 快)
+    static const String _techCrunchFeed = 'https://techcrunch.com/feed/';
+    static const String _arsFeed = 'https://feeds.arstechnica.com/arstechnica/index';
+    static const String _engadgetFeed = 'https://www.engadget.com/rss.xml';
   static const String _doubanBookFeed = 'https://www.douban.com/feed/review/book';
   static const String _doubanMovieFeed = 'https://www.douban.com/feed/review/movie';
   static const String _doubanMusicFeed = 'https://www.douban.com/feed/review/music';
@@ -203,9 +207,9 @@ static const String _proxyBase = '/rss';
       //              豆瓣电影 20, 豆瓣音乐 20, Solidot 20, Lifehacker 100 (8/14 移除, 解析 8s)
       switch (scene) {
         case Scene.learn:
-          // learn: 偏科技/技术/商业 — IT之家 + 少数派 + HN Best
-          // 8/14 二次治本: 移除 geekpark (700KB 4-6s) + 36kr (WAF 8s+ timeout)
-          return [_ithomeFeed, _sspaiFeed, _hnBestFeed];
+          // learn: 偏科技/技术/商业 — IT之家 + 少数派 + TechCrunch + Ars
+          // 8/14 三次治本: HN Best 3.7s 慢 → TechCrunch 0.25s + Ars 0.34s (快 + 多内容)
+          return [_ithomeFeed, _sspaiFeed, _techCrunchFeed, _arsFeed];
         case Scene.listen:
           // listen: 偏音乐/艺术/英文 podcast — 豆瓣音乐 + NPR Music + NPR Arts
           return [_doubanMusicFeed, _nprMusicFeed, _nprArtsFeed, _nprFeed];
@@ -214,17 +218,18 @@ static const String _proxyBase = '/rss';
           // 8/14: 移除 lifehacker (8s+ 解析慢拖累), 替换为 豆瓣热门 重复 + sspai
           return [_doubanBookFeed, _doubanMovieFeed, _solidotFeed, _doubanMusicFeed, _sspaiFeed];
         case Scene.workout:
-          // workout: 真实 RSS 不够, 偏生活 + 杂谈 + 工具 — 少数派 + Solidot + 豆瓣热门
-          return [_sspaiFeed, _solidotFeed, _doubanBookFeed, _hnBestFeed];
+          // workout: 真实 RSS 不够, 偏生活 + 杂谈 + 工具 — 少数派 + Solidot + 豆瓣热门 + Engadget
+          // 8/14 三次治本: HN Best 慢 → Engadget 0.59s
+          return [_sspaiFeed, _solidotFeed, _doubanBookFeed, _engadgetFeed];
         default:
           return _feedUrls;
       }
     } else {
       // 8/13 升一阶: 国际版 4 场景偏不同 NPR 源
-      // 8/14 二次治本: 移除 lifehacker + geekpark + 36kr (慢源)
+      // 8/14 三次治本: HN Best 慢 → TechCrunch 替代
       switch (scene) {
         case Scene.learn:
-          return [_nprBooksFeed, _nprFeed, _vergeFeed, _hnBestFeed];
+          return [_nprBooksFeed, _nprFeed, _vergeFeed, _techCrunchFeed];
         case Scene.listen:
           return [_nprMusicFeed, _nprArtsFeed, _nprFeed];
         case Scene.relax:
@@ -332,10 +337,30 @@ static const String _proxyBase = '/rss';
     // 8/14 治本 (沿 SOUL #198): 之前用 _feedUrls (国内 [sspai, NPR, 36kr]) → 只返回 3 源
     //   真凶: 但 fetchTop 实际拉 4-5 源 (_feedUrlsForScene) → 极客/IT之家/HN 数据丢
     //   修: 用 feedUrls 替代 _feedUrls (本次循环用的源列表)
+    // 8/14 三次治本 (沿 SOUL #169 不撒谎): sourceName 重写, 避免 disk cache 老 '36氪' 污染
+    //   真凶: disk cache 写入的 sourceName='36氪' (instance _sourceName), 后续命中 disk cache 的
+    //     rssItem 仍带 '36氪' 标签 → UI 显示错误 source
+    //   修: 在 fetchTop 末尾按 host 重写每 item sourceName
     final List<RssItem> result = [];
     for (final feedUrl in feedUrls) {
       final mem = _cachedByFeedUrl[feedUrl];
-      if (mem != null) result.addAll(mem);
+      if (mem != null) {
+        // 8/14 三次治本: 修正 sourceName (disk cache stale)
+        final correctName = _resolveSourceName(feedUrl);
+        for (final item in mem) {
+          if (item.sourceName != correctName) {
+            result.add(RssItem(
+              title: item.title,
+              url: item.url,
+              description: item.description,
+              pubDate: item.pubDate,
+              sourceName: correctName,
+            ));
+          } else {
+            result.add(item);
+          }
+        }
+      }
     }
     return result;
   }
@@ -408,9 +433,10 @@ static const String _proxyBase = '/rss';
           //   真凶: 后端 curl 返 10 条, 但 Dart http package 在 web 上可能 body 被截断 / 编码错
           webconsole.log('[rss] $feedUrl → status=${resp.statusCode} bodyLen=${resp.body.length}');
           // 8/14 治本 (沿 SOUL #18 #103): 大 body (700KB+) 解析可能慢, 包 Future.timeout
+          // 8/14 三次治本: 传 feedUrl 给 _parse 让 sourceName 真解析 (避免所有 RSS 标 '36氪')
           List<RssItem> items;
           try {
-            items = await Future(() => _parse(resp.body, limit))
+            items = await Future(() => _parse(resp.body, limit, feedUrl))
                 .timeout(const Duration(seconds: 2), onTimeout: () {
               webconsole.log('[rss] $feedUrl → parse timeout 2s, return []');
               return <RssItem>[];
@@ -439,7 +465,10 @@ static const String _proxyBase = '/rss';
     return [];
   }
 
-  List<RssItem> _parse(String body, int limit) {
+  // 8/14 三次治本 (沿 SOUL #169 不撒谎): 加 feedUrl 参数 → sourceName 真实
+  List<RssItem> _parse(String body, int limit, String feedUrl) {
+    // 8/14: 在 parse 时根据 feedUrl 设 sourceName (而不是用 instance _sourceName='36氪' fallback)
+    final realSourceName = _resolveSourceName(feedUrl);
     try {
       final doc = xml.XmlDocument.parse(body);
       // RSS 2.0 用 <item>, Atom 用 <entry>, 7/29 加 Atom fallback (少数派是 Atom)
@@ -479,7 +508,7 @@ static const String _proxyBase = '/rss';
             url: url,
             description: desc,
             pubDate: dt,
-            sourceName: _sourceName,
+            sourceName: realSourceName,  // 8/14 三次治本: 用 feedUrl 解析的真 sourceName (不再是 '36氪')
           ),
         );
       }
@@ -516,11 +545,12 @@ static const String _proxyBase = '/rss';
 
   /// 7/14 加: 把 RSS item 转 ContentItem (适配 24 桶)
   ContentItem toContentItem(RssItem r, {String contentType = 'article'}) {
-    // 8/13 治本 (沿 SOUL #169 不撒谎 + 透明原则): 用真实 source name 替代 _sourceName
-    //   真凶: 之前 _sourceName 写死 '36氪' / 'The Verge' → NPR item 也显示 '36氪' (跨源混杂)
-    //   后果: UI 显示 "来源:36氪" 但实际是 NPR Music 英文 podcast → 误导用户
-    //   修: source 用真实 feedUrl host (sspai.com → '少数派', npr.org → 'NPR', 36kr.com → '36氪')
-    final realSource = _resolveSourceName(r.url);
+    // 8/14 三次治本 (沿 SOUL #169 不撒谎 + #198): source 用 rssItem.sourceName (来自 feedUrl)
+    //   真凶: 之前 _resolveSourceName(r.url) 用 item url (music.douban.com/review/...)
+    //     → 不匹配 feedUrl 检测 → fallthrough 到 _sourceName='36氪' (instance)
+    //     → 所有 RSS item UI 显示 '36氪' (包括 NPR/豆瓣音乐/IT之家)
+    //   修: 用 r.sourceName (在 _parse 时根据 feedUrl 真解析写入)
+    final realSource = r.sourceName.isNotEmpty ? r.sourceName : _resolveSourceName(r.url);
     // 8/13 治本 (沿 SOUL #198 #137 真凶链第 2 弹): 4 场景重叠
     //   真凶: 之前 sourceType 用 isInternational 写死 'rss' 或 'news36kr' → 国内所有 RSS 都标 news36kr
     //     → ContentScreen / 数据流无法区分 source → 4 场景推荐池完全共享 → 高度重叠
@@ -565,7 +595,10 @@ static const String _proxyBase = '/rss';
     if (url.contains('douban.com/feed/review/book')) return '豆瓣读书';
     if (url.contains('douban.com/feed/review/movie')) return '豆瓣电影';
     if (url.contains('douban.com/feed/review/music')) return '豆瓣音乐';
-    if (url.contains('lifehacker.com')) return 'Lifehacker';
+    // 8/14 三次治本: HN Best 替换为 3 快源
+    if (url.contains('techcrunch.com')) return 'TechCrunch';
+    if (url.contains('arstechnica.com')) return 'Ars Technica';
+    if (url.contains('engadget.com')) return 'Engadget';
     // fallback: 原 _sourceName
     return _sourceName;
   }
