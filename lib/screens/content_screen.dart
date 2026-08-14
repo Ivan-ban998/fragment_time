@@ -160,6 +160,23 @@ class _ContentScreenState extends State<ContentScreen> {
     );
   }
 
+  /// 8/14 加 (沿 SOUL #18 #103): 监听 userType/scene/isInternational 变化, 重建推荐
+  ///   真凶: 之前 SceneScreen key 只跟 userType (没 isInternational), 切国际版
+  ///     → SceneScreen didUpdateWidget rebuild → ContentScreen widget isInternational
+  ///     变了 → 没 didUpdateWidget → _recItems 还是旧国际版/国内版 → "切了国际版不变"
+  ///   修: didUpdateWidget 检测 scene/userType/isInternational 变化 → force=true 重启
+  @override
+  void didUpdateWidget(covariant ContentScreen oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    if (oldWidget.userType != widget.userType ||
+        oldWidget.scene != widget.scene ||
+        oldWidget.isInternational != widget.isInternational) {
+      debugPrint('[content] didUpdateWidget: ${oldWidget.userType}/${oldWidget.scene}/intl=${oldWidget.isInternational} → ${widget.userType}/${widget.scene}/intl=${widget.isInternational}, 重建推荐');
+      _recOffset = 0;
+      _loadRecommendations(force: true);
+    }
+  }
+
   @override
   void dispose() {
     _llmFallbackTimer?.cancel();
@@ -321,11 +338,17 @@ class _ContentScreenState extends State<ContentScreen> {
     //     收到 force=true 仍未重置 _recLoading 守卫, 后续 await fallback 期间 _recLoading
     //     可能被 setState 切回 true ("换 6 张" 不响应)
     //   修: force=true 显式 _recLoading = false + _recRetryCount = 0, 触发新一轮真 load
+    // 8/14 治本 (沿 SOUL #18 真改没改对 第 N+7 次): race condition 修复
+    //   真凶: 之前 force=true 设 _recLoading=false (line 325), 但 Step 2 line 360 又 setState(_recLoading=true)
+    //     → 用户连点 "换 6 张" 2 次 → 第 1 次 Step 2 在 await → 第 2 次 force 又走 Step 1
+    //     → Step 1 设 _recItems 覆盖第 1 次 Step 2 的新结果
+    //   修: 用 _recLoading=true 守卫直到 Step 2 完成 (force=true 才 bypass)
+    //   副作用: force=true "换 6 张" 显示 1s loading → UX OK (Step 1 仍 < 100ms 返 fallback)
     if (force) {
       _recLoading = false;
       _recRetryCount = 0;
     }
-    if (_recLoading) return;
+    if (_recLoading) return; // 关键: 这里 _recLoading=true 表示上一轮 Step 2 还在, 跳过
     if (_recRetryCount >= 3 && !force) {
       return;
     }
@@ -338,6 +361,12 @@ class _ContentScreenState extends State<ContentScreen> {
     // 8/13 升一阶 (沿 SOUL #190 第 N+4 次): 重载时 forceFresh=true 跳过 in-memory cache
     //   真凶: 5min cache + shuffle 仍同组 → "换 6 张" 老卡
     //   修: force=true (换 6 张) → forceFresh=true 跳过 cache
+    // 8/14 治本: force=true 时立刻 setState _recLoading=true 占位, 阻止新一轮 race
+    if (force) {
+      setState(() {
+        _recLoading = true;
+      });
+    }
     final dismissedIds = await UserPreferenceService.instance.getDismissedIds();
     final fallback = NewsService().getRecommendations(
       widget.userType, widget.scene,
@@ -349,21 +378,28 @@ class _ContentScreenState extends State<ContentScreen> {
     if (fallbackItems.isNotEmpty) {
       setState(() {
         _recItems = fallbackItems;
-        _recLoading = false;
+        // 8/14: force 模式下 _recLoading 保持 true, 等 Step 2 完成后才 false
+        if (!force) _recLoading = false;
       });
-    } else {
+    } else if (!force) {
+      // 8/14: force 模式且 fallback 空 → _recLoading 保持 true 等 Step 2
       setState(() {
         _recLoading = false;
       });
     }
     // Step 2: 后台异步拉真 RSS — 拿到后覆盖 fallback (如果是非空)
-    setState(() => _recLoading = true);
+    // 8/14: 不再 setState(true), 因为 force 模式已经在上面 setState(true) 过了
     try {
+      // 8/14 治本 (沿 SOUL #190 真改没改对 第 N+6 次): Step 2 跟 Step 1 一样 forceFresh=force
+      //   真凶: 之前 Step 2 不传 forceFresh, 5min cache 命中 → "换 6 张" 老卡覆盖 Step 1 新卡
+      //   修: Step 2 跟 Step 1 一样 forceFresh=force + excludeIds 一致 → 两步一致
       final rec = await ContentAggregator().fetchRecommendContent(
         userType: widget.userType,
         scene: widget.scene,
         isInternational: widget.isInternational,
         offset: _recOffset, // 8/1 加 (沿用 #103): 让 Step 2 跟 Step 1 用同样 offset, 避免覆盖回旧 6 条
+        forceFresh: force, // 8/14 透传 force → Step 2 跟 Step 1 同样跳过 in-memory cache
+        excludeIds: dismissedIds, // 8/14 透传 dismissedIds → Step 2 也排除 ❌ 过的
       );
       if (!mounted) return;
       if (rec.isNotEmpty) {
