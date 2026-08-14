@@ -254,8 +254,12 @@ static const String _proxyBase = '/rss';
 
     // 8/13 升一阶 (沿 SOUL #198): 用 _feedUrlsForScene 替代 _feedUrls
     // 8/13 升一阶: 用传进来的 scene (避免 instance _currentScene 串扰)
+    // 8/13 治本 (沿 SOUL #18 #6 #103 真改没改对 第 N+6 次): disk cache 并发加载
+    //   真凶: 之前 _loadFromDisk 在 for 循环里 await → 4-5 源 × 200ms = 1s 额外等
+    //   修: Future.wait 并发加载
     if (scene != null) _currentScene = scene;
     final feedUrls = _feedUrlsForScene;
+    final diskFutures = <String, Future<List<RssItem>>>{};
     for (final feedUrl in feedUrls) {
       // 1. in-memory cache (5min TTL) — forceFresh=true 跳过
       if (!forceFresh &&
@@ -265,43 +269,71 @@ static const String _proxyBase = '/rss';
         aggregated.addAll(_cachedByFeedUrl[feedUrl]!);
         continue;
       }
-      // 2. disk cache (冷启动用) — 同步返旧数据, 后台静默刷新
-      final diskItems = await _loadFromDisk(feedUrl);
-      if (diskItems.isNotEmpty) {
-        // 旧数据先填占位 (in-memory 也写一份, 5min 内不重复查 disk)
-        _cachedByFeedUrl[feedUrl] = diskItems;
-        _cacheLoadedAt ??= DateTime.now();
-        aggregated.addAll(diskItems);
+      // 2. disk cache (冷启动用) — 异步并发加载
+      diskFutures[feedUrl] = _loadFromDisk(feedUrl);
+    }
+    if (diskFutures.isNotEmpty) {
+      final diskResults = await Future.wait(
+        diskFutures.entries.map((e) async {
+          final items = await e.value;
+          return MapEntry(e.key, items);
+        }),
+        eagerError: false,
+      );
+      for (final entry in diskResults) {
+        final feedUrl = entry.key;
+        final items = entry.value;
+        if (items.isNotEmpty) {
+          // 旧数据先填占位 (in-memory 也写一份, 5min 内不重复查 disk)
+          _cachedByFeedUrl[feedUrl] = items;
+          _cacheLoadedAt ??= DateTime.now();
+          aggregated.addAll(items);
+          // 不需要再 fetch (有 disk 数据 = 静默后台刷新)
+        } else {
+          // 3. 无 disk 数据 → 需要 fetch
+          needsFetch.add(feedUrl);
+        }
       }
-      // 3. 标记要 fetch (有 disk 数据 = 静默后台, 无 disk 数据 = 同步等)
-      needsFetch.add(feedUrl);
     }
 
     // 4. 并发 fetch (沿 SOUL #137 dedupe: 同源串行, 不同源并发)
+    // 8/13 治本 (沿 SOUL #18 真改没改对 第 N+6 次): 之前 for await 串行
+    //   真凶: 4 源 × 8s = 32s 最差 → 用户等 30s+ 转圈
+    //   修: Future.wait 真并发 → 总耗时 = 最慢单源 (≈ 4s, 36kr WAF 后 timeout)
+    // 8/13 治本 (沿 SOUL #6): 单源失败 catch → 不影响其他源
+    final fetchFutures = <Future<void>>[];
     for (final feedUrl in needsFetch) {
       final inFlight = _pendingByFeedUrl[feedUrl];
       if (inFlight != null) {
-        await inFlight;
+        fetchFutures.add(inFlight);
         continue;
       }
       final future = _fetchFeed(feedUrl, limit: limit);
       _pendingByFeedUrl[feedUrl] = future;
-      try {
-        final items = await future;
-        if (items.isNotEmpty) {
-          _cachedByFeedUrl[feedUrl] = items;
-          _cacheLoadedAt ??= DateTime.now();
-          // 8/8 新加: 落盘 (fire-and-forget, 不阻塞)
-          unawaited(_saveToDisk(feedUrl, items));
-        }
-      } finally {
-        _pendingByFeedUrl.remove(feedUrl);
-      }
+      fetchFutures.add(
+        future.then((items) {
+          if (items.isNotEmpty) {
+            _cachedByFeedUrl[feedUrl] = items;
+            _cacheLoadedAt ??= DateTime.now();
+            unawaited(_saveToDisk(feedUrl, items));
+          }
+        }, onError: (e) {
+          // 8/13 治本: 单源失败 (timeout/network) → 跳过, 不影响其他源
+        }).whenComplete(() {
+          _pendingByFeedUrl.remove(feedUrl);
+        }),
+      );
+    }
+    if (fetchFutures.isNotEmpty) {
+      await Future.wait(fetchFutures, eagerError: false);
     }
 
     // 5. 重组结果: 优先取最新 in-memory (fetch 后已更新), 没 fetch 到的用 disk
+    // 8/14 治本 (沿 SOUL #198): 之前用 _feedUrls (国内 [sspai, NPR, 36kr]) → 只返回 3 源
+    //   真凶: 但 fetchTop 实际拉 4-5 源 (_feedUrlsForScene) → 极客/IT之家/HN 数据丢
+    //   修: 用 feedUrls 替代 _feedUrls (本次循环用的源列表)
     final List<RssItem> result = [];
-    for (final feedUrl in _feedUrls) {
+    for (final feedUrl in feedUrls) {
       final mem = _cachedByFeedUrl[feedUrl];
       if (mem != null) result.addAll(mem);
     }
@@ -355,7 +387,11 @@ static const String _proxyBase = '/rss';
 
   /// 8/7 加 (沿 SOUL #137): 单源 RSS 拉取 (1 个 HTTP 请求)
   Future<List<RssItem>> _fetchFeed(String feedUrl, {required int limit}) async {
-    for (var attempt = 1; attempt <= 2; attempt++) {
+    // 8/14 治本 (沿 SOUL #18 #103 真改没改对 第 N+7 次): timeout 8s → 4s, retries 2 → 1
+    //   真凶: 之前 8s × 2 retries = 16s worst case per source → fetchByBucket 等 16s
+    //   修: 4s × 1 retry = 4s worst case → 总耗时 = max(4s) 即使单源慢
+    //   副作用: 真的慢源直接 fail 跳过, 不拖累其他 (之前 36kr WAF 等 8s 才 502)
+    for (var attempt = 1; attempt <= 1; attempt++) {
       try {
         final resp = await http
             .get(
@@ -365,13 +401,24 @@ static const String _proxyBase = '/rss';
                 'Accept': 'application/rss+xml, application/xml;q=0.9, */*;q=0.8',
               },
             )
-            .timeout(const Duration(seconds: 8));
+            .timeout(const Duration(seconds: 4));
 
         if (resp.statusCode == 200) {
           // 8/7 加 (沿 SOUL #137 真凶): web 专用 console.log 验 0 条真凶
           //   真凶: 后端 curl 返 10 条, 但 Dart http package 在 web 上可能 body 被截断 / 编码错
           webconsole.log('[rss] $feedUrl → status=${resp.statusCode} bodyLen=${resp.body.length}');
-          final items = _parse(resp.body, limit);
+          // 8/14 治本 (沿 SOUL #18 #103): 大 body (700KB+) 解析可能慢, 包 Future.timeout
+          List<RssItem> items;
+          try {
+            items = await Future(() => _parse(resp.body, limit))
+                .timeout(const Duration(seconds: 2), onTimeout: () {
+              webconsole.log('[rss] $feedUrl → parse timeout 2s, return []');
+              return <RssItem>[];
+            });
+          } catch (e) {
+            webconsole.log('[rss] $feedUrl → parse error: $e');
+            items = <RssItem>[];
+          }
           webconsole.log('[rss] $feedUrl → parsed ${items.length} items');
           if (items.isNotEmpty) return items;
           // 解析空 -> 试下一个源 (在外层循环里 break 走)
