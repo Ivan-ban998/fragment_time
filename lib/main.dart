@@ -347,6 +347,15 @@ class _MainHomeScreenState extends State<MainHomeScreen> {
   bool _showWelcome = true; // 6/25 Brien 反馈: 首启欢迎屏 (取昵称/跳过)
   bool _checkedWelcome = false;
 
+
+  // 8/16 加 (沿 SOUL #103): public method 替代外部 setState (avoid protected warning)
+  void switchTab(int index) {
+    setState(() {
+      _selectedIndex = index;
+      if (_showOnboarding) _showOnboarding = false;
+    });
+    if (index == 2) _refreshSubscriptionBadge();
+  }
   @override
   void initState() {
     super.initState();
@@ -1016,11 +1025,8 @@ Widget _buildNavItem(
         child: InkWell(
           borderRadius: BorderRadius.circular(20),
           onTap: () {
-            mainState.setState(() {
-              mainState._selectedIndex = index;
-              if (mainState._showOnboarding) mainState._showOnboarding = false;
-            });
-            if (index == 2) mainState._refreshSubscriptionBadge();
+            // 8/16 修 (沿 SOUL #103): 用 public method 替代外部 setState (avoid protected warning)
+            mainState.switchTab(index);
           },
           child: Padding(
             padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 6),
