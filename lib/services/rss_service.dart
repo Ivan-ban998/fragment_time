@@ -664,8 +664,18 @@ static const String _proxyBase = '/rss';
     if (url.contains('techcrunch.com')) return 'TechCrunch';
     if (url.contains('arstechnica.com')) return 'Ars Technica';
     if (url.contains('engadget.com')) return 'Engadget';
-    // fallback: 原 _sourceName
-    return _sourceName;
+    // 8/16 修 (沿 SOUL #169 不撒谎): fallback 不用 _sourceName (写死 '36氪')
+    //   真凶: 新 RSS 源没 mapping → 返 _sourceName='36氪' 误导用户
+    //   修: fallback 返 'RSS' (中性) + 末尾带 host (给 Brien 调试用)
+    if (url.contains('://')) {
+      try {
+        final host = Uri.parse(url).host;
+        return host.isNotEmpty ? 'RSS ($host)' : 'RSS';
+      } catch (_) {
+        return 'RSS';
+      }
+    }
+    return 'RSS';
   }
 
   /// 8/13 加: 从 URL 解析真实 ContentSource (跟 source name 同步)
