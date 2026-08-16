@@ -535,14 +535,69 @@ static const String _proxyBase = '/rss';
   }
 
   String _stripHtml(String html) {
-    if (html.isEmpty) return '';
-    // 7/14 简化: 拿前 160 chars (移除 HTML 标签)
-    final stripped = html
-        .replaceAll(RegExp(r'<[^>]+>'), '')
-        .replaceAll(RegExp(r'\s+'), ' ')
-        .trim();
-    return stripped.length > 160 ? '${stripped.substring(0, 160)}…' : stripped;
-  }
+      if (html.isEmpty) return '';
+      // 7/14 简化: 拿前 160 chars (移除 HTML 标签)
+      // 8/16 治本 (沿 SOUL #169 不撒谎): 解码 HTML entity + 截取真正 description
+      //   真凶: 之前 replaceAll(RegExp(r'<[^>]+>'), '') 只移除 tag, 不处理 HTML entity
+      //     → 豆瓣 RSS 的 description 是 "{&#34;blocks&#34;:...}" 这种内部 JSON dump
+      //     → UI 显示 "{&#34;blocks&#34;:[...]}" 用户看到乱码
+      //     → TTS 读 _fullText 包含 JSON 乱码, 听感也很差
+      //   修法:
+      //     1. 移除 HTML tag
+      //     2. 用 _decodeHtmlEntities 解码 HTML entity (&#34; → ", &amp; → & 等)
+      //     3. 如果 description 看起来像 JSON dump (豆瓣内部 blocks), 截取前 80 chars
+      final stripped = html
+          .replaceAll(RegExp(r'<[^>]+>'), '')
+          .replaceAll(RegExp(r'\s+'), ' ')
+          .trim();
+      final unescaped = _decodeHtmlEntities(stripped);
+      // 检测豆瓣内部 JSON dump 模式: "{"blocks":..." 或 "{&#34;blocks&#34;:..."
+      // 8/16 修: 截到 "评论:" 之前 (豆瓣 description 通常 "用户 评论: 书名 评价: 推荐\n\nJSON dump")
+      if (unescaped.contains('"blocks":[') || unescaped.contains('"entityRanges":[')) {
+        // 找到 JSON dump 起始位置 "{"
+        final jsonStart = unescaped.indexOf('{');
+        if (jsonStart > 0) {
+          // 截到 JSON dump 之前, 避免 UI 显示 JSON
+          return unescaped.substring(0, jsonStart).trim();
+        }
+        return unescaped.length > 80 ? '${unescaped.substring(0, 80)}…' : unescaped;
+      }
+      return unescaped.length > 160 ? '${unescaped.substring(0, 160)}…' : unescaped;
+    }
+
+    /// 8/16 加 (沿 SOUL #169 不撒谎): 解码 HTML entity (避免 UI 显示乱码)
+    /// 真凶: 之前 _stripHtml 不解码 entity, 豆瓣 RSS 返 "&#34;blocks&#34;..." UI 显乱码
+    /// 修: 用 RegExp 替换所有 &#NNN; 和 &xxx; 形式
+    String _decodeHtmlEntities(String s) {
+      return s
+          // 数字 entity: &#34; → ", &#38; → &, &#39; → '
+          .replaceAllMapped(
+            RegExp(r'&#(\d+);'),
+            (m) {
+              final code = int.tryParse(m.group(1)!);
+              return code != null ? String.fromCharCode(code) : m.group(0)!;
+            },
+          )
+          // 16 进制 entity: &#x27; → '
+          .replaceAllMapped(
+            RegExp(r'&#x([0-9a-fA-F]+);'),
+            (m) {
+              final code = int.tryParse(m.group(1)!, radix: 16);
+              return code != null ? String.fromCharCode(code) : m.group(0)!;
+            },
+          )
+          // 命名 entity: &amp; → &, &lt; → <, &gt; → >, &quot; → ", &apos; → '
+          .replaceAll('&amp;', '&')
+          .replaceAll('&lt;', '<')
+          .replaceAll('&gt;', '>')
+          .replaceAll('&quot;', '"')
+          .replaceAll('&apos;', "'")
+          .replaceAll('&nbsp;', ' ')
+          .replaceAll('&mdash;', '—')
+          .replaceAll('&hellip;', '…')
+          .replaceAll('&ldquo;', '“')
+          .replaceAll('&rdquo;', '”');
+    }
 
   /// 简易 RFC 822 解析: "Mon, 14 Jul 2026 19:21:42 +0800" → DateTime
   DateTime _parseRfc822(String s) {
