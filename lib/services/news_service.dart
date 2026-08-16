@@ -142,6 +142,13 @@ class NewsService {
     if (query.trim().isEmpty) return [];
     final q = query.toLowerCase();
     final results = <ContentItem>[];
+    // 8/16 加 (沿 SOUL #198 真改没改对 第 N+17 次): 同时搜 RSS 真实数据
+    //   真凶: 之前只搜 _allContent 24 桶 stub, 不搜 RSS 真数据
+    //     → AI 助手 card 点击打开显示 stub 占位, 跟真 RSS 数据完全断开
+    //     → 用户报告"AI 卡点击打开网页几乎无效"
+    //   修: NewsService.search 同时查 stub + 真 RSS (国内 + 国际)
+    //     → RSS 真数据优先 (有真实 URL), stub 兜底
+    // 1. 先查 stub (本地库, 0 网络延迟)
     for (final list in _allContent.values) {
       for (final item in list) {
         if (item.title.toLowerCase().contains(q) ||
@@ -149,6 +156,23 @@ class NewsService {
           results.add(item);
         }
       }
+    }
+    // 2. 再查 RSS 真数据 (国内 + 国际, 4 场景)
+    try {
+      final rssService = RssService(isInternational: false);
+      for (final scene in Scene.values) {
+        final rssItems = await rssService.fetchTop(limit: 30, scene: scene);
+        for (final rssItem in rssItems) {
+          if (rssItem.title.toLowerCase().contains(q) ||
+              (rssItem.description?.toLowerCase().contains(q) ?? false)) {
+            // 转 RssItem -> ContentItem (用 RssService.toContentItem)
+            final ci = rssService.toContentItem(rssItem);
+            results.add(ci);
+          }
+        }
+      }
+    } catch (_) {
+      // RSS 拉失败不影响 stub 返回
     }
     return results;
   }
