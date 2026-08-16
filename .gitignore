@@ -48,3 +48,11 @@ GoogleService-Info.plist
 build_outputs/
 *.apk
 *.apk.sha1
+
+# 8/16 加 (沿 SOUL #15 #188 安全透明): 含 hardcoded API key 的临时 test 脚本不入仓
+test_llm.dart
+# 同类: rss_trace_test.dart (调试用)
+rss_trace_test.dart
+
+# 8/16 加: deprecated/backup 文件不入仓
+*.deprecated
