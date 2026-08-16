@@ -14,6 +14,14 @@ class TtsService {
   bool _isPaused = false;
   String _currentText = '';
 
+  // 8/16 加 (沿 SOUL #103 第 N+21 次): onend 后清状态, 避免按钮卡住
+  /// 之前 onend 只清 progress, _isSpeaking 还 true → pause/stop 返 false → 按钮无反应
+  void markFinished() {
+    _isSpeaking = false;
+    _isPaused = false;
+    progress.value = 0.0;
+  }
+
   // 7/1: 实时进度 (0..1)
   static final ValueNotifier<double> progress = ValueNotifier<double>(0.0);
 

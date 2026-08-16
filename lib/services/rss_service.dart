@@ -426,7 +426,11 @@ static const String _proxyBase = '/rss';
     //   真凶: 之前 8s × 2 retries = 16s worst case per source → fetchByBucket 等 16s
     //   修: 4s × 1 retry = 4s worst case → 总耗时 = max(4s) 即使单源慢
     //   副作用: 真的慢源直接 fail 跳过, 不拖累其他 (之前 36kr WAF 等 8s 才 502)
-    for (var attempt = 1; attempt <= 1; attempt++) {
+    // 8/16 修 (沿 SOUL #8 真改没改对 第 N+19 次): retry dead code
+    //   真凶: 之前 'attempt <= 1' + 'if (attempt < 2)' 永远 retry 不到 → 死代码
+    //   修: attempt <= 2 真做 1 retry, retry 间隔 500ms (避免太快重连源 WAF 触发)
+    const maxAttempts = 2;
+    for (var attempt = 1; attempt <= maxAttempts; attempt++) {
       try {
         final resp = await http
             .get(
@@ -463,9 +467,9 @@ static const String _proxyBase = '/rss';
         // 5xx 才重试, 4xx 直接试下一个源
         if (resp.statusCode < 500) break;
       } catch (e) {
-        // timeout/network -> 重试一次
-        if (attempt < 2) {
-          await Future.delayed(Duration(milliseconds: 300));
+        // timeout/network -> 重试一次 (500ms 间隔, 避免 WAF 误判 spam)
+        if (attempt < maxAttempts) {
+          await Future.delayed(const Duration(milliseconds: 500));
           continue;
         }
         // 该源失败 -> 试下一个
