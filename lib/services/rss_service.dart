@@ -461,8 +461,13 @@ static const String _proxyBase = '/rss';
           }
           webconsole.log('[rss] $feedUrl → parsed ${items.length} items');
           if (items.isNotEmpty) return items;
-          // 解析空 -> 试下一个源 (在外层循环里 break 走)
-          break;
+          // 8/16 治本 (沿 SOUL #103 第 N+25 次): parse 空 retry 1 次
+          //   真凶: 之前解析空 (body 200 但 items=0) 直接 break → 不 retry
+          //     → 临时源问题 (HTML 乱码 / WAF) 永远 retry 不到
+          //   修: items 空且 attempt < max → fall through 重试 (跟 5xx 一致)
+          if (attempt >= maxAttempts) break;
+          await Future.delayed(const Duration(milliseconds: 500));
+          continue;
         }
         // 5xx 才重试, 4xx 直接试下一个源
         if (resp.statusCode < 500) break;
