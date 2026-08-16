@@ -2119,11 +2119,16 @@ class _QuoteAiSummarySectionState extends State<_QuoteAiSummarySection> {
     if (_loading || _summary != null) return;
     setState(() { _loading = true; _failed = false; });
     final prompt = widget.isEn
-        ? '\${widget.author}: "“widget.quoteText”\n\nBriefly explain what this quote means (max 100 words). Reply in English.'
+        ? 'Author: \${widget.author}\nQuote: "\${widget.quoteText}"\n\nBriefly explain what this quote means (max 100 words). Reply in English.'
         : '作者: \${widget.author}\n名言: "\${widget.quoteText}"\n\n用 80 字以内解释这句名言的意思, 不要复述, 不要标题, 直接回答。';
     try {
+      // 8/16 治本 (沿 SOUL #6 #8 #103): 30s → 60s 用 LLM 实际可达
+      //   真凶: 之前 30s timeout, 7b cold start 30-60s, 30s 经常 hit
+      //     → 用户看到 'AI 摘要超时' 跟 'AI 摘要几乎没用' 体感一样
+      //   修: 60s timeout, 7b 第一次能搞定, 后续 1-3s 出结果
+      //   7/1 优化: LlmService.generateRaw 内部已含 1.5b 兜底
       final result = await LlmService.generateRaw(prompt, isEn: widget.isEn)
-        .timeout(const Duration(seconds: 30), onTimeout: () => widget.isEn ? '(AI summary timeout — exceeds 30s. Ollama cold start may need ~60s for first request.)' : '（AI 摘要超时 - 超过 30s。 Ollama 冷启动首请求需约 60s。）');
+        .timeout(const Duration(seconds: 60), onTimeout: () => widget.isEn ? '(AI summary timeout — Ollama 7b cold start may need ~60s. Try again — subsequent calls are 1-3s.)' : '（AI 摘要超时 - Ollama 7b 冷启动首请求需约 60s。再试一次, 后续 1-3s。）');
       if (!mounted) return;
       setState(() { _summary = result.trim(); _loading = false; });
     } catch (e) {
