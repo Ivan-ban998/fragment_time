@@ -2119,8 +2119,8 @@ class _QuoteAiSummarySectionState extends State<_QuoteAiSummarySection> {
     if (_loading || _summary != null) return;
     setState(() { _loading = true; _failed = false; });
     final prompt = widget.isEn
-        ? 'Author: \${widget.author}\nQuote: "\${widget.quoteText}"\n\nBriefly explain what this quote means (max 100 words). Reply in English.'
-        : '作者: \${widget.author}\n名言: "\${widget.quoteText}"\n\n用 80 字以内解释这句名言的意思, 不要复述, 不要标题, 直接回答。';
+        ? 'Author: ${widget.author}\nQuote: "${widget.quoteText}"\n\nBriefly explain what this quote means (max 100 words). Reply in English.'
+        : '作者: ${widget.author}\n名言: "${widget.quoteText}"\n\n用 80 字以内解释这句名言的意思, 不要复述, 不要标题, 直接回答。';
     try {
       // 8/16 治本 (沿 SOUL #6 #8 #103): 30s → 60s 用 LLM 实际可达
       //   真凶: 之前 30s timeout, 7b cold start 30-60s, 30s 经常 hit
