@@ -5,8 +5,7 @@
 import 'package:flutter/foundation.dart' show kIsWeb;
 // 8/7 加 (沿 SOUL #137 真凶): web 上 print() 走 console.log 估计被截,
 //   真接 dart:html console.log 避免 release mode print 走 stdout 丢
-import 'web_console_stub.dart'
-    if (dart.library.html) 'web_console_web.dart' as webconsole;
+import 'web_console_stub.dart' if (dart.library.html) 'web_console_web.dart' as webconsole;
 import 'package:http/http.dart' as http;
 import 'package:xml/xml.dart' as xml;
 import 'package:shared_preferences/shared_preferences.dart';
@@ -79,18 +78,15 @@ static const String _proxyBase = '/rss';
     //   listen: NPR Music (10) + 豆瓣音乐 (20) + NPR Arts (10) = 40 items 音乐/艺术
     //   relax: 豆瓣热门 (20) + 豆瓣电影 (20) + Solidot (20) + Lifehacker (100) = 160 items 生活
     //   workout: 少数派 (10, 工具体系) + Solidot (20 部分) = 真实 RSS 不够, 精选兑底
-    static const String _geekparkFeed = 'https://www.geekpark.net/rss';
-    static const String _ithomeFeed = 'https://www.ithome.com/rss/';
+      static const String _ithomeFeed = 'https://www.ithome.com/rss/';
     static const String _solidotFeed = 'https://www.solidot.org/index.rss';
-    static const String _hnBestFeed = 'https://hnrss.org/best';  // 8/14 标记: 慢, 已用 TechCrunch/Ars/Engadget 替代
-    // 8/14 二次治本 (沿 SOUL #8): HN Best 3.7s 慢 → 替换为 TechCrunch + Ars Technica + Engadget (0.25-0.59s 快)
+      // 8/14 二次治本 (沿 SOUL #8): HN Best 3.7s 慢 → 替换为 TechCrunch + Ars Technica + Engadget (0.25-0.59s 快)
     static const String _techCrunchFeed = 'https://techcrunch.com/feed/';
     static const String _arsFeed = 'https://feeds.arstechnica.com/arstechnica/index';
     static const String _engadgetFeed = 'https://www.engadget.com/rss.xml';
   static const String _doubanBookFeed = 'https://www.douban.com/feed/review/book';
   static const String _doubanMovieFeed = 'https://www.douban.com/feed/review/movie';
   static const String _doubanMusicFeed = 'https://www.douban.com/feed/review/music';
-  static const String _lifehackerFeed = 'https://lifehacker.com/rss';
   // NPR 细分 (国际版英语源, 不同 scene 偏好)
   static const String _nprBooksFeed = 'https://feeds.npr.org/1032/rss.xml';
   static const String _nprArtsFeed = 'https://feeds.npr.org/1008/rss.xml';
@@ -98,7 +94,6 @@ static const String _proxyBase = '/rss';
   static const String _nprHealthFeed = 'https://feeds.npr.org/1128/rss.xml';
   static const String _nprEducationFeed = 'https://feeds.npr.org/1013/rss.xml';
   static const String _nprPlanetMoneyFeed = 'https://feeds.npr.org/1105/rss.xml';
-  static const String _nprPoliticsFeed = 'https://feeds.npr.org/1014/rss.xml';
 
   // 8/8 加 (沿 SOUL #189): 持久化 cache (SharedPreferences)
   //   用户痛点: 冷启动 / reload web / 断网 → 28 桶全部 8s×N 慢加载
@@ -166,7 +161,12 @@ static const String _proxyBase = '/rss';
   //   修法: 同一 bucket 多次调 = 1 个 in-flight, 其他 await 同一 Future
   static final Map<String, Future<List<RssItem>>> _pendingByFeedUrl = {};
   static final Map<String, List<RssItem>> _cachedByFeedUrl = {};
-  static DateTime? _cacheLoadedAt;
+  // 8/16 治本 (沿 SOUL #18 真改没改对 第 N+15 次): _cacheLoadedAt 改成 per-feedUrl 字典
+  //   真凶: 之前 _cacheLoadedAt 是 global DateTime, 一个源 fetch 设了值, 所有源跟着用
+  //     → 经常 fetch 的源让 _cacheLoadedAt 永远小于 5min, 其他源一直命中 in-memory cache
+  //     → 实际上前面 fetch 的源"刷新"了所有源的 TTL → 错位
+  //   修: 每个 source 有自己的 _cachedLoadedAt[feedUrl], 5min TTL per source
+  static final Map<String, DateTime> _cachedLoadedAt = {};
 
   // 缓存 TTL: 5 分钟 (用户拖动 Tinder / 切场景 不要反复拉)
   static const Duration _cacheTtl = Duration(minutes: 5);
@@ -267,10 +267,13 @@ static const String _proxyBase = '/rss';
     final diskFutures = <String, Future<List<RssItem>>>{};
     for (final feedUrl in feedUrls) {
       // 1. in-memory cache (5min TTL) — forceFresh=true 跳过
+      // 8/16 升一阶 (沿 SOUL #18): per-feedUrl TTL 检查
+      //   之前 _cacheLoadedAt 是 global, 一个源 fetch 设了值, 其他源一直命中
+      //   修: _cachedLoadedAt[feedUrl] per source, 5min TTL per source
       if (!forceFresh &&
           _cachedByFeedUrl.containsKey(feedUrl) &&
-          _cacheLoadedAt != null &&
-          DateTime.now().difference(_cacheLoadedAt!) < _cacheTtl) {
+          _cachedLoadedAt.containsKey(feedUrl) &&
+          DateTime.now().difference(_cachedLoadedAt[feedUrl]!) < _cacheTtl) {
         aggregated.addAll(_cachedByFeedUrl[feedUrl]!);
         continue;
       }
@@ -290,8 +293,11 @@ static const String _proxyBase = '/rss';
         final items = entry.value;
         if (items.isNotEmpty) {
           // 旧数据先填占位 (in-memory 也写一份, 5min 内不重复查 disk)
+          // 8/16 升一阶 (沿 SOUL #18): 每 disk cache 命中都更新 cache time (per-feedUrl)
+          //   之前 _cacheLoadedAt ??= DateTime.now() 只在 null 时设, 永远老的值
+          //   修: = (不是 ??=) 每次 disk cache 命中都更新到最新
           _cachedByFeedUrl[feedUrl] = items;
-          _cacheLoadedAt ??= DateTime.now();
+          _cachedLoadedAt[feedUrl] = DateTime.now();
           aggregated.addAll(items);
           // 不需要再 fetch (有 disk 数据 = 静默后台刷新)
         } else {
@@ -319,7 +325,8 @@ static const String _proxyBase = '/rss';
         future.then((items) {
           if (items.isNotEmpty) {
             _cachedByFeedUrl[feedUrl] = items;
-            _cacheLoadedAt ??= DateTime.now();
+            // 8/16 升一阶 (沿 SOUL #18): per-feedUrl cache time
+            _cachedLoadedAt[feedUrl] = DateTime.now();
             unawaited(_saveToDisk(feedUrl, items));
           }
         }, onError: (e) {
