@@ -887,7 +887,7 @@ Rules:
           title: title,
           type: type,
           source: realItem.source, // 7/1: 移掉死循环 null-aware (realItem 已 non-null)
-          duration: realItem.duration ?? '',
+          duration: realItem.duration,
           url: realItem.externalUrl ?? '',
           audioUrl: realItem.audioUrl,
           realItem: realItem,
@@ -917,7 +917,7 @@ Rules:
               : item.contentType == ContentType.short ? 'short'
               : 'article',
           source: item.source,
-          duration: item.duration ?? '',
+          duration: item.duration,
           url: item.externalUrl ?? '',
           audioUrl: item.audioUrl,
           realItem: item,
