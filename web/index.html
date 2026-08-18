@@ -31,6 +31,11 @@
 
   <title>碎片时间</title>
   <link rel="manifest" href="manifest.json">
+  <!-- 8/18 加 (沿 SOUL #15 #125 安全): CSP / X-Frame-Options / X-Content-Type 防御 header -->
+  <meta http-equiv="Content-Security-Policy" content="default-src 'self' 'unsafe-inline' 'unsafe-eval' data: blob: https: ws: wss:; img-src 'self' data: https:; media-src 'self' blob: https:; connect-src 'self' https: ws: wss:; frame-ancestors 'none';">
+  <meta http-equiv="X-Frame-Options" content="DENY">
+  <meta http-equiv="X-Content-Type-Options" content="nosniff">
+  <meta http-equiv="Referrer-Policy" content="strict-origin-when-cross-origin">
   <meta name="theme-color" content="#6750A4">
 
   <!-- 6/25 PWA: 只在 HTTPS 注册 SW (HTTP 下浏览器拒绝, build_and_serve.sh 也会禁用) -->
