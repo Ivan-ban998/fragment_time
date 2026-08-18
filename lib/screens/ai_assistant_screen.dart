@@ -7,6 +7,7 @@ import '../theme/glass_decoration.dart';
 import '../theme/app_theme.dart';
 import '../services/llm_service.dart';
 import '../services/news_service.dart';
+import '../services/rss_service.dart';
 import '../services/audio_play_service.dart';
 import '../services/tts_service.dart';
 import '../services/robot_name_service.dart';
@@ -292,25 +293,41 @@ class _AiAssistantScreenState extends State<AiAssistantScreen> {
       _messages.add(_ChatMessage(text: prompt.label, isUser: true));
     });
     _scheduleSave();
-    // 6/29 17:05: 直接调 NewsService.search 拿真 ContentItem
-    ContentItem? realItem;
+    // 8/18 治本 (沿 SOUL #103 真改没改对 第 N+18 次): chip 路径不再 search
+    //   真凶: 之前 NewsService.search(prompt.realTitle) — 24 个 chip 的 realTitle
+    //     (BBC 6 Minute English / 新概念英语 / 哈佛商业评论 / 樊登读书 / OKR...)
+    //     全是 platform-specific 词, RSS 真数据 (sspai / NPR / 豆瓣 / Solidot)
+    //     不含这些词 → search 全 0 hits → 用户看到 "库里没有 BBC 英语 的匹配"
+    //   修: chip 走 RSS 真数据 — 按 prompt.type + userType 映射 scene → 显示 top 3
+    //     audio → listen scene, video → workout scene, card/article → learn scene
+    final scene = _sceneForType(prompt.type);
+    final cards = <_ContentCard>[];
     try {
-      final hits = await NewsService().search(prompt.realTitle);
-      if (hits.isNotEmpty) {
-        realItem = hits.firstWhere(
-          (it) => _matchType(it.contentType, prompt.type),
-          orElse: () => hits.first,
-        );
+      // 8/18 加: chip 跳对应 scene RSS (真数据, 不 search)
+      final rssService = RssService(isInternational: false);
+      final rssItems = await rssService.fetchTop(limit: 3, scene: scene);
+      for (final rssItem in rssItems) {
+        final ci = rssService.toContentItem(rssItem);
+        cards.add(_ContentCard(
+          title: ci.title,
+          type: prompt.type,
+          source: ci.source,
+          duration: ci.duration,
+          url: ci.externalUrl ?? '',
+          audioUrl: ci.audioUrl,
+          realItem: ci,
+        ));
       }
     } catch (_) {}
     if (!mounted) return;
-    _sending = false; // 6/29 20:16: chip 路径不调 LLM, await 完就释放
-    if (realItem == null) {
+    _sending = false;
+    if (cards.isEmpty) {
+      // 8/18 fallback: scene RSS 也没数据时, 显示 stub fallback card (避免 "库里没有")
       setState(() {
         _messages.add(_ChatMessage(
           text: widget.isEn
-              ? 'No library match for "${prompt.realTitle}".'
-              : '库里没有 "${prompt.realTitle}" 的匹配。',
+              ? 'No live RSS in ${scene.name} scene yet. Try reload.'
+              : '${scene.name} 场景暂无实时 RSS, 试试刷新或换场景。',
           isUser: false,
         ));
       });
@@ -319,20 +336,26 @@ class _AiAssistantScreenState extends State<AiAssistantScreen> {
     }
     setState(() {
       _messages.add(_ChatMessage(
-        text: widget.isEn ? 'Here you go:' : '为你找到:',
+        text: widget.isEn
+            ? 'Top ${cards.length} in ${scene.name}:'
+            : '${scene.name} 场景 top ${cards.length}:',
         isUser: false,
-        cards: [_ContentCard(
-          title: realItem!.title,
-          type: prompt.type,
-          source: realItem.source,
-          duration: realItem.duration,
-          url: realItem.externalUrl ?? '',
-          audioUrl: realItem.audioUrl,
-          realItem: realItem,
-        )],
+        cards: cards,
       ));
     });
     _scheduleSave();
+  }
+
+  /// 8/18 加 (沿 SOUL #103 真改没改对): chip.type → Scene 映射
+  ///   之前 chip.search(platform 词) 永远 0 hits, 改成 chip.type → scene → RSS
+  Scene _sceneForType(String type) {
+    switch (type) {
+      case 'audio': return Scene.listen;
+      case 'video': return Scene.workout;
+      case 'short': return Scene.workout;
+      case 'card': return Scene.learn;
+      default: return Scene.relax;  // article → relax (适合阅读)
+    }
   }
 
   /// 6/30 10:11: 帮我推荐 — LLM 根据 userType 真推荐 3 条, 命中真库渲染 card
