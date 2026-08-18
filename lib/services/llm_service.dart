@@ -340,6 +340,13 @@ class LlmService {
           .post(Uri.parse(endpoint), headers: headers, body: jsonEncode(body))
           .timeout(const Duration(seconds: 15));
       if (response.statusCode != 200) {
+        // 8/18 加 (沿 SOUL #125 防 spam): 429 rate limit 显示 Retry-After
+        //   真凶: 之前 429 返 '(LLM unavailable)' 用户不知道等几秒
+        //   修: 429 + Retry-After header → 显式 retry 提示
+        if (response.statusCode == 429) {
+          final retryAfter = response.headers['retry-after'] ?? '6';
+          return isEn ? '(rate limited, retry after ${retryAfter}s)' : '（请求过快, ${retryAfter}s 后重试）';
+        }
         // 8/13: 失败 fallback 到本地 Ollama 7b (慢但可用, 沿 SOUL #8 不抢用户注意力)
         if (!useRemote && useProxy) {
           debugPrint('[llm generateRaw] proxy fail ${response.statusCode}, fallback to ollama');
