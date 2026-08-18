@@ -177,8 +177,17 @@ static const String _proxyBase = '/rss';
   static int _cacheMisses = 0;
   static int get cacheHits => _cacheHits;
   static int get cacheMisses => _cacheMisses;
+  static int get totalCacheCalls => _cacheHits + _cacheMisses;
   static double get cacheHitRate =>
       (_cacheHits + _cacheMisses) == 0 ? 0.0 : _cacheHits / (_cacheHits + _cacheMisses);
+
+  // 8/16 加 (沿 SOUL #188 透明): 一次性看 cache 状态
+  static Map<String, dynamic> get cacheStats => {
+        'hits': _cacheHits,
+        'misses': _cacheMisses,
+        'total': _cacheHits + _cacheMisses,
+        'hit_rate': ((_cacheHits + _cacheMisses) == 0 ? 0.0 : _cacheHits / (_cacheHits + _cacheMisses) * 100).toStringAsFixed(1),
+      };
 
   /// 7/29 加: 多 RSS 源 fallback 链
   /// 8/13 升一阶 (沿 SOUL #137 真凶链): 国际版 + 国内版都加 NPR 公开源
@@ -344,6 +353,12 @@ static const String _proxyBase = '/rss';
           }
         }, onError: (e) {
           // 8/13 治本: 单源失败 (timeout/network) → 跳过, 不影响其他源
+          // 8/16 治本 (沿 SOUL #18 真改没改对 第 N+26 次): fetch 失败时清 in-memory cache
+          //   真凶: 之前 fetch 失败但 in-memory cache 还在 (disk cache 设的) → 5min 内永远返老 disk 数据
+          //   → fetch 失败后用户看到 stale content 5min
+          //   修: 清 in-memory + cache time, 让下次 fetchTop 直接 disk cache 重读 (避免 stale 5min)
+          _cachedByFeedUrl.remove(feedUrl);
+          _cachedLoadedAt.remove(feedUrl);
         }).whenComplete(() {
           _pendingByFeedUrl.remove(feedUrl);
         }),
