@@ -126,6 +126,13 @@ static const String _proxyBase = '/rss';
   /// 8/8 加: 写 disk cache (成功后, 异步 fire-and-forget)
   static Future<void> _saveToDisk(String feedUrl, List<RssItem> items) async {
     if (items.isEmpty) return;
+    // 8/18 加: disk write debounce (1 min 同源跳过)
+    final now = DateTime.now();
+    final lastWrite = _lastDiskWrite[feedUrl];
+    if (lastWrite != null && now.difference(lastWrite) < _diskWriteDebounce) {
+      return; // skip 写 disk, in-memory cache 已能返
+    }
+    _lastDiskWrite[feedUrl] = now;
     try {
       final prefs = await SharedPreferences.getInstance();
       final key = '$_diskPrefix${feedUrl.hashCode.abs()}';
@@ -170,6 +177,12 @@ static const String _proxyBase = '/rss';
 
   // 缓存 TTL: 5 分钟 (用户拖动 Tinder / 切场景 不要反复拉)
   static const Duration _cacheTtl = Duration(minutes: 5);
+
+  // 8/18 加 (沿 SOUL #189): disk write debounce (1 min, 防多 scene 同源连写)
+  //   真凶: 之前 _saveToDisk 每次 fetch 完成都写 → sspai 4 场景共享 → 1 min 内 4 次写 disk
+  //   修: _lastDiskWrite[feedUrl] 记录, < 1min 跳过写 (in-memory cache 已能返)
+  static const Duration _diskWriteDebounce = Duration(minutes: 1);
+  static final Map<String, DateTime> _lastDiskWrite = {};
 
   // 8/16 加 (沿 SOUL #125): cache hit/miss 统计
   //   给 Brien '推动正式应用'监控用 — 看 fetchTop 真 cache 效率
