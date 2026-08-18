@@ -171,6 +171,15 @@ static const String _proxyBase = '/rss';
   // 缓存 TTL: 5 分钟 (用户拖动 Tinder / 切场景 不要反复拉)
   static const Duration _cacheTtl = Duration(minutes: 5);
 
+  // 8/16 加 (沿 SOUL #125): cache hit/miss 统计
+  //   给 Brien '推动正式应用'监控用 — 看 fetchTop 真 cache 效率
+  static int _cacheHits = 0;
+  static int _cacheMisses = 0;
+  static int get cacheHits => _cacheHits;
+  static int get cacheMisses => _cacheMisses;
+  static double get cacheHitRate =>
+      (_cacheHits + _cacheMisses) == 0 ? 0.0 : _cacheHits / (_cacheHits + _cacheMisses);
+
   /// 7/29 加: 多 RSS 源 fallback 链
   /// 8/13 升一阶 (沿 SOUL #137 真凶链): 国际版 + 国内版都加 NPR 公开源
   ///   - 国内: sspai(主) + NPR Top Stories(英文新闻补 listen/relax) + 36kr(fallback 经常 WAF)
@@ -274,9 +283,13 @@ static const String _proxyBase = '/rss';
           _cachedByFeedUrl.containsKey(feedUrl) &&
           _cachedLoadedAt.containsKey(feedUrl) &&
           DateTime.now().difference(_cachedLoadedAt[feedUrl]!) < _cacheTtl) {
+        // 8/16 加: cache hit 计数
+        _cacheHits++;
         aggregated.addAll(_cachedByFeedUrl[feedUrl]!);
         continue;
       }
+      // 8/16 加: cache miss 计数
+      _cacheMisses++;
       // 2. disk cache (冷启动用) — 异步并发加载
       diskFutures[feedUrl] = _loadFromDisk(feedUrl);
     }
