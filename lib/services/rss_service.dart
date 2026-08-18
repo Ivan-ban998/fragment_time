@@ -189,6 +189,17 @@ static const String _proxyBase = '/rss';
         'hit_rate': ((_cacheHits + _cacheMisses) == 0 ? 0.0 : _cacheHits / (_cacheHits + _cacheMisses) * 100).toStringAsFixed(1),
       };
 
+  // 8/18 加 (沿 SOUL #125 调试): admin 可调清 cache (debug 用)
+  //   沿 #137 真凶链: 之前 _cachedByFeedUrl / _cachedLoadedAt 没 reset API
+  //     → 调试 stale 数据时只能等 5min TTL
+  //   修: 加 clearCache static method, admin dashboard 一键清
+  static void clearCache() {
+    _cachedByFeedUrl.clear();
+    _cachedLoadedAt.clear();
+    _cacheHits = 0;
+    _cacheMisses = 0;
+  }
+
   /// 7/29 加: 多 RSS 源 fallback 链
   /// 8/13 升一阶 (沿 SOUL #137 真凶链): 国际版 + 国内版都加 NPR 公开源
   ///   - 国内: sspai(主) + NPR Top Stories(英文新闻补 listen/relax) + 36kr(fallback 经常 WAF)
