@@ -27,7 +27,38 @@ class LlmService {
     }
   }
 
-  static String _stagingMockRaw(String langCode) {
+  // 8/18 加 (沿 SOUL #189): LRU cache helpers
+  static String? _llmCacheLookup(String key) {
+    final now = DateTime.now();
+    for (final entry in _llmCache) {
+      if (entry['key'] == key) {
+        final ts = entry['ts'] as DateTime;
+        if (now.difference(ts) < _llmCacheTtl) {
+          return entry['result'] as String;
+        }
+      }
+    }
+    return null;
+  }
+
+  static void _llmCacheInsert(String key, String result) {
+    final now = DateTime.now();
+    _llmCache.removeWhere((e) => now.difference(e['ts'] as DateTime) >= _llmCacheTtl);
+    _llmCache.removeWhere((e) => e['key'] == key);
+    _llmCache.add({'key': key, 'result': result, 'ts': now});
+    if (_llmCache.length > _llmCacheSize) {
+      _llmCache.removeAt(0);
+    }
+  }
+
+  // 8/18 加 (沿 SOUL #125): admin 调试清 cache
+  static void clearLlmCache() {
+    _llmCache.clear();
+    _llmCacheHits = 0;
+    _llmCacheMisses = 0;
+  }
+
+    static String _stagingMockRaw(String langCode) {
     return langCode == 'en'
         ? '[STAGING mock] Configure LLM provider for real response.'
         : '[STAGING mock] 配置 LLM provider 走真回复。';
@@ -83,6 +114,23 @@ class LlmService {
   }
   // 6/25 E: 7b CPU 推理太慢 (首 token 30-60s), 切 1.5b (CPU 上 5-10x 快, 老人模式总结质量仍可)
   static const String _model = 'qwen2.5:7b'; // 6/29 16:55: 1.5b 不理解"音乐/英语/冥想"区别, 回到 7b
+
+  // 8/18 加 (沿 SOUL #189): LLM prompt LRU cache (10 entries, 1h TTL)
+  //   真凶: 之前 _QuoteAiSummarySection 等每次 initState 都调 LLM
+  //     → 同一 quote 重进 reader 仍重调 (重复 quota 烧)
+  //   修: LRU cache key = (prompt, isEn), hash 命中返 cached result
+  //   副作用: 重复 quote 重进秒返 (avoid 7b 7s wait)
+  static const int _llmCacheSize = 10;
+  static const Duration _llmCacheTtl = Duration(hours: 1);
+  static final List<Map<String, dynamic>> _llmCache = []; // [{key, result, ts}]
+
+  // 8/18 加 (沿 SOUL #188 透明): cache stats
+  static int _llmCacheHits = 0;
+  static int _llmCacheMisses = 0;
+  static int get llmCacheHits => _llmCacheHits;
+  static int get llmCacheMisses => _llmCacheMisses;
+  static double get llmCacheHitRate =>
+      (_llmCacheHits + _llmCacheMisses) == 0 ? 0.0 : _llmCacheHits / (_llmCacheHits + _llmCacheMisses);
   // 8/2 沿用 SOUL #126 #127: minimax 反代同 Ollama 模式, web 动态取 hostname
   // key 在 NAS 反代持有, web bundle 不接触 key (沿用 18:10 安全注释)
   // 8/7 改 (沿 SOUL #171 模式 #137 真凶): 同 origin /api/llm
@@ -241,6 +289,15 @@ class LlmService {
 
   // 6/11 加: 原始 prompt 接口 - 给私教/回顾这种需要自定义 prompt 的场景
   static Future<String> generateRaw(String prompt, {bool isEn = true}) async {
+    // 8/18 加 (沿 SOUL #189): LRU prompt cache check
+    //   cache key = (prompt, isEn) hash → 命中返 cached result
+    final cacheKey = '$isEn:${prompt.hashCode}';
+    final cached = _llmCacheLookup(cacheKey);
+    if (cached != null) {
+      _llmCacheHits++;
+      return cached;
+    }
+    _llmCacheMisses++;
     // 8/10 staging 守卫
     if (RuntimeMode.current.useStub) {
       debugPrint('[llm staging] 返 mock raw');
@@ -294,7 +351,10 @@ class LlmService {
       final msg = json['message'] as Map<String, dynamic>?;
       final rawContent = (msg?['content'] as String?) ?? (isEn ? '(no response)' : '（无回复）');
       // 18:26 MiniMax reasoning strip
-      return useRemote ? stripThinkTags(rawContent) : rawContent;
+      final result = useRemote ? stripThinkTags(rawContent) : rawContent;
+      // 8/18 加 (沿 SOUL #189): cache result
+      _llmCacheInsert(cacheKey, result);
+      return result;
     } catch (e) {
       // 8/13: 异常 fallback
       if (!useRemote && useProxy) {
