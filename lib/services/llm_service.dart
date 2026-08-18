@@ -343,8 +343,10 @@ class LlmService {
         // 8/18 加 (沿 SOUL #125 防 spam): 429 rate limit 显示 Retry-After
         //   真凶: 之前 429 返 '(LLM unavailable)' 用户不知道等几秒
         //   修: 429 + Retry-After header → 显式 retry 提示
+        // 8/18 调优 (沿 SOUL #189): bucket 10/min burst 5 → 20/min burst 15
+        //   测后: 4 LLM call per quote (摘要+作者+延伸思考+问 AI) + 短时切换 scene
         if (response.statusCode == 429) {
-          final retryAfter = response.headers['retry-after'] ?? '6';
+          final retryAfter = response.headers['retry-after'] ?? '3';
           return isEn ? '(rate limited, retry after ${retryAfter}s)' : '（请求过快, ${retryAfter}s 后重试）';
         }
         // 8/13: 失败 fallback 到本地 Ollama 7b (慢但可用, 沿 SOUL #8 不抢用户注意力)
