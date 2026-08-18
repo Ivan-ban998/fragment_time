@@ -200,6 +200,36 @@ class _AiAssistantScreenState extends State<AiAssistantScreen> {
 
   // 6/29 16:09: 保存聊天历史到 prefs (最近 30 条)
   Timer? _saveDebounce;
+  /// 8/20 加 (沿 SOUL #188 透明): user 清空聊天 (deletes all messages + saves empty)
+  void _clearChat() async {
+    if (_messages.isEmpty) return;
+    final confirm = await showDialog<bool>(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        title: Text(widget.isEn ? 'Clear all messages?' : '清空所有消息？'),
+        content: Text(widget.isEn
+            ? 'This will delete all chat history with the AI assistant. This cannot be undone.'
+            : '将删除与 AI 助手的所有聊天记录。无法撤销。'),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(ctx, false),
+            child: Text(widget.isEn ? 'Cancel' : '取消'),
+          ),
+          TextButton(
+            onPressed: () => Navigator.pop(ctx, true),
+            style: TextButton.styleFrom(foregroundColor: Colors.red),
+            child: Text(widget.isEn ? 'Clear' : '清空'),
+          ),
+        ],
+      ),
+    );
+    if (confirm != true) return;
+    setState(() {
+      _messages.clear();
+    });
+    _scheduleSave();
+  }
+
   void _scheduleSave() {
     _saveDebounce?.cancel();
     _saveDebounce = Timer(const Duration(seconds: 1), _saveHistory);
@@ -1064,6 +1094,11 @@ Rules:
                           ),
                       ],
                     ),
+                  ),
+                  IconButton(
+                    icon: const Icon(Icons.delete_sweep),
+                    onPressed: _clearChat,
+                    tooltip: widget.isEn ? 'Clear chat' : '清空聊天',
                   ),
                   IconButton(
                     icon: const Icon(Icons.close),
