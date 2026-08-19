@@ -10,6 +10,9 @@
 
 set -e
 
+# 8/28 加 (沿 SOUL #125 监控): 记录 last build command (供 /admin/build_info 显示)
+echo "bash $0 $*" > /tmp/.last_build_cmd
+
 PROJECT_DIR="/volume1/AI_Jarvis/OpenClaw/workspace/projects/fragment_time_good"
 FLUTTER="/opt/flutter/bin/flutter"
 LOG="/tmp/ft_http.log"
