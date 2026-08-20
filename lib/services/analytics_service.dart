@@ -15,16 +15,16 @@ class AnalyticsService {
   static const int _maxEvents = 1000;
 
   // 6 类事件 + 自定义 props
-  static const String EVT_APP_OPEN = 'app_open';
-  static const String EVT_USER_TYPE_SELECT = 'user_type_select';
-  static const String EVT_SCENE_SELECT = 'scene_select';
-  static const String EVT_ITEM_OPEN = 'item_open';
-  static const String EVT_TTS_PLAY = 'tts_play';
-  static const String EVT_VIDEO_PLAY = 'video_play';
-  static const String EVT_VIDEO_OPEN_EXTERNAL = 'video_open_external';
-  static const String EVT_SEARCH = 'search';
-  static const String EVT_SAVE = 'save';
-  static const String EVT_HISTORY_DELETE = 'history_delete';
+  static const String evtAppOpen = 'app_open';
+  static const String evtUserTypeSelect = 'user_type_select';
+  static const String evtSceneSelect = 'scene_select';
+  static const String evtItemOpen = 'item_open';
+  static const String evtTtsPlay = 'tts_play';
+  static const String evtVideoPlay = 'video_play';
+  static const String evtVideoOpenExternal = 'video_open_external';
+  static const String evtSearch = 'search';
+  static const String evtSave = 'save';
+  static const String evtHistoryDelete = 'history_delete';
 
   /// 记录一条事件
   /// props = {'key': 'value'} 任意字符串字典
@@ -86,33 +86,33 @@ class AnalyticsService {
       final name = e['e'] as String? ?? '';
       final p = (e['p'] as Map?)?.cast<String, String>() ?? {};
 
-      if (name == EVT_APP_OPEN) {
+      if (name == evtAppOpen) {
         appOpens++;
         if (t > oneDayAgo) appOpens1d++;
         if (t > oneWeekAgo) appOpens7d++;
-      } else if (name == EVT_USER_TYPE_SELECT) {
+      } else if (name == evtUserTypeSelect) {
         final ut = p['userType'] ?? '';
         if (ut.isNotEmpty) userTypePick[ut] = (userTypePick[ut] ?? 0) + 1;
-      } else if (name == EVT_SCENE_SELECT) {
+      } else if (name == evtSceneSelect) {
         final sc = p['scene'] ?? '';
         if (sc.isNotEmpty) scenePick[sc] = (scenePick[sc] ?? 0) + 1;
-      } else if (name == EVT_ITEM_OPEN) {
+      } else if (name == evtItemOpen) {
         final id = p['id'] ?? '';
         if (id.isNotEmpty) itemOpens[id] = (itemOpens[id] ?? 0) + 1;
-      } else if (name == EVT_TTS_PLAY) {
+      } else if (name == evtTtsPlay) {
         ttsPlays++;
-      } else if (name == EVT_VIDEO_PLAY) {
+      } else if (name == evtVideoPlay) {
         videoPlays++;
-      } else if (name == EVT_VIDEO_OPEN_EXTERNAL) {
+      } else if (name == evtVideoOpenExternal) {
         videoExtClicks++;
-      } else if (name == EVT_SEARCH) {
+      } else if (name == evtSearch) {
         searches++;
         final q = p['q'] ?? '';
         if (q.isNotEmpty) searchTerms[q] = (searchTerms[q] ?? 0) + 1;
-      } else if (name == EVT_SAVE) {
+      } else if (name == evtSave) {
         final t = p['type'] ?? '';
         if (t.isNotEmpty) savesByType[t] = (savesByType[t] ?? 0) + 1;
-      } else if (name == EVT_HISTORY_DELETE) {
+      } else if (name == evtHistoryDelete) {
         historyDeletes++;
       }
     }
@@ -120,7 +120,7 @@ class AnalyticsService {
     // 24 桶偏好（userType × scene 组合）
     final bucketPick = <String, int>{};
     for (final e in events) {
-      if (e['e'] == EVT_SCENE_SELECT) {
+      if (e['e'] == evtSceneSelect) {
         final p = (e['p'] as Map?)?.cast<String, String>() ?? {};
         final ut = p['userType'] ?? '';
         final sc = p['scene'] ?? '';

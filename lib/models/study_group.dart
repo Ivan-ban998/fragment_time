@@ -1,5 +1,4 @@
 // 6/9 Sofa 启发：学习小组（创业者 / 学生可用）
-import 'package:flutter/material.dart';
 import 'models.dart';
 
 class StudyGroup {

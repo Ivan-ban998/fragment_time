@@ -4,7 +4,6 @@ import '../theme/glass_decoration.dart';
 import '../models/models.dart';
 import '../services/local_subscription_service.dart';
 import '../services/news_service.dart';
-import '../theme/app_theme.dart';
 import '../widgets/skeleton.dart';
 import 'content_reader_screen.dart';
 

@@ -229,7 +229,7 @@ class _SceneScreenState extends State<SceneScreen> {
                 isEn: isEn,
                 onTap: () {
                   AnalyticsService.instance.track(
-                    AnalyticsService.EVT_USER_TYPE_SELECT,
+                    AnalyticsService.evtUserTypeSelect,
                     props: {'userType': userType.name, 'source': 'today_pick_scene'},
                   );
                   Navigator.push(
@@ -296,7 +296,7 @@ class _SceneScreenState extends State<SceneScreen> {
                       scene: scene,
                       scale: _scale,
                       onTap: () {
-                        AnalyticsService.instance.track(AnalyticsService.EVT_SCENE_SELECT, props: {
+                        AnalyticsService.instance.track(AnalyticsService.evtSceneSelect, props: {
                           'userType': userType.name,
                           'scene': scene.type.name,
                         });
@@ -494,7 +494,7 @@ class _TimeRecommendBanner extends StatelessWidget {
     return GestureDetector(
       onTap: () {
         AnalyticsService.instance.track(
-          AnalyticsService.EVT_SCENE_SELECT,
+          AnalyticsService.evtSceneSelect,
           props: {'userType': userType.name, 'scene': rec.scene.name, 'source': 'time_recommend_banner'},
         );
         Navigator.push(

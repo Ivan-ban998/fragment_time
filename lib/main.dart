@@ -378,7 +378,7 @@ class _MainHomeScreenState extends State<MainHomeScreen> {
     _migrateOldEncourageItems();
     // 7/30: 每日推荐 开关初始化 (默认值都开, 在 settings 可关)
     DailyPrefsService.init();
-    AnalyticsService.instance.track(AnalyticsService.EVT_APP_OPEN);
+    AnalyticsService.instance.track(AnalyticsService.evtAppOpen);
   }
 
   // 6/26 迁移: 删老 id 'encourage_*' 的 item, banner 现在只存名言

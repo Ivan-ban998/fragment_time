@@ -38,7 +38,6 @@ import '../services/analytics_service.dart';
 import '../services/news_service.dart';
 import '../services/bilibili_service.dart';
 import '../widgets/tinder_recommendation_stack.dart';
-import '../widgets/iframe_video_view.dart';
 import '../widgets/quiz_panel.dart';
 import 'content_reader_screen.dart';
 import '../services/study_group_service.dart';
@@ -951,7 +950,7 @@ class _ContentScreenState extends State<ContentScreen> {
   }
 
   Future<void> _pushToReader(ContentItem item) async {
-    AnalyticsService.instance.track(AnalyticsService.EVT_ITEM_OPEN);
+    AnalyticsService.instance.track(AnalyticsService.evtItemOpen);
     await Navigator.push(
       context,
       MaterialPageRoute(
@@ -1025,7 +1024,7 @@ class _ContentScreenState extends State<ContentScreen> {
     if (_isSaved) {
       try {
         await LocalSubscriptionService.instance.subscribe(item);
-        AnalyticsService.instance.track(AnalyticsService.EVT_SAVE);
+        AnalyticsService.instance.track(AnalyticsService.evtSave);
         if (mounted) {
           _showFloatingSnack(context, isEn ? 'Saved' : '已收藏');
         }

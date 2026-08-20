@@ -76,7 +76,7 @@ class _SearchScreenState extends State<SearchScreen> {
     if (query.trim().isNotEmpty) {
       // 6/8 埋点
       AnalyticsService.instance.track(
-        AnalyticsService.EVT_SEARCH,
+        AnalyticsService.evtSearch,
         props: {'q': query},
       );
       await _saveHistory(query); // 6/11 加: 记历史

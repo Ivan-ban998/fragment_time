@@ -1,7 +1,6 @@
 import 'dart:async';
 
 import 'package:flutter/material.dart';
-import 'package:flutter/foundation.dart' show kIsWeb;
 import '../theme/glass_decoration.dart';
 import '../services/news_service.dart';
 import '../services/local_subscription_service.dart';

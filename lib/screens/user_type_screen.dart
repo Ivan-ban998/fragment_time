@@ -4,7 +4,6 @@ import '../theme/app_theme.dart';
 import '../theme/glass_decoration.dart';
 import '../services/analytics_service.dart';
 import '../services/local_subscription_service.dart';
-import '../services/time_aware_recommender.dart';
 import 'scene_screen.dart';
 import 'content_screen.dart';
 import 'topic_onboarding_screen.dart';
@@ -312,7 +311,7 @@ class _UserTypeScreenState extends State<UserTypeScreen> {
                                 scale: scale,
                                 isSelected: isSelected,
                                 onTap: () {
-                                  AnalyticsService.instance.track(AnalyticsService.EVT_USER_TYPE_SELECT,
+                                  AnalyticsService.instance.track(AnalyticsService.evtUserTypeSelect,
                                       props: {'userType': ut.type.name});
                                   widget.onUserTypeSelected(ut.type);
                                   // 6/28 15:06 Brien 反馈: '角色选择之后, 兴趣选择怎么没有了? 兴趣选择之后才是这个页面'

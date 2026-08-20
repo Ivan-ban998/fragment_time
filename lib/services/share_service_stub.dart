@@ -1,6 +1,5 @@
 // 6/9 stub for non-web platforms (Android / iOS / Desktop)
 // 真实 share 走 share_service_web.dart（web only via conditional import）
-import 'package:flutter/material.dart';
 import '../models/models.dart';
 
 class ShareCardResult {

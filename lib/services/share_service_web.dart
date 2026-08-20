@@ -31,7 +31,7 @@ class ShareService {
       _downloadBytes(bytes, filename);
       // 3. 埋点
       AnalyticsService.instance.track(
-        AnalyticsService.EVT_SAVE, // 复用 EVT_SAVE 当 share? 单独 EVT_SHARE 更好
+        AnalyticsService.evtSave, // 复用 evtSave 当 share? 单独 EVT_SHARE 更好
         props: {'id': item.id, 'type': item.contentType.name, 'action': 'share_card'},
       );
       return true;

@@ -69,7 +69,7 @@ void speakWeb(String text) {
 
   // 6/8 埋点
   AnalyticsService.instance.track(
-    AnalyticsService.EVT_TTS_PLAY,
+    AnalyticsService.evtTtsPlay,
     props: {'len': '${text.length}'},
   );
   html.window.speechSynthesis!.speak(utter);

@@ -8,7 +8,6 @@ import '../services/handle_service.dart';
 import '../services/robot_name_service.dart';
 import '../theme/app_theme.dart';
 import '../main.dart' as app;
-import 'user_type_screen.dart';
 
 // 6/25 WelcomeScreen → MainHomeScreen 通信信号 (ValueNotifier)
 class WelcomeCompleteSignal {
