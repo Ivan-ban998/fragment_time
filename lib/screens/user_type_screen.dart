@@ -46,7 +46,6 @@ class _UserTypeScreenState extends State<UserTypeScreen> {
   void initState() {
     super.initState();
     // 6/24 B 方案：老人默认折叠，非老人默认展开
-    _showAllTypes = !widget.isElderlyMode;
   }
 
   @override
@@ -55,7 +54,6 @@ class _UserTypeScreenState extends State<UserTypeScreen> {
     // 切换老人模式时同步默认行为
     if (oldWidget.isElderlyMode != widget.isElderlyMode) {
       setState(() {
-        _showAllTypes = !widget.isElderlyMode;
       });
     }
   }
@@ -331,6 +329,7 @@ class _UserTypeScreenState extends State<UserTypeScreen> {
                                             } else {
                                             }
                                           } catch (e) {
+                                            debugPrint('[p29] catch err');
                                           }
                                         },
                                       ),

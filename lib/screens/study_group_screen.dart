@@ -117,7 +117,7 @@ class _StudyGroupScreenState extends State<StudyGroupScreen> {
                   );
                   // 6/10 加: 同步 handle 到 service
                   await HandleService().set(handleCtrl.text.trim());
-                  if (mounted) Navigator.pop(ctx, true);
+                  if (ctx.mounted) Navigator.pop(ctx, true);
                 },
                 child: Text(isEn ? 'Create' : '创建'),
               ),

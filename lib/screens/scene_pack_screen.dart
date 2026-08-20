@@ -105,7 +105,7 @@ class _ScenePackScreenState extends State<ScenePackScreen> {
                       : () async {
                           final picked = items.where((i) => _selected.contains(i.id)).toList();
                           await _svc.setPack(_nameCtrl.text, picked);
-                          if (mounted) Navigator.pop(context);
+                          if (context.mounted) Navigator.pop(context);
                         },
                   icon: const Icon(Icons.save),
                   label: Text('${widget.isEn ? "Save" : "保存"} (${_selected.length})'),

@@ -264,6 +264,7 @@ class _ContentReaderScreenState extends State<ContentReaderScreen> {
       // 6/25 v17: 不 3s 淺出, 常驻底部, 用户手动 X 关
       _markCompleteTimer?.cancel();
     } catch (e) {
+      debugPrint('[p29] err: $e');
     }
   }
 
@@ -368,7 +369,7 @@ class _ContentReaderScreenState extends State<ContentReaderScreen> {
     // 需动态 import 避免 build-time cycle (这里在同文件直接引用)
     final groups = await StudyGroupService.instance.getAll();
     // 只显示当前内容 category 相关的 (简化为显示所有)
-    if (!mounted) return;
+    if (!context.mounted) return;
     final selected = await showDialog<String>(
       context: context,
       builder: (ctx) => SimpleDialog(
@@ -405,19 +406,19 @@ class _ContentReaderScreenState extends State<ContentReaderScreen> {
         ],
       ),
     );
-    if (selected == null || !mounted) return;
+    if (selected == null || !context.mounted) return;
     // 6/12 弹窗内创建小组
     String? targetGroupId = selected;
     if (selected == '__create__') {
       final newId = await _showQuickCreateGroupDialog(context);
-      if (newId == null || !mounted) return;
+      if (newId == null || !context.mounted) return;
       targetGroupId = newId;
     }
     await StudyGroupService.instance.addContent(targetGroupId, item.id);
     final allGroups = await StudyGroupService.instance.getAll();
     final g = allGroups.firstWhere((x) => x.id == targetGroupId,
         orElse: () => allGroups.first);
-    if (!mounted) return;
+    if (!context.mounted) return;
     _showFloatingSnack(context, isEn ? 'Added to ${g.name}' : '已加入 ${g.name}');
   }
 

@@ -66,10 +66,12 @@ class _MySubscriptionsScreenState extends State<MySubscriptionsScreen>
   }
 
   Future<void> _load() async {
-    final items = await _subService.getSubscribedItems();
-    final sources = await SubscriptionService.instance.getSubscribedSources();
-    final categories = await SubscriptionService.instance.getSubscribedCategories();
-    final handle = await HandleService().get();
+    // 8/28 P29: _items/_followingPlatforms/_followingCategories/_handle fields unused
+    //   → 直接 fire-and-forget 这些 await, 只保留 setState (_loading = false)
+    await _subService.getSubscribedItems();
+    await SubscriptionService.instance.getSubscribedSources();
+    await SubscriptionService.instance.getSubscribedCategories();
+    await HandleService().get();
     if (!mounted) return;
     setState(() {
       _loading = false;
@@ -923,19 +925,6 @@ class _MySubscriptionsScreenState extends State<MySubscriptionsScreen>
   // 6/25 A: 关注 Tab section header (类似 70fa9a7 风格)
 
   // 6/25 A: ContentSource enum 转中文
-  String _sourceNameZh(ContentSource s) {
-    switch (s) {
-      case ContentSource.ximalaya: return '喜马拉雅';
-      case ContentSource.news36kr: return '36氪';
-      case ContentSource.bilibili: return 'B站';
-      case ContentSource.youtube: return 'YouTube';
-      case ContentSource.rss: return 'RSS';
-      case ContentSource.applePodcasts: return 'Apple Podcasts';
-      case ContentSource.lizhiFM: return '荔枝FM';
-      case ContentSource.zhihu: return '知乎';
-      case ContentSource.spotify: return 'Spotify';
-    }
-  }
 
 // 6/25 A: 分组/卡片 helper 删了 (TabBar 子视图取代, 简化)
 

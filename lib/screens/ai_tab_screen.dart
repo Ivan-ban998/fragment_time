@@ -166,9 +166,4 @@ class _AbilityCard extends StatelessWidget {
 
 /// 6/30 00:15: chip 行 — 复用 25 chip, 简化版 (只显示 label, 弹 sheet 跟 AI 助手一样)
 
-class _ChipDef {
-  final String emoji;
-  final String label;
-  const _ChipDef(this.emoji, this.label);
-}
 

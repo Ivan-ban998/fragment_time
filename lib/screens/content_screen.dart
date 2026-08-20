@@ -16,11 +16,9 @@
 
 import 'dart:async';
 import 'package:flutter/material.dart';
-import 'package:flutter/foundation.dart';
 import 'package:url_launcher/url_launcher.dart';
 import '../models/models.dart';
 import '../config/runtime_mode.dart';
-import '../services/llm_service.dart';
 import '../services/history_service.dart';
 import '../theme/app_theme.dart';
 import '../theme/glass_decoration.dart';
@@ -188,16 +186,6 @@ class _ContentScreenState extends State<ContentScreen> {
   // 启动 LLM 流式
 
   // 兑底: 显示预制 stub
-  void _showStub({String reason = 'unknown'}) {
-    if (!mounted) return;
-    _llmFallbackTimer?.cancel();
-    setState(() {
-      _buf = isEn
-          ? '⚠️ Online AI service unavailable right now.\n\nShowing the recommended content instead. (reason: $reason)'
-          : '⚠️ 在线 AI 暂不可用\n\n为你推荐预制内容。 (原因: $reason)';
-      _loading = false;
-    });
-  }
 
   // 6/26 Brien 00:22 '要真实数据': 从 NewsService 24 桶加载第 1 条作为 aiContentItem
   Future<void> _loadFromBucket() async {
@@ -230,52 +218,11 @@ class _ContentScreenState extends State<ContentScreen> {
 
   // 6/25 锁死角色匹配: 检测 LLM 生成内容是否跟当前 userType 匹配
   // 1.5b 模型偶尔输出学生内容给上班族, 检测后 fallback
-  bool _isRoleMatch(String content, UserType currentType) {
-    // 学生专属关键词 (其他角色不该出现)
-    const studentKeywords = [
-      '高考', '中考', '考试', '作业', '课本', '老师', '学生党', ' K12', '学校',
-      '学习规划', '学习策略', '高效学习', '考试技巧', '学生',
-      'exam', 'homework', 'school', 'study plan',
-    ];
-    // 儿童专属关键词
-    const childKeywords = [
-      '小朋友', '幼儿园', '小儿', ' 幼', '儿童',
-      'kid', 'children',
-    ];
-    // 创业专属 (不该出现上班族/退休)
-    // 老年专属 (不该出现学生/儿童)
-    final lower = content.toLowerCase();
-    if (currentType == UserType.student || currentType == UserType.child) {
-      return true; // 这些角色反而可能需要这些关键词
-    }
-    for (final k in studentKeywords) {
-      if (lower.contains(k.toLowerCase())) return false;
-    }
-    for (final k in childKeywords) {
-      if (lower.contains(k.toLowerCase())) return false;
-    }
-    return true;
-  }
 
   // 6/25 fallback: LLM 内容错位 → 调 NewsService 拿一条真内容替代
   // 8/14 改名 (沿 SOUL #169 不撒谎): _loadFakeContent → _loadFallbackContent
   //   真凶: 之前叫 _loadFakeContent 误导 (Fake = 假数据) → 实际调 NewsService 拿真 RSS
   //   修: 改名 _loadFallbackContent 反映 'AI 错位时用真 RSS 替代' 语义
-  Future<void> _loadFallbackContent() async {
-    try {
-      final results = await NewsService().getRecommendations(
-        widget.userType, widget.scene, isInternational: widget.isInternational,
-      );
-      if (!mounted || results.isEmpty) return;
-      final item = results.first;
-      setState(() {
-        _buf = '${item.title}\n\n${item.description}';
-        _aiContentItem = item;
-      });
-    } catch (e) {
-      debugPrint('[LLM] _loadFallbackContent error: $e');
-    }
-  }
 
   // 加载推荐 6 条 (用 ContentAggregator 6 张看完换 6 张)
   // 7/30 D 修: 同步立即返 fallback (24 桶假数据, <100ms), 异步 RSS 到后覆盖
@@ -449,7 +396,7 @@ class _ContentScreenState extends State<ContentScreen> {
       builder: (_) => AiAssistantScreen(
         isEn: isEn,
         isElderlyMode: widget.isElderlyMode,
-        userTypeName: widget.userType.title ?? '',
+        userTypeName: widget.userType.title,
         userType: widget.userType,
         todayHistory: today,
         contextQuote: _aiContentItem?.title, // 6/30 12:23: 让 AI 知道刚读完这篇
@@ -1659,7 +1606,7 @@ class _ContentScreenState extends State<ContentScreen> {
 
   Future<void> _showWeeklyRecap() async {
     try {
-      final recap = await WeeklyRecapService.instance.generate(useLLM: false);
+      await WeeklyRecapService.instance.generate(useLLM: false);
       if (!mounted) return;
       await showDialog(
         context: context,

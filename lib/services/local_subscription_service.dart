@@ -179,7 +179,6 @@ class LocalSubscriptionService extends ChangeNotifier {
   List<String> _packIds = [];
 
   Future<void> setPack(String name, List<ContentItem> items) async {
-    _packName = name;
     _packIds = items.map((i) => i.id).toList();
     final prefs = await SharedPreferences.getInstance();
     await prefs.setString('${_packKey}_name', name);
@@ -195,7 +194,6 @@ class LocalSubscriptionService extends ChangeNotifier {
   }
 
   Future<void> clearPack() async {
-    _packName = null;
     _packIds = [];
     final prefs = await SharedPreferences.getInstance();
     await prefs.remove('${_packKey}_name');

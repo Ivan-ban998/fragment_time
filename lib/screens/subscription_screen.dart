@@ -462,17 +462,18 @@ class _SubscriptionScreenState extends State<SubscriptionScreen> {
             onPressed: () async {
               final name = nameCtrl.text.trim();
               final url = urlCtrl.text.trim();
+              final messenger = ScaffoldMessenger.of(ctx);
               if (name.isEmpty || url.isEmpty) {
-                _showFloatingSnack(ctx, isEn ? 'Both required' : '名称和 URL 都需要填');
+                messenger.showSnackBar(SnackBar(content: Text(isEn ? 'Both required' : '名称和 URL 都需要填')));
                 return;
               }
               if (!url.startsWith('http')) {
-                _showFloatingSnack(ctx, isEn ? 'URL must start with http(s)' : 'URL 必须以 http 开头');
+                messenger.showSnackBar(SnackBar(content: Text(isEn ? 'URL must start with http(s)' : 'URL 必须以 http 开头')));
                 return;
               }
               await SubscriptionService.instance.addCustomRss(name, url);
               if (ctx.mounted) Navigator.pop(ctx);
-              _showFloatingSnack(context, isEn ? 'RSS added' : 'RSS 已添加');
+              messenger.showSnackBar(SnackBar(content: Text(isEn ? 'RSS added' : 'RSS 已添加')));
             },
             child: Text(isEn ? 'Add' : '添加'),
           ),
@@ -503,13 +504,14 @@ class _SubscriptionScreenState extends State<SubscriptionScreen> {
           FilledButton(
             onPressed: () async {
               final cat = catCtrl.text.trim();
+              final messenger = ScaffoldMessenger.of(ctx);
               if (cat.isEmpty) {
-                _showFloatingSnack(ctx, isEn ? 'Name required' : '名称不能为空');
+                messenger.showSnackBar(SnackBar(content: Text(isEn ? 'Name required' : '名称不能为空')));
                 return;
               }
               await SubscriptionService.instance.subscribeCategory(cat);
               if (ctx.mounted) Navigator.pop(ctx);
-              _showFloatingSnack(context, isEn ? 'Category added' : '类目已添加');
+              messenger.showSnackBar(SnackBar(content: Text(isEn ? 'Category added' : '类目已添加')));
             },
             child: Text(isEn ? 'Add' : '添加'),
           ),

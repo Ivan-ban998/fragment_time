@@ -323,6 +323,7 @@ class _MainHomeScreenState extends State<MainHomeScreen> {
       await _loadDailyQuote();
       // 3. ContentScreen 通过 _subscribedItems 变化自动 rebuild (Consumer/Provider 风格)
     } catch (e) {
+      debugPrint('[p29] err: $e');
     }
   }
 
@@ -1170,15 +1171,13 @@ class _DailyEncouragementBanner extends StatefulWidget {
   final bool isElderlyMode;
   final String handle; // 6/25: 昵称 (从 HandleService 传入)
   final VoidCallback onTapDetail; // 6/24 v13: 点 banner 弹相关推荐
-  final VoidCallback? onNextQuote; // 6/29: 点 "下一个" 按钮
   const _DailyEncouragementBanner({
     required this.text,
-    this.quote,
+    required this.quote, // P29: was optional, change to required
     required this.isEn,
     required this.isElderlyMode,
     required this.handle,
     required this.onTapDetail,
-    this.onNextQuote,
   });
 
   @override
