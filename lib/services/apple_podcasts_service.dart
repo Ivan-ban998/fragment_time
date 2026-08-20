@@ -37,7 +37,7 @@ class ApplePodcast {
   // 转 ContentItem 适配 24 桶
   ContentItem toContentItem() {
     return ContentItem(
-      id: 'apple_podcast_${id}',
+      id: 'apple_podcast_$id',
       title: name,
       description: '$artistName · ${genres.join('/')}',
       source: 'Apple Podcasts',

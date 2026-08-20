@@ -7,8 +7,7 @@ import '../services/local_subscription_service.dart';
 import 'scene_screen.dart';
 import 'content_screen.dart';
 import 'topic_onboarding_screen.dart';
-import 'loading_screen.dart';
-import '../main.dart' as appMain;
+import '../main.dart' as app_main;
 
 class UserTypeScreen extends StatefulWidget {
   final dynamic config;
@@ -42,7 +41,6 @@ class UserTypeScreen extends StatefulWidget {
 
 class _UserTypeScreenState extends State<UserTypeScreen> {
   // 6/24 B 方案：完整模式 — 5 桶默认 + 老人默认折叠其余桶
-  late bool _showAllTypes;
 
   @override
   void initState() {
@@ -290,7 +288,7 @@ class _UserTypeScreenState extends State<UserTypeScreen> {
                       // 5 桶主区
                       LayoutBuilder(
                         builder: (context, constraints) {
-                          final w = constraints.maxWidth;
+                          final _ = constraints.maxWidth;
                           // 6/25 Brien 反馈: 3 列太小 → 回到 2 列 (老默认)
                           final cols = widget.isElderlyMode ? 1 : 2;
                           return GridView.builder(
@@ -327,7 +325,7 @@ class _UserTypeScreenState extends State<UserTypeScreen> {
                                           Navigator.of(topCtx).pop();
                                           // TopicOnboarding 选完/跳过 → 加载 LoadingScreen
                                           try {
-                                            final state = appMain.globalMainKey.currentState;
+                                            final state = app_main.globalMainKey.currentState;
                                             if (state != null) {
                                               (state as dynamic).showLoadingScreen();
                                             } else {
@@ -467,87 +465,6 @@ class _ChooseRoleHint extends StatelessWidget {
   }
 }
 
-class _TodayPickCard extends StatelessWidget {
-  final double scale;
-  final bool isEn;
-  final VoidCallback onTap;
-
-  const _TodayPickCard({
-    required this.scale,
-    required this.isEn,
-    required this.onTap,
-  });
-
-  @override
-  Widget build(BuildContext context) {
-    return GestureDetector(
-      onTap: onTap,
-      child: Container(
-        padding: EdgeInsets.symmetric(horizontal: 16 * scale, vertical: 14 * scale),
-        decoration: BoxDecoration(
-          // 7/19 fix v2: LinearGradient 全量清除
-          color: const Color(0xFF7C5CFC),
-          borderRadius: BorderRadius.circular(20),
-          boxShadow: [
-            BoxShadow(
-              color: const Color(0xFF7C5CFC).withValues(alpha: 0.3),
-              blurRadius: 12,
-              offset: const Offset(0, 4),
-            ),
-          ],
-        ),
-        child: Row(
-          children: [
-            Icon(Icons.auto_awesome, color: Colors.white, size: 28 * scale),
-            SizedBox(width: 12 * scale),
-            Expanded(
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Text(
-                    isEn ? '"What should I read now?"' : '"现在看什么？"',
-                    style: TextStyle(
-                      color: Colors.white.withValues(alpha: 0.85),
-                      fontSize: 11 * scale,
-                      fontStyle: FontStyle.italic,
-                    ),
-                  ),
-                  SizedBox(height: 2),
-                  Text(
-                    isEn ? 'Tap to start — 5 min story' : '点一下，5 分钟开始读',
-                    style: TextStyle(
-                      color: Colors.white,
-                      fontSize: 16 * scale,
-                      fontWeight: FontWeight.w600,
-                    ),
-                    maxLines: 2,
-                    overflow: TextOverflow.ellipsis,
-                  ),
-                ],
-              ),
-            ),
-            SizedBox(width: 8 * scale),
-            Container(
-              padding: EdgeInsets.symmetric(horizontal: 14 * scale, vertical: 8 * scale),
-              decoration: BoxDecoration(
-                color: Colors.white,
-                borderRadius: BorderRadius.circular(20 * scale),
-              ),
-              child: Text(
-                isEn ? 'Start' : '开始',
-                style: TextStyle(
-                  color: const Color(0xFF7C5CFC),
-                  fontSize: 13 * scale,
-                  fontWeight: FontWeight.w700,
-                ),
-              ),
-            ),
-          ],
-        ),
-      ),
-    );
-  }
-}
 
 // 6/15 重写: 6/9 Sofa 启发 — 续读小卡 (上次看到一半)
 class _InProgressRow extends StatefulWidget {

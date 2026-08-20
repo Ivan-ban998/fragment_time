@@ -224,7 +224,6 @@ static const String _proxyBase = '/rss';
       ? [_vergeFeed, _nprFeed, _nprMusicFeed]
       : [_sspaiFeed, _nprFeed, _kr36Feed];
 
-  String get _sourceName => isInternational ? 'The Verge' : '36氪';
 
   /// 8/13 升一阶 (沿 SOUL #198): 按 scene 配 RSS 源优先级 — 4 场景重叠真凶
   /// 真凶: 4 场景都走同一组 _feedUrls (sspai+NPR+36kr) → 主题词筛后重叠高
@@ -232,9 +231,8 @@ static const String _proxyBase = '/rss';
   /// 副作用: shuffle + 主题词筛还是过滤, 但起始 source 不同 → 池子不同
   /// 8/13 治本: 把 currentScene 从 static 改 instance (避免 RssService 单例串扰)
   /// 8/14 二次治本 (沿 SOUL #8 Brien 负优化反馈): 移除 lifehacker (2MB body 解析慢 8s+)
+  /// P29 batch2: 删 unnecessary getter/setter (只在本类内用)
   Scene? _currentScene;
-  Scene? get currentScene => _currentScene;
-  set currentScene(Scene? s) => _currentScene = s;
 
   /// 8/13 加: 公开 _feedUrlsForScene 给 test (验证 4 场景配不同源)
   List<String> get feedUrlsForScene => _feedUrlsForScene;
@@ -808,7 +806,7 @@ static const String _proxyBase = '/rss';
     ],
   };
 
-  Future<List<ContentItem>> fetchByBucket(UserType userType, Scene scene, {int shuffleSeed = 0, bool forceFresh = false, Scene? sceneOverride = null}) async {
+  Future<List<ContentItem>> fetchByBucket(UserType userType, Scene scene, {int shuffleSeed = 0, bool forceFresh = false, Scene? sceneOverride}) async {
     // 8/13 治本 (沿 SOUL #198 #137 #190): 4 场景重叠真凶
     //   真凶: 之前用 rssService.currentScene = scene (instance field) 但 _feedUrlsForScene 在 fetchTop 内读
     //     → 跨场景调用串扰 (4 场景用同一 RssService 实例)

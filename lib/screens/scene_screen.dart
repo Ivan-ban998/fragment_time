@@ -11,7 +11,7 @@ import '../services/handle_service.dart';
 import '../services/history_service.dart';
 import '../services/weather_service.dart';
 import '../services/daily_prefs_service.dart';
-import '../main.dart' as appMain;
+import '../main.dart' as app_main;
 import 'content_screen.dart';
 import 'loading_screen.dart';
 import 'ai_assistant_screen.dart';
@@ -62,7 +62,7 @@ class _SceneScreenState extends State<SceneScreen> {
       final h = await HandleService().get();
       if (!mounted) return;
       setState(() => _handle = h);
-    } catch (_) {}
+    } catch (e) { debugPrint('[scene_screen] error: $e'); }
   }
 
   UserType get userType => widget.userType;
@@ -131,7 +131,7 @@ class _SceneScreenState extends State<SceneScreen> {
                       Navigator.of(context).pop();
                       // 调 MainHomeScreen._reloadAll() 重新拉关注列表 + 每日名言
                       try {
-                        final state = appMain.globalMainKey.currentState;
+                        final state = app_main.globalMainKey.currentState;
                         if (state != null) {
                           (state as dynamic)._reloadAll();
                         }
@@ -723,6 +723,7 @@ class DailyEncouragementBanner extends StatefulWidget {
   final VoidCallback onTapDetail; // 6/24 v13: 点 banner 弹相关推荐
   final VoidCallback? onNextQuote; // 6/29: 点 "下一个" 按钮
   const DailyEncouragementBanner({
+    super.key,
     required this.text,
     this.quote,
     required this.isEn,
@@ -738,7 +739,6 @@ class DailyEncouragementBanner extends StatefulWidget {
 
 class _DailyEncouragementBannerState extends State<DailyEncouragementBanner> {
   bool _saved = false;
-  bool _loaded = false;
 
   @override
   void initState() {
@@ -768,7 +768,6 @@ class _DailyEncouragementBannerState extends State<DailyEncouragementBanner> {
       final quoteText = widget.quote?.text ?? '';
       if (quoteText.isEmpty) {
         if (mounted) setState(() => _saved = false);
-        _loaded = true;
         return;
       }
       final key = 'quote_saved_${quoteText.hashCode}';
@@ -786,10 +785,8 @@ class _DailyEncouragementBannerState extends State<DailyEncouragementBanner> {
         }
       }
       if (mounted) setState(() => _saved = shouldBeSaved);
-      _loaded = true;
-    } catch (_) {
+    } catch (e) { debugPrint('[scene_screen] err: $e');
       if (mounted) setState(() => _saved = false);
-      _loaded = true;
     }
   }
 
@@ -830,7 +827,7 @@ class _DailyEncouragementBannerState extends State<DailyEncouragementBanner> {
         final prefs = await SharedPreferences.getInstance();
         final key = 'quote_saved_${quoteText.hashCode}';
         await prefs.setBool(key, true);
-      } catch (_) {}
+      } catch (e) { debugPrint('[scene_screen] error: $e'); }
       if (!mounted) return;
       setState(() => _saved = true);
       // 6/24 v9: 弹 SnackBar + "查看" 按钮 (跳 Tab 2)
@@ -843,7 +840,7 @@ class _DailyEncouragementBannerState extends State<DailyEncouragementBanner> {
           action: SnackBarAction(
             label: widget.isEn ? 'View' : '查看',
             onPressed: () {
-              appMain.navigateToMainTab(2);
+              app_main.navigateToMainTab(2);
             },
           ),
         ),

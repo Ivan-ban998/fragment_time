@@ -140,7 +140,7 @@ class LlmService {
   static const String _llmProxyEndpoint = '/api/llm';
   // native (APK) 保留原始 11435 endpoint (native 不撞 CNA)
   static String get _nativeLlmProxyEndpoint {
-    return 'http://${_ollamaHost}:11435/api/llm';
+    return 'http://$_ollamaHost:11435/api/llm';
   }
   // 8/7 加 (沿 SOUL #137 真凶): 默认走 minimax 反代 (key 隐式走 NAS, 不进 build); 不传 LLM_BACKEND=ollama 兜底本地
   // 跟 Ollama 同端口风格 (11435), web 端同 hostname 解析
@@ -166,8 +166,8 @@ class LlmService {
       return;
     }
     // 18:26 Thinking strip state (MiniMax reasoning model)
-    String _miniMaxBuffer = '';
-    int _miniMaxYieldedLen = 0;
+    String miniMaxBuffer = '';
+    int miniMaxYieldedLen = 0;
     final systemPrompt = _buildSystemPrompt(userType, languageCode, prefSummary: prefSummary);
     final userPrompt = _buildUserPrompt(userType, scene, languageCode, isInternational);
 
@@ -255,11 +255,11 @@ class LlmService {
                 // 18:26 MiniMax reasoning model: content 含  ...
                 // 累积 buffer + strip + yield 增量 (隐藏 thinking)
                 if (content != null) {
-                  _miniMaxBuffer += content;
-                  final safe = stripThinkTags(_miniMaxBuffer);
-                  if (safe.length > _miniMaxYieldedLen) {
-                    yield safe.substring(_miniMaxYieldedLen);
-                    _miniMaxYieldedLen = safe.length;
+                  miniMaxBuffer += content;
+                  final safe = stripThinkTags(miniMaxBuffer);
+                  if (safe.length > miniMaxYieldedLen) {
+                    yield safe.substring(miniMaxYieldedLen);
+                    miniMaxYieldedLen = safe.length;
                   }
                 }
               } catch (_) {}
@@ -278,8 +278,11 @@ class LlmService {
             final message = json['message'] as Map?;
             final content = message?['content'] as String?;
             final thinking = message?['thinking'] as String?;
-            if (content != null && content.isNotEmpty) yield content;
-            else if (thinking != null && thinking.isNotEmpty) yield thinking;
+            if (content != null && content.isNotEmpty) {
+              yield content;
+            } else if (thinking != null && thinking.isNotEmpty) {
+              yield thinking;
+            }
             if (json['done'] == true) return;
           } catch (_) {}
         }
@@ -421,10 +424,6 @@ class LlmService {
     if (RuntimeMode.current.useStub) {
       debugPrint('[llm staging] chatStream 返 mock');
       // 取最后一条 user message 的前 50 字 mock 回
-      final lastUser = messages.lastWhere(
-        (m) => m['role'] == 'user',
-        orElse: () => {'role': 'user', 'content': ''},
-      );
       final lang = messages.any((m) {
         final c = m['content'];
         return c != null && c.contains(RegExp(r'[\u4e00-\u9fff]'));
@@ -612,7 +611,7 @@ class LlmService {
       case 'child_workout':
         return '$childHint 面向 6-12 岁儿童的课间小游戏。$region。5 个 1 分钟安全动作，250 字。$userDesc。动作要安全有趣、不能有危险动作。';
       default:
-        return '$childHint 面向${_userTypeZh(u)}的${sceneName}内容。$region。5 分钟可读完，250 字。$userDesc。';
+        return '$childHint 面向${_userTypeZh(u)}的$sceneName内容。$region。5 分钟可读完，250 字。$userDesc。';
     }
   }
 
@@ -646,25 +645,6 @@ class LlmService {
 
   // 6/25 锁角色匹配: 按当前 userType 返回禁词列表
   // 例: 上班族 → 禁止输出学生内容关键词
-  static String _forbiddenForUserType(UserType u) {
-    final parts = <String>[];
-    if (u != UserType.student && u != UserType.child) {
-      parts.add('禁止出现：高考、中考、考试、作业、课本、老师、学生党、K12、学校、学习规划、学习策略、高效学习、考试技巧、学生、考试');
-    }
-    if (u != UserType.child) {
-      parts.add('禁止出现：小朋友、幼儿园、儿童');
-    }
-    if (u == UserType.officeWorker) {
-      parts.add('只写职场内容 (行业/方法论/通勤要闻/正念/工位运动)。禁止 K12/学生/育儿/养生内容');
-    }
-    if (u == UserType.senior) {
-      parts.add('只写养生/健康/兴趣内容。禁止 K12/学生/职场术语');
-    }
-    if (u == UserType.entrepreneur) {
-      parts.add('只写商业/管理/行业动态。禁止 K12/学生/育儿/养生');
-    }
-    return parts.join(' ');
-  }
 
   static String _sceneZh(Scene s) {
     switch (s) {

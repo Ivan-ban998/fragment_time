@@ -52,7 +52,6 @@ class _AiAssistantScreenState extends State<AiAssistantScreen> {
   final _scrollController = ScrollController();
   final _focusNode = FocusNode(); // 6/30 11:01: 点 "自由聊" chip 自动 focus 输入框 + 弹键盘
   final List<_ChatMessage> _messages = [];
-  String _dailyGreeting = ''; // 6/30 12:23: sheet 顶部今日总结 (AI 主动提)
   List<String> _contextSuggestions = []; // 6/30 12:40: 基于今日历史的 3 个可点提问
 
 
@@ -86,9 +85,6 @@ class _AiAssistantScreenState extends State<AiAssistantScreen> {
       // 6/30 12:23: 历史为空 → 1 句引导 (不调 LLM, 避免冷启动)
       if (!mounted) return;
       setState(() {
-        _dailyGreeting = widget.isEn
-            ? 'Pick a scene on Home — I\'ll help you digest what you read.'
-            : '去首页选个场景看看，读完来找我帮你理清。';
         _contextSuggestions = [];
       });
       return;
@@ -103,7 +99,6 @@ class _AiAssistantScreenState extends State<AiAssistantScreen> {
     if (!mounted) return;
     setState(() {
       _contextSuggestions = _staticSuggestions(history, topics);
-      _dailyGreeting = '';
     });
   }
 
@@ -1558,9 +1553,7 @@ class _CardTile extends StatelessWidget {
               ScaffoldMessenger.of(context).showSnackBar(
                 SnackBar(
                   content: Text(
-                    '♪ ' + (card.title.length > 30
-                        ? card.title.substring(0, 30) + '…'
-                        : card.title),
+                    '♪ ${card.title.length > 30 ? '${card.title.substring(0, 30)}…' : card.title}',
                   ),
                   duration: const Duration(seconds: 2),
                 ),
@@ -1573,7 +1566,7 @@ class _CardTile extends StatelessWidget {
               launchUrl(uri, mode: kIsWeb ? LaunchMode.platformDefault : LaunchMode.externalApplication);
               ScaffoldMessenger.of(context).showSnackBar(
                 SnackBar(
-                  content: Text('♫ 跳 ' + (item.source.isNotEmpty ? item.source : '原文')),
+                  content: Text('♫ 跳 ${item.source.isNotEmpty ? item.source : '原文'}'),
                   duration: const Duration(seconds: 2),
                 ),
               );
@@ -1586,9 +1579,7 @@ class _CardTile extends StatelessWidget {
                 TtsService.instance.speak(ttsText);
                 ScaffoldMessenger.of(context).showSnackBar(
                   SnackBar(
-                    content: Text('🔊 TTS 读: ' + (item.title.length > 24
-                        ? item.title.substring(0, 24) + '…'
-                        : item.title)),
+                    content: Text('🔊 TTS 读: ${item.title.length > 24 ? '${item.title.substring(0, 24)}…' : item.title}'),
                     duration: const Duration(seconds: 2),
                   ),
                 );
@@ -1601,7 +1592,7 @@ class _CardTile extends StatelessWidget {
               launchUrl(uri, mode: kIsWeb ? LaunchMode.platformDefault : LaunchMode.externalApplication);
               ScaffoldMessenger.of(context).showSnackBar(
                 SnackBar(
-                  content: Text('♫ ' + (item.source.isNotEmpty ? item.source : '打开原文')),
+                  content: Text('♫ ${item.source.isNotEmpty ? item.source : '打开原文'}'),
                   duration: const Duration(seconds: 2),
                 ),
               );

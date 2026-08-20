@@ -164,7 +164,7 @@ class NewsService {
         final rssItems = await rssService.fetchTop(limit: 30, scene: scene);
         for (final rssItem in rssItems) {
           if (rssItem.title.toLowerCase().contains(q) ||
-              (rssItem.description?.toLowerCase().contains(q) ?? false)) {
+              (rssItem.description.toLowerCase().contains(q) ?? false)) {
             // 转 RssItem -> ContentItem (用 RssService.toContentItem)
             final ci = rssService.toContentItem(rssItem);
             results.add(ci);

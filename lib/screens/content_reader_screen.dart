@@ -2,7 +2,6 @@ import 'package:flutter/material.dart';
 import 'package:flutter/foundation.dart';
 import 'package:url_launcher/url_launcher.dart';
 import 'dart:async';
-import 'dart:ui';
 import '../models/models.dart';
 import '../models/quote.dart';
 import '../theme/app_theme.dart';
@@ -192,7 +191,7 @@ class _ContentReaderScreenState extends State<ContentReaderScreen> {
         }
       }
       List<ContentItem> candidates = [];
-      for (final key in allBuckets) {
+      for (final _ in allBuckets) {
         // 直接调 NewsService 内部 _allContent, 但没暴露 — 改用 6x4 = 24 次
         final results = await NewsService().getRecommendations(_inferType(), _inferScene());
         candidates.addAll(
@@ -201,7 +200,7 @@ class _ContentReaderScreenState extends State<ContentReaderScreen> {
       }
       if (!mounted || candidates.isEmpty) return;
       final next = candidates.first;
-      final summary = '${next.title}\n\n${next.description ?? "".trim()}';
+      final summary = '${next.title}\n\n${next.description}';
       if (!mounted) return;
       setState(() {
         _aiSummary = summary;
@@ -333,7 +332,7 @@ class _ContentReaderScreenState extends State<ContentReaderScreen> {
   ContentItem get item => widget.item;
 
   String get _fullText {
-    return '${item.title}。${item.description ?? ''} ${_getExtendedContent()}';
+    return '${item.title}。${item.description} ${_getExtendedContent()}';
   }
 
   Future<void> _togglePlay() async {
@@ -682,7 +681,7 @@ class _ContentReaderScreenState extends State<ContentReaderScreen> {
                           Uri.parse(item.externalUrl!),
                           mode: LaunchMode.externalApplication,
                         );
-                      } catch (_) {}
+                      } catch (e) { debugPrint('[content_reader] error: $e'); }
                     },
                     child: Container(
                       padding: EdgeInsets.symmetric(horizontal: 6 * scale, vertical: 2 * scale),
@@ -1513,7 +1512,7 @@ class _QuoteReadLayout extends StatelessWidget {
 
   // 从 description 解析 quote text + source (7/15 banner save 格式: "quote — 《source》")
   (String, String?) _parse() {
-    final desc = item.description ?? '';
+    final desc = item.description;
     final idx = desc.indexOf(' — ');
     if (idx > 0) {
       return (desc.substring(0, idx), desc.substring(idx + 3));
@@ -1585,7 +1584,7 @@ class _QuoteReadLayout extends StatelessWidget {
                             Padding(
                               padding: EdgeInsets.only(top: 4 * scale),
                               child: Text(
-                                '《${source}》',
+                                '《$source》',
                                 style: TextStyle(color: Colors.white.withValues(alpha: 0.85), fontSize: 14 * scale),
                               ),
                             ),
@@ -1597,7 +1596,7 @@ class _QuoteReadLayout extends StatelessWidget {
                 SizedBox(height: 20 * scale),
                 // quote 全文 (大 italic)
                 Text(
-                  '“${text}”',
+                  '“$text”',
                   style: TextStyle(
                     color: Colors.white,
                     fontSize: 18 * scale,
@@ -1846,8 +1845,8 @@ class _QuoteHistorySectionState extends State<_QuoteHistorySection> {
     // 7/31 沿用 #121: 7b 在 NAS CPU 上 30s timeout 太短（实测 31s）, 改 60s
     // 沿用 #107: prompt 加不确定时只说不知道, 避免 7b 瞎编
     final prompt = widget.isEn
-        ? 'Author: ${widget.author}${src}. Quote: "${widget.quoteText}".\n\nIn 80 words or fewer, briefly introduce the author\'s background and the historical context of this quote. If you are not sure about this specific quote or author, say "I am not familiar with this specific quote" — DO NOT make up facts. Reply in English.'
-        : '作者: ${widget.author}${src}\n名言: "${widget.quoteText}"\n\n用 80 字以内介绍这位作者的生平和这句名言的历史背景, 不要复述名言本身, 直接回答。\n\n如果你是 7b 小模型, 不熟悉这句或这位作者, 只说 "我对这句不熟悉, 换个试试" — 不要编造事实。';
+        ? 'Author: ${widget.author}$src. Quote: "${widget.quoteText}".\n\nIn 80 words or fewer, briefly introduce the author\'s background and the historical context of this quote. If you are not sure about this specific quote or author, say "I am not familiar with this specific quote" — DO NOT make up facts. Reply in English.'
+        : '作者: ${widget.author}$src\n名言: "${widget.quoteText}"\n\n用 80 字以内介绍这位作者的生平和这句名言的历史背景, 不要复述名言本身, 直接回答。\n\n如果你是 7b 小模型, 不熟悉这句或这位作者, 只说 "我对这句不熟悉, 换个试试" — 不要编造事实。';
     try {
       final result = await LlmService.generateRaw(prompt, isEn: widget.isEn)
         .timeout(const Duration(seconds: 60), onTimeout: () => widget.isEn ? '(History unavailable - timeout)' : '（历史背景暂不可用）');
@@ -2325,7 +2324,7 @@ class _QuoteRelatedSectionState extends State<_QuoteRelatedSection> {
                           if (await canLaunchUrl(uri)) {
                             await launchUrl(uri, mode: kIsWeb ? LaunchMode.platformDefault : LaunchMode.externalApplication);
                           }
-                        } catch (_) {}
+                        } catch (e) { debugPrint('[content_reader] error: $e'); }
                       }
                     : null,
               )).toList(),

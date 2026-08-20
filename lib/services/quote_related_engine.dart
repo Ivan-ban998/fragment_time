@@ -110,7 +110,7 @@ class QuoteRelatedEngine {
     bool kwHit = false;
     for (final k in keywords) {
       if (c.title.toLowerCase().contains(k.toLowerCase()) ||
-          (c.description?.toLowerCase().contains(k.toLowerCase()) ?? false)) {
+          (c.description.toLowerCase().contains(k.toLowerCase()) ?? false)) {
         kwHit = true;
         break;
       }

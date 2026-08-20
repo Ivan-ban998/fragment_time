@@ -6,7 +6,7 @@ import '../services/news_service.dart';
 import '../services/local_subscription_service.dart';
 import '../services/llm_service.dart';
 import '../models/models.dart';
-import '../main.dart' as appMain;
+import '../main.dart' as app_main;
 
 // 6/28 加: SceneScreen '强制刷新' 信号
 // LoadingScreen 开始 → SceneScreen 收到信号 → 调 ContentAggregator 重新拉推荐池
@@ -92,13 +92,13 @@ class _LoadingScreenState extends State<LoadingScreen>
         // 3s 后跳兜底, 上游 http.Client 由 generateStream 内部 timeout(120s) 自己 release
         final buffer = StringBuffer();
         try {
-          await for (final _ in LlmService.generateStream(
+          await for (final chunk in LlmService.generateStream(
             userType: _userTypeFromName(userTypeName),
             scene: Scene.learn,
             languageCode: widget.languageCode,
             isInternational: isEn,
           ).timeout(const Duration(seconds: 3))) {
-            buffer.write(_);
+            buffer.write(chunk);
           }
         } on TimeoutException {
           // 3s 到点: 返回当前已写 buffer, 不等上游流结束
@@ -351,12 +351,12 @@ class _LoadingScreenState extends State<LoadingScreen>
                             if (widget.isEntryRoute) {
                               // 首启: onComplete 关 LoadingScreen, webForceReload 刷新到 SceneScreen
                               widget.onComplete?.call();
-                              appMain.webForceReload();
+                              app_main.webForceReload();
                             } else {
                               // 非首启: 同样走 onComplete + 刷新, 不调 Navigator.pop (Stack child pop 会抛异常)
                               ForceReloadSignal.notifyReload();
                               widget.onComplete?.call();
-                              appMain.webForceReload();
+                              app_main.webForceReload();
                             }
                           }
                         : null,

@@ -4,13 +4,11 @@
 // 卡片图渲染 = OffscreenCanvas? Flutter web 没 — 退路：手画 CustomPainter 渲染到 Canvas
 
 import 'dart:async';
-import 'dart:typed_data';
 // ignore: avoid_web_libraries_in_flutter
 import 'dart:html' as html;
 import 'dart:ui' as ui;
 
 import 'package:flutter/material.dart';
-import 'package:flutter/rendering.dart';
 import 'package:flutter/services.dart';
 
 import '../models/models.dart';
@@ -44,7 +42,7 @@ class ShareService {
 
   String _filenameFor(ContentItem item, bool isEn) {
     final safe = item.id.replaceAll(RegExp(r'[^A-Za-z0-9_-]'), '_');
-    return 'fragmenttime_${safe}.png';
+    return 'fragmenttime_$safe.png';
   }
 
   Future<Uint8List> _renderCard(ContentItem item, {required bool isEn, String handle = '@你'}) async {
@@ -99,10 +97,10 @@ class ShareService {
     );
 
     // 6. 描述（如果有）
-    if (item.description != null && item.description!.isNotEmpty) {
+    if (item.description.isNotEmpty) {
       _drawTextWrapped(
         canvas,
-        item.description!,
+        item.description,
         Offset(cardRect.left + 60, cardRect.top + 380),
         titleMaxWidth,
         color: const Color(0xFF666666),
@@ -202,7 +200,7 @@ class ShareService {
   }
 
   Future<void> _copyFallback(ContentItem item, bool isEn) async {
-    final text = '${item.title}\n${item.description ?? ''}\n${item.externalUrl ?? ''}';
+    final text = '${item.title}\n${item.description}\n${item.externalUrl ?? ''}';
     await Clipboard.setData(ClipboardData(text: text));
   }
 }

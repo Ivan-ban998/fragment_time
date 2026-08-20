@@ -5,7 +5,6 @@ import '../models/models.dart';
 import '../services/local_subscription_service.dart';
 import '../services/news_service.dart';
 import '../widgets/skeleton.dart';
-import 'content_reader_screen.dart';
 
 class ScenePackScreen extends StatefulWidget {
   final UserType userType;
@@ -40,11 +39,17 @@ class _ScenePackScreenState extends State<ScenePackScreen> {
   Widget build(BuildContext context) {
     final hour = DateTime.now().hour;
     String defaultName;
-    if (hour < 9) defaultName = widget.isEn ? 'Morning pack' : '早安包';
-    else if (hour < 14) defaultName = widget.isEn ? 'Lunch pack' : '午休包';
-    else if (hour < 18) defaultName = widget.isEn ? 'Afternoon pack' : '下午包';
-    else if (hour < 22) defaultName = widget.isEn ? 'Evening pack' : '晚上包';
-    else defaultName = widget.isEn ? 'Night pack' : '睡前包';
+    if (hour < 9) {
+      defaultName = widget.isEn ? 'Morning pack' : '早安包';
+    } else if (hour < 14) {
+      defaultName = widget.isEn ? 'Lunch pack' : '午休包';
+    } else if (hour < 18) {
+      defaultName = widget.isEn ? 'Afternoon pack' : '下午包';
+    } else if (hour < 22) {
+      defaultName = widget.isEn ? 'Evening pack' : '晚上包';
+    } else {
+      defaultName = widget.isEn ? 'Night pack' : '睡前包';
+    }
 
     return Scaffold(
       appBar: AppBar(

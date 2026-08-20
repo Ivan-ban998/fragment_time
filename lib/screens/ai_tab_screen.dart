@@ -165,44 +165,6 @@ class _AbilityCard extends StatelessWidget {
 }
 
 /// 6/30 00:15: chip 行 — 复用 25 chip, 简化版 (只显示 label, 弹 sheet 跟 AI 助手一样)
-class _QuickPrompts extends StatelessWidget {
-  static const _chips = <_ChipDef>[
-    _ChipDef('🇬🇧', 'BBC 英语'),
-    _ChipDef('🎧', '新概念英语'),
-    _ChipDef('🧘', '5 分钟冥想'),
-    _ChipDef('🌿', '白噪音'),
-    _ChipDef('📰', '今日新闻'),
-    _ChipDef('💼', '哈佛商业'),
-    _ChipDef('📚', '樊登读书'),
-    _ChipDef('🎓', '睡前英语'),
-    _ChipDef('🔬', '今日科普'),
-    _ChipDef('🏛', '中学古诗'),
-    _ChipDef('📊', 'OKR 入门'),
-    _ChipDef('🧠', '深度工作'),
-    _ChipDef('💰', '谈加薪'),
-    _ChipDef('🏆', '精益创业'),
-    _ChipDef('📈', '增长黑客'),
-    _ChipDef('👨‍👩‍👧', '正面管教'),
-    _ChipDef('👨‍👦', '孩子磨蹭'),
-    _ChipDef('🏃', '跑步热身'),
-    _ChipDef('💪', '眼保健操'),
-    _ChipDef('😴', '考前放空'),
-    _ChipDef('🍅', '番茄钟'),
-    _ChipDef('📐', '物理入门'),
-    _ChipDef('🏛', '历史今天'),
-    _ChipDef('🌙', '凌晨冥想'),
-    _ChipDef('🌅', '会议拉伸'),
-  ];
-
-  @override
-  Widget build(BuildContext context) {
-    return Wrap(
-      spacing: 8,
-      runSpacing: 8,
-      children: _chips.map((c) => _ChipButton(def: c)).toList(),
-    );
-  }
-}
 
 class _ChipDef {
   final String emoji;
@@ -210,32 +172,3 @@ class _ChipDef {
   const _ChipDef(this.emoji, this.label);
 }
 
-class _ChipButton extends StatelessWidget {
-  final _ChipDef def;
-  const _ChipButton({required this.def});
-
-  @override
-  Widget build(BuildContext context) {
-    return ActionChip(
-      avatar: Text(def.emoji, style: const TextStyle(fontSize: 14)),
-      label: Text(def.label, style: const TextStyle(fontSize: 13)),
-      backgroundColor: const Color(0xFF7C5CFC).withValues(alpha: 0.08),
-      side: BorderSide(color: const Color(0xFF7C5CFC).withValues(alpha: 0.3)),
-      onPressed: () {
-        // 6/30 00:18: chip 简化为弹 chat sheet, 走跟按钮一样的路径
-        // 内部用 sheet 内的 25 chip 机制 (0 LLM)
-        showModalBottomSheet(
-          context: context,
-          isScrollControlled: true,
-          backgroundColor: Colors.transparent,
-          barrierColor: Colors.black54,
-          builder: (_) => AiAssistantScreen(
-            isEn: false,
-            isElderlyMode: false,
-            userTypeName: '你',
-          ),
-        );
-      },
-    );
-  }
-}

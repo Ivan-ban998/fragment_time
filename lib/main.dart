@@ -162,7 +162,7 @@ class _FragmentTimeAppState extends State<FragmentTimeApp> {
         );
         return _DevReaderHome(userType: userType, scene: scene, autoQuiz: autoQuiz);
       }
-    } catch (_) {}
+    } catch (e) { debugPrint('[main.dart] error: $e'); }
     return MainHomeScreen(
       themeMode: _mode,
       onThemeModeChanged: (m) => setState(() => _mode = m),
@@ -317,7 +317,6 @@ class _MainHomeScreenState extends State<MainHomeScreen> {
       final items = await _subService.getSubscribedItems();
       if (!mounted) return;
       setState(() {
-        _subscribedItems = items;
         _subscriptionCount = items.length;
       });
       // 2. 重新拉每日名言 (DailyMessage)
@@ -337,7 +336,6 @@ class _MainHomeScreenState extends State<MainHomeScreen> {
   // 这里不再声明 (8/8 删: 之前重复声明 bool? 字段, 从未被读, 死代码 shadow 风险)
   String _languageCode = 'zh';
   UserType? _selectedUserType;
-  List<ContentItem> _subscribedItems = [];
   int _subscriptionCount = 0;
   int _selectedIndex = 0; // 6/30 09:42: 默认进场景 (Tab 0), AI 是场景页浮动按钮
   String _streakMessage = '';
@@ -389,7 +387,7 @@ class _MainHomeScreenState extends State<MainHomeScreen> {
       for (final it in old) {
         await LocalSubscriptionService.instance.unsubscribe(it);
       }
-    } catch (_) {}
+    } catch (e) { debugPrint('[main.dart] error: $e'); }
   }
 
   // 6/25 昵称扩展: 加载 handle (banner / 收藏 tab / 分享卡都用)
@@ -444,7 +442,7 @@ class _MainHomeScreenState extends State<MainHomeScreen> {
       debugPrint('[Quote] got quote, text.length=${quote.text.length}');
       // 7/15: LLM 或 fallback 返 Quote, 超过 80 字兑底 (仍返回原 Quote, 让 banner 截)
       final trimmed = quote.text.length > 80
-          ? Quote(text: quote.text.substring(0, 80) + '…', author: quote.author, source: quote.source, textEn: quote.textEn, authorEn: quote.authorEn, createdAt: quote.createdAt)
+          ? Quote(text: '${quote.text.substring(0, 80)}…', author: quote.author, source: quote.source, textEn: quote.textEn, authorEn: quote.authorEn, createdAt: quote.createdAt)
           : quote;
       if (!mounted) return;
       setState(() {
@@ -496,7 +494,7 @@ class _MainHomeScreenState extends State<MainHomeScreen> {
       try {
         final prefs = await SharedPreferences.getInstance();
         await prefs.setBool('quote_saved_${quoteText.hashCode}', true);
-      } catch (_) {}
+      } catch (e) { debugPrint('[main.dart] error: $e'); }
       if (!mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
@@ -592,13 +590,12 @@ class _MainHomeScreenState extends State<MainHomeScreen> {
     });
   }
 
-  int _prevStreak = 0;
   Future<void> _recordOpen() async {
     final before = await _streakService.getStreakCount();
     await _streakService.recordOpen();
     final result = await _streakService.checkJustUnlocked(isEn, before);
     if (!mounted) return;
-    setState(() => _prevStreak = result.streak);
+    setState(() {}); // P29 batch2: _prevStreak field deleted (was unused write-only)
     if (result.justUnlocked != null) {
       // 6/9 B：milestone 解锁弹窗
       WidgetsBinding.instance.addPostFrameCallback((_) {
@@ -639,7 +636,6 @@ class _MainHomeScreenState extends State<MainHomeScreen> {
       _isInternational = isInt;
       _isElderlyMode = isElderly;
       _languageCode = lang;
-      _subscribedItems = items;
       _subscriptionCount = items.length;
       _streakMessage = msg;
       if (typeName.isNotEmpty) {
@@ -655,7 +651,6 @@ class _MainHomeScreenState extends State<MainHomeScreen> {
     final items = await _subService.getSubscribedItems();
     if (!mounted) return;
     setState(() {
-      _subscribedItems = items;
       _subscriptionCount = items.length;
     });
   }
@@ -714,10 +709,9 @@ class _MainHomeScreenState extends State<MainHomeScreen> {
           final items = await _subService.getSubscribedItems();
           if (!mounted) return;
           setState(() {
-            _subscribedItems = items;
             _subscriptionCount = items.length;
           });
-        } catch (_) {}
+        } catch (e) { debugPrint('[main.dart] error: $e'); }
       }
     } catch (e) {
       debugPrint('auto-subscribe 失败: $e');
@@ -750,7 +744,7 @@ class _MainHomeScreenState extends State<MainHomeScreen> {
           final t = DateTime.fromMillisecondsSinceEpoch(h.readAt);
           return now.difference(t).inDays <= 7;
         }).take(6).toList();
-      } catch (_) {}
+      } catch (e) { debugPrint('[main.dart] error: $e'); }
     }
 
     // 关键词 (kg 仍然走 LLM 现算, 显示在 chip)
@@ -772,6 +766,7 @@ class _MainHomeScreenState extends State<MainHomeScreen> {
         isEn: isEn,
         quote: _dailyQuote,
         llmKeywords: llmKeywords,
+        selectedUserType: _selectedUserType, // P29 batch2: fix unused_element (was never passed)
       ),
     );
   }
@@ -1192,7 +1187,6 @@ class _DailyEncouragementBanner extends StatefulWidget {
 
 class _DailyEncouragementBannerState extends State<_DailyEncouragementBanner> {
   bool _saved = false;
-  bool _loaded = false;
 
   @override
   void initState() {
@@ -1222,7 +1216,6 @@ class _DailyEncouragementBannerState extends State<_DailyEncouragementBanner> {
       final quoteText = widget.quote?.text ?? '';
       if (quoteText.isEmpty) {
         if (mounted) setState(() => _saved = false);
-        _loaded = true;
         return;
       }
       final key = 'quote_saved_${quoteText.hashCode}';
@@ -1240,10 +1233,8 @@ class _DailyEncouragementBannerState extends State<_DailyEncouragementBanner> {
         }
       }
       if (mounted) setState(() => _saved = shouldBeSaved);
-      _loaded = true;
     } catch (_) {
       if (mounted) setState(() => _saved = false);
-      _loaded = true;
     }
   }
 
@@ -1284,7 +1275,7 @@ class _DailyEncouragementBannerState extends State<_DailyEncouragementBanner> {
         final prefs = await SharedPreferences.getInstance();
         final key = 'quote_saved_${quoteText.hashCode}';
         await prefs.setBool(key, true);
-      } catch (_) {}
+      } catch (e) { debugPrint('[main.dart] error: $e'); }
       if (!mounted) return;
       setState(() => _saved = true);
       // 6/24 v9: 弹 SnackBar + "查看" 按钮 (跳 Tab 2)
@@ -1744,7 +1735,7 @@ class _QuoteDetailSheet extends StatelessWidget {
                                 if (await canLaunchUrl(uri)) {
                                   await launchUrl(uri, mode: kIsWeb ? LaunchMode.platformDefault : LaunchMode.externalApplication);
                                 }
-                              } catch (_) {}
+                              } catch (e) { debugPrint('[main.dart] error: $e'); }
                             }
                           : null,
                       child: Padding(

@@ -71,7 +71,7 @@ class AboutScreen extends StatelessWidget {
               onPressed: () async {
                 final msg = ctrl.text.trim();
                 if (msg.isEmpty) return;
-                Navigator.pop(ctx, msg + '|||' + attachScreenshot.toString());
+                Navigator.pop(ctx, '$msg|||$attachScreenshot');
               },
               child: Text(isEn ? 'Send' : '发送'),
             ),
@@ -103,7 +103,7 @@ class AboutScreen extends StatelessWidget {
 
   // 7/1: 静态 SnackBar 提示 (供 showFeedbackDialog 调用, 不依赖 instance)
   static void _showFloatingSnackStatic(BuildContext context, String msg) {
-    final isEn = Localizations.localeOf(context).languageCode == 'en';
+    final _ = Localizations.localeOf(context).languageCode == 'en';
     ScaffoldMessenger.of(context).showSnackBar(
       SnackBar(
         content: Text(msg),

@@ -220,10 +220,10 @@ class _SourceContentCard extends StatelessWidget {
                         maxLines: 2,
                         overflow: TextOverflow.ellipsis,
                       ),
-                      if (item.description != null && item.description!.isNotEmpty) ...[
+                      if (item.description.isNotEmpty) ...[
                         SizedBox(height: 4 * scale),
                         Text(
-                          item.description!,
+                          item.description,
                           style: TextStyle(
                             fontSize: 12 * scale,
                             color: Colors.black54,
@@ -274,7 +274,6 @@ class _SourceContentCard extends StatelessWidget {
       case ContentType.short: return Icons.flash_on;
       case ContentType.card: return Icons.style_outlined;
       case ContentType.quiz: return Icons.quiz_outlined;
-      default: return Icons.article_outlined;
     }
   }
 }

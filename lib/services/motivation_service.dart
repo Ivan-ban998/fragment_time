@@ -373,13 +373,13 @@ class AISummary {
     final summaries = isEn
         ? [
             'This content covers key insights that can be absorbed in about 5 minutes. Perfect for your $source routine.',
-            'Trending among ${source} listeners this week. Summarized: the core idea challenge traditional views.',
-            'Community pick: This has been bookmarked by thousands of ${source} users. Quick summary available.',
+            'Trending among $source listeners this week. Summarized: the core idea challenge traditional views.',
+            'Community pick: This has been bookmarked by thousands of $source users. Quick summary available.',
           ]
         : [
             '这段内容约5分钟可以消化，配合你的$source使用习惯。',
-            '本周在${source}圈子内很热，核心观点挑战传统认知。',
-            '社区精选：已被数千${source}用户收藏，这里有摘要。',
+            '本周在$source圈子内很热，核心观点挑战传统认知。',
+            '社区精选：已被数千$source用户收藏，这里有摘要。',
           ];
     final hash = title.hashCode.abs();
     return summaries[hash % summaries.length];

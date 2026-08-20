@@ -12,13 +12,10 @@
 //
 // 5 个核心状态: _buf (流式 buffer), _llmGotFirstChunk (是否收到首 chunk), _llmFallbackTimer (10s 兑底),
 // _summary (TL;DR 精要), _recItems (推荐 6 条, 来自 ContentAggregator)
-// 8/14 注: _startLlm() 当前未在 initState 调用 (沿 6/26 Brien '要真实数据' 决策),
 //   _llmFallbackTimer 10s 备用 timer 等未来 AI assistant 启用 LLM 时再跑
 
 import 'dart:async';
-import 'dart:ui';
 import 'package:flutter/material.dart';
-import 'package:flutter/services.dart';
 import 'package:flutter/foundation.dart';
 import 'package:url_launcher/url_launcher.dart';
 import '../models/models.dart';
@@ -38,11 +35,9 @@ import '../services/analytics_service.dart';
 import '../services/news_service.dart';
 import '../services/bilibili_service.dart';
 import '../widgets/tinder_recommendation_stack.dart';
-import '../widgets/quiz_panel.dart';
 import 'content_reader_screen.dart';
 import '../services/study_group_service.dart';
 import '../services/weekly_recap_service.dart';
-import '../services/analytics_service.dart';
 import '../services/handle_service.dart';
 import '../services/connectivity_helper.dart';
 
@@ -75,8 +70,6 @@ class _ContentScreenState extends State<ContentScreen> {
   Timer? _llmFallbackTimer;
   StreamSubscription? _sub;
   ContentItem? _aiContentItem;
-  LlmSummary? _summary;
-  int _streak = 0;
   int _recOffset = 0; // 6 张看完换 6 张 offset
   List<ContentItem> _recItems = [];
   // 7/2 B 站真 BV 缓存: itemId → 首条结果 (避免重复 API 调用, 嵌 iframe 用)
@@ -99,17 +92,12 @@ class _ContentScreenState extends State<ContentScreen> {
   bool _aiOfferShown = false; // 6/30 12:23: 读完弹 AI sheet 防重复
   bool _hasScrolled = false; // 6/26: 滚到过文章中部才显"读完啦"按钮
   bool _ttsPlaying = false;
-  bool _showAllDoneDialog = false; // 6 张全看完弹 dialog
   List<ContentItem> _inProgressItems = []; // 续读
   int _todayCompleteCount = 0; // 今日完成计数
   bool _showTlDrBanner = false; // TL;DR 精要 banner
   bool _tlDrExpanded = false; // 7/2 默认折叠 1 行, 点展开看 3 行
   bool _continueExpanded = false; // 7/2 默认折叠 1 条续读, 点展开看 3 条
   String _tlDrText = ''; // TL;DR 文本
-  int _quizAnswers = 0; // quiz 答对
-  bool _showStudyGroupEntry = false; // 学习小组入口
-  bool _showWeeklyRecapButton = false; // 周回顾按钮
-  bool _showPrivacyPolicy = false; // 隐私政策弹窗
 
   // 进度追踪
   int _progress = 0; // 0/25/50/100
@@ -198,56 +186,6 @@ class _ContentScreenState extends State<ContentScreen> {
   }
 
   // 启动 LLM 流式
-  Future<void> _startLlm() async {
-    // 6/14 v3: 30s 兑底 timer (首 chunk 到达关 / onError onDone 关 / dispose 关)
-    // 8/14 治本 (沿 SOUL #8 真改没改对 第 N+12 次): 30s → 10s
-    //   真凶: 之前 30s fallback timer, 但实际 MiniMax 1.3s 首 token (8/13 修后)
-    //     → 30s 远大于实际生成时间, 用户等很久才看到内容
-    //   修: 30s → 10s, fail fast 显示兜底 (实际 99% 情况 < 3s)
-    _llmFallbackTimer = Timer(const Duration(seconds: 10), () {
-      if (!_llmGotFirstChunk && mounted) {
-        _showStub(reason: 'timeout_10s');
-      }
-    });
-
-    try {
-      final stream = LlmService.generateStream(
-        userType: widget.userType,
-        scene: widget.scene,
-        languageCode: widget.languageCode,
-        isInternational: widget.isInternational,
-      );
-      _sub = stream.listen(
-        (chunk) {
-          if (!mounted) return;
-          setState(() {
-            _buf += chunk;
-            if (!_llmGotFirstChunk) {
-              _llmGotFirstChunk = true;
-              _loading = false;
-              _llmFallbackTimer?.cancel();
-            }
-          });
-        },
-        onError: (e) {
-          if (!mounted) return;
-          _showStub(reason: 'stream_error: $e');
-        },
-        onDone: () {
-          if (!mounted) return;
-          _llmFallbackTimer?.cancel();
-          // 6/25 锁死角色匹配: 生成完成后检测内容是否跟当前 userType 匹配
-          // 1.5b 质量不够时可能输出学生内容给上班族, 检测后 fallback
-          if (_buf.length > 30 && !_isRoleMatch(_buf, widget.userType)) {
-            // 内容错位: 重置 buf 并调假数据桶
-            _loadFallbackContent();
-          }
-        },
-      );
-    } catch (e) {
-      _showStub(reason: 'start_error: $e');
-    }
-  }
 
   // 兑底: 显示预制 stub
   void _showStub({String reason = 'unknown'}) {
@@ -262,7 +200,6 @@ class _ContentScreenState extends State<ContentScreen> {
   }
 
   // 6/26 Brien 00:22 '要真实数据': 从 NewsService 24 桶加载第 1 条作为 aiContentItem
-  String _loadFromBucketErr = '';
   Future<void> _loadFromBucket() async {
     try {
       final items = await NewsService().getRecommendations(
@@ -271,7 +208,6 @@ class _ContentScreenState extends State<ContentScreen> {
       if (!mounted) return;
       if (items.isEmpty) {
         setState(() {
-          _loadFromBucketErr = '桶数据为空: ${widget.userType.bucketKey}_${widget.scene.bucketKey}';
           _loading = false;
         });
         return;
@@ -279,15 +215,13 @@ class _ContentScreenState extends State<ContentScreen> {
       final first = items.first;
       setState(() {
         _aiContentItem = first;
-        _buf = '${first.title}\n\n${first.description ?? "".trim()}';
+        _buf = '${first.title}\n\n${first.description}';
         _llmGotFirstChunk = true;
         _loading = false;
-        _loadFromBucketErr = '';
       });
     } catch (e) {
       if (mounted) {
         setState(() {
-          _loadFromBucketErr = '加载失败: $e';
           _loading = false;
         });
       }
@@ -335,7 +269,7 @@ class _ContentScreenState extends State<ContentScreen> {
       if (!mounted || results.isEmpty) return;
       final item = results.first;
       setState(() {
-        _buf = '${item.title}\n\n${item.description ?? ''}';
+        _buf = '${item.title}\n\n${item.description}';
         _aiContentItem = item;
       });
     } catch (e) {
@@ -515,7 +449,7 @@ class _ContentScreenState extends State<ContentScreen> {
       builder: (_) => AiAssistantScreen(
         isEn: isEn,
         isElderlyMode: widget.isElderlyMode,
-        userTypeName: widget.userType?.title ?? '',
+        userTypeName: widget.userType.title ?? '',
         userType: widget.userType,
         todayHistory: today,
         contextQuote: _aiContentItem?.title, // 6/30 12:23: 让 AI 知道刚读完这篇
@@ -614,7 +548,6 @@ class _ContentScreenState extends State<ContentScreen> {
   Future<void> _onAllSixDismissed() async {
     if (!mounted) return;
     setState(() {
-      _showAllDoneDialog = true;
       _recOffset += 6;
       _recItems = [];
       _recLoading = false; // 8/1 修: 强制重 load, 不被 _recLoading 卡住
@@ -1010,7 +943,7 @@ class _ContentScreenState extends State<ContentScreen> {
     if (picked != null && mounted) {
       // 6/12 6 个快捷问题：复用 _buf 加在后面
       setState(() {
-        _buf = (_buf.isEmpty ? '' : '$_buf\n\n') + '问: $picked\n答: ';
+        _buf = '${_buf.isEmpty ? '' : '$_buf\n\n'}问: $picked\n答: ';
       });
       // 6/9 ask 用同一个 LLM 流式 endpoint (复用 _startLlm 的 stream 复用)
       // 6/22 简化: 不真调 LLM, 改写 _buf 后停止 (用户可以手动看 hero 主体)
@@ -1085,9 +1018,13 @@ class _ContentScreenState extends State<ContentScreen> {
     String timeStr = '';
     if (since != null) {
       final mins = DateTime.now().difference(since).inMinutes;
-      if (mins < 1) timeStr = isEn ? 'just now' : '刚刚';
-      else if (mins < 60) timeStr = isEn ? '$mins min ago' : '$mins 分钟前';
-      else timeStr = isEn ? '${mins ~/ 60}h ago' : '${mins ~/ 60} 小时前';
+      if (mins < 1) {
+        timeStr = isEn ? 'just now' : '刚刚';
+      } else if (mins < 60) {
+        timeStr = isEn ? '$mins min ago' : '$mins 分钟前';
+      } else {
+        timeStr = isEn ? '${mins ~/ 60}h ago' : '${mins ~/ 60} 小时前';
+      }
     }
     return Container(
       margin: EdgeInsets.only(bottom: 8 * _scale),
@@ -1390,7 +1327,7 @@ class _ContentScreenState extends State<ContentScreen> {
                                 _t('小 O 念你听', 'Voice by 小 O'),
                                 style: TextStyle(fontSize: 11 * _scale, color: AppTheme.primary, fontWeight: FontWeight.w600),
                               ),
-                              if (item.duration != null && item.duration!.isNotEmpty) ...[
+                              if (item.duration.isNotEmpty) ...[
                                 Text(
                                   ' · ${item.duration}',
                                   style: TextStyle(fontSize: 11 * _scale, color: AppTheme.textLight),
@@ -1546,51 +1483,6 @@ class _ContentScreenState extends State<ContentScreen> {
   }
 
   // 7/29 加: RSS 拉空时空状态. 访客看到"今日暂无新内容" + 下拉重试
-  // 8/8 升一阶: 显示 _loadFromBucketErr 调试信息 (沿 SOUL #25 #26 #27 沿 #169 不撒谎)
-  Widget _buildEmptyState() {
-    final sourceLabel = widget.isInternational ? 'The Verge' : '36氪 / 少数派';
-    return Container(
-      margin: EdgeInsets.only(bottom: 8 * _scale),
-      padding: EdgeInsets.all(16 * _scale),
-      decoration: BoxDecoration(
-        color: AppTheme.primary.withValues(alpha: 0.05),
-        borderRadius: BorderRadius.circular(12),
-        border: Border.all(color: AppTheme.primary.withValues(alpha: 0.15)),
-      ),
-      child: Row(
-        children: [
-          Icon(Icons.refresh_outlined, size: 20 * _scale, color: AppTheme.primary),
-          SizedBox(width: 12 * _scale),
-          Expanded(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Text(
-                  isEn ? 'No new content today' : '今日暂无新内容',
-                  style: TextStyle(fontSize: 14 * _scale, fontWeight: FontWeight.w600, color: AppTheme.primary),
-                ),
-                SizedBox(height: 4 * _scale),
-                Text(
-                  isEn
-                      ? 'Live from $sourceLabel · pull to refresh'
-                      : '正在拉 $sourceLabel 的最新内容 · 下拉刷新',
-                  style: TextStyle(fontSize: 12 * _scale, color: AppTheme.hintColor(context)),
-                ),
-                // 8/8: 显示底层错误 (沿 #117 沿用 alert: 仅在用户报错时显示)
-                if (_loadFromBucketErr.isNotEmpty && kDebugMode) ...[
-                  SizedBox(height: 4 * _scale),
-                  Text(
-                    'debug: $_loadFromBucketErr',
-                    style: TextStyle(fontSize: 10 * _scale, color: AppTheme.hintColor(context).withValues(alpha: 0.6)),
-                  ),
-                ],
-              ],
-            ),
-          ),
-        ],
-      ),
-    );
-  }
 
   Widget _buildHero({required bool isDark, required bool isWarm}) {
     // 7/25 14:05 v10 真凶修: Scene.listen 背景 0xFFF0F9FF (浅蓝) + glassFrosted 0.45 白 = 透明看不上
@@ -1768,7 +1660,6 @@ class _ContentScreenState extends State<ContentScreen> {
   Future<void> _showWeeklyRecap() async {
     try {
       final recap = await WeeklyRecapService.instance.generate(useLLM: false);
-      final summary = recap.summary;
       if (!mounted) return;
       await showDialog(
         context: context,
@@ -1776,7 +1667,7 @@ class _ContentScreenState extends State<ContentScreen> {
           shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
           title: Text(isEn ? '📊 Weekly recap' : '📊 本周回顾'),
           content: SingleChildScrollView(
-            child: Text(summary ?? (isEn ? 'No data this week' : '本周无数据'),
+            child: Text((isEn ? 'No data this week' : '本周无数据'),
                 style: const TextStyle(fontSize: 14, height: 1.5)),
           ),
           actions: [

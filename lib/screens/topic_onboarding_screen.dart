@@ -183,7 +183,7 @@ class _TopicOnboardingScreenState extends State<TopicOnboardingScreen> {
                       child: Text(
                         isEn
                             ? 'Done (${_selected.length})'
-                            : '完成${_selected.length > 0 ? " (${_selected.length})" : ""}',
+                            : '完成${_selected.isNotEmpty ? " (${_selected.length})" : ""}',
                         style: TextStyle(
                           fontSize: 15 * scale,
                           fontWeight: FontWeight.w600,

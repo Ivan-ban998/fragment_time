@@ -1,7 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'dart:convert';
-import 'dart:ui';
 import '../models/models.dart';
 import '../theme/app_theme.dart';
 import '../services/motivation_service.dart';

@@ -22,7 +22,7 @@ class InlineReadView extends StatefulWidget {
 }
 
 class _InlineReadViewState extends State<InlineReadView> {
-  bool _loadFailed = false;
+  final bool _loadFailed = false;
 
   @override
   Widget build(BuildContext context) {

@@ -37,11 +37,7 @@ class MySubscriptionsScreen extends StatefulWidget {
 class _MySubscriptionsScreenState extends State<MySubscriptionsScreen>
     with WidgetsBindingObserver, TickerProviderStateMixin {
   final LocalSubscriptionService _subService = LocalSubscriptionService.instance;
-  List<ContentItem> _items = [];
   bool _loading = true;
-  int _followingPlatforms = 0;
-  int _followingCategories = 0;
-  String _handle = '@你'; // 6/25 昵称扩展: 顶部显示
   late TabController _tabController; // 6/25 A: 子 Tab 切换 (内容/名言/关注)
   // 7/20 16:48 Brien 反馈 "收藏内容多了, 让用户搜搜" → 加搜索框, 跨 3 个子 Tab 共享
   final TextEditingController _searchCtrl = TextEditingController();
@@ -76,10 +72,6 @@ class _MySubscriptionsScreenState extends State<MySubscriptionsScreen>
     final handle = await HandleService().get();
     if (!mounted) return;
     setState(() {
-      _items = items;
-      _followingPlatforms = sources.length;
-      _followingCategories = categories.length;
-      _handle = handle;
       _loading = false;
     });
   }
@@ -283,7 +275,7 @@ class _MySubscriptionsScreenState extends State<MySubscriptionsScreen>
     );
   }
 
-  // 7/30: 顶部汇总已升级为 _FollowingHeroCard (紫色 hero), 在 _buildFollowingTab 内 pinned 展示
+  // 7/30: 顶部汇总已升级为 _followingHeroCard (紫色 hero), 在 _buildFollowingTab 内 pinned 展示
   // (旧 _buildStickySummary / _buildSummaryBar 轻量浅紫条已删, 统一 hero 风格)
 
   // 6/25 A: 收藏 Tab (内容 / 名言)
@@ -535,7 +527,7 @@ class _MySubscriptionsScreenState extends State<MySubscriptionsScreen>
               return _buildNoSearchResult(scale, isEn);
             }
             // 7/30: 紫色 hero pinned 在顶部 (跟 Tab 1/2 hero 风格统一)
-            final heroCard = _FollowingHeroCard(
+            final heroCard = _followingHeroCard(
               platformCount: sources.length,
               categoryCount: categories.length,
               scale: scale,
@@ -560,7 +552,7 @@ class _MySubscriptionsScreenState extends State<MySubscriptionsScreen>
                       // 7/30 Brien "点关注平台/类别 → 看推荐最新热门" → 加横向 chip 跳转 SourceDetailScreen
                       // 多关注也不需竖翻 (总在一屏内)
                       if (sources.isNotEmpty) ...[
-                        _FollowingSectionHeader(
+                        _followingSectionHeader(
                           label: isEn ? 'PLATFORMS' : '关注平台',
                           icon: Icons.subscriptions,
                           scale: scale,
@@ -574,7 +566,7 @@ class _MySubscriptionsScreenState extends State<MySubscriptionsScreen>
                             separatorBuilder: (_, __) => SizedBox(width: 8 * scale),
                             itemBuilder: (context, i) {
                               final s = sources[i];
-                              return _FollowingSourceChip(
+                              return _followingSourceChip(
                                 source: s,
                                 isEn: isEn,
                                 scale: scale,
@@ -597,7 +589,7 @@ class _MySubscriptionsScreenState extends State<MySubscriptionsScreen>
                         SizedBox(height: 20 * scale),
                       ],
                       if (categories.isNotEmpty) ...[
-                        _FollowingSectionHeader(
+                        _followingSectionHeader(
                           label: isEn ? 'CATEGORIES' : '关注类目',
                           icon: Icons.category_outlined,
                           scale: scale,
@@ -611,7 +603,7 @@ class _MySubscriptionsScreenState extends State<MySubscriptionsScreen>
                             separatorBuilder: (_, __) => SizedBox(width: 8 * scale),
                             itemBuilder: (context, i) {
                               final c = categories[i];
-                              return _FollowingCategoryChip(
+                              return _followingCategoryChip(
                                 categoryName: c,
                                 isEn: isEn,
                                 scale: scale,
@@ -641,9 +633,9 @@ class _MySubscriptionsScreenState extends State<MySubscriptionsScreen>
   }
 
   // 7/30: 平台横滑 chip — 点击跳 SourceDetailScreen
-  // 7/30 美化: 复用 _FollowingSourceRow 的 sourceColor (bilibili 粉 / zhihu 蓝 / 36 氪 etc.)
+  // 7/30 美化: 复用 _followingSourceRow 的 sourceColor (bilibili 粉 / zhihu 蓝 / 36 氪 etc.)
   // chip 底色 = sourceColor 12% + 边框 = sourceColor 40% + 图标 = sourceColor 实色
-  Widget _FollowingSourceChip({
+  Widget _followingSourceChip({
     required ContentSource source,
     required bool isEn,
     required double scale,
@@ -694,7 +686,7 @@ class _MySubscriptionsScreenState extends State<MySubscriptionsScreen>
 
   // 7/30: 类目横滑 chip — 点击推 placeholder (CategoryDetailScreen 后续加)
   // 7/30: 类目横滑 chip — 复用 AppTheme.secondary (紫色) 跟 Tab 1/2 hero 风格一致
-  Widget _FollowingCategoryChip({
+  Widget _followingCategoryChip({
     required String categoryName,
     required bool isEn,
     required double scale,
@@ -744,7 +736,7 @@ class _MySubscriptionsScreenState extends State<MySubscriptionsScreen>
   }
 
   // 17:45: 关注 Tab 顶部 Hero 统计 (紫色 24 圆角, 56x56 avatar + 数字 + 管理按钮)
-  Widget _FollowingHeroCard({
+  Widget _followingHeroCard({
     required int platformCount,
     required int categoryCount,
     required double scale,
@@ -855,7 +847,7 @@ class _MySubscriptionsScreenState extends State<MySubscriptionsScreen>
   }
 
   // 17:45: 关注 Tab 段头 (紫色 16px + icon)
-  Widget _FollowingSectionHeader({required String label, required IconData icon, required double scale}) {
+  Widget _followingSectionHeader({required String label, required IconData icon, required double scale}) {
     final s = scale;
     return Row(
       children: [
@@ -875,7 +867,7 @@ class _MySubscriptionsScreenState extends State<MySubscriptionsScreen>
   }
 
   // 7/30: 源色映射 — bilibili 粉 / zhihu 蓝 / 喜马拉雅橙 / 默认紫
-  // 复用给 _FollowingSourceRow + _FollowingSourceChip, 跨 widget 保持一致
+  // 复用给 _followingSourceRow + _followingSourceChip, 跨 widget 保持一致
   Color _sourceColor(ContentSource s) {
     if (s == ContentSource.bilibili) return const Color(0xFFFB7299);
     if (s == ContentSource.zhihu) return const Color(0xFF0084FF);
@@ -887,108 +879,8 @@ class _MySubscriptionsScreenState extends State<MySubscriptionsScreen>
   }
 
   // 17:45: 关注 Tab 平台行 (跟内容 Timeline 同款 紫 4% 底 + 12% 边框)
-  Widget _FollowingSourceRow({
-    required dynamic source,
-    required bool isEn,
-    required double scale,
-    required VoidCallback onRemove,
-  }) {
-    final s = scale;
-    final sourceObj = source as ContentSource;
-    final name = isEn ? sourceObj.name : _sourceNameZh(sourceObj);
-    final sourceColor = _sourceColor(sourceObj);
-
-    return Container(
-      margin: EdgeInsets.only(bottom: 8 * s),
-      padding: EdgeInsets.symmetric(vertical: 12 * s, horizontal: 8 * s),
-      decoration: BoxDecoration(
-        color: AppTheme.primary.withValues(alpha: 0.04),
-        borderRadius: BorderRadius.circular(14),
-        border: Border.all(color: AppTheme.primary.withValues(alpha: 0.12)),
-      ),
-      child: Row(
-        children: [
-          Container(
-            width: 40 * s,
-            height: 40 * s,
-            decoration: BoxDecoration(
-              color: Colors.white,
-              shape: BoxShape.circle,
-              border: Border.all(color: sourceColor.withValues(alpha: 0.4), width: 1.5),
-            ),
-            alignment: Alignment.center,
-            child: Icon(sourceObj.icon, color: sourceColor, size: 18 * s),
-          ),
-          SizedBox(width: 12 * s),
-          Expanded(
-            child: Text(
-              name,
-              style: TextStyle(fontSize: 14 * s, fontWeight: FontWeight.w700),
-              maxLines: 1,
-              overflow: TextOverflow.ellipsis,
-            ),
-          ),
-          IconButton(
-            onPressed: onRemove,
-            icon: Icon(Icons.close, size: 18, color: AppTheme.textLight),
-            padding: EdgeInsets.zero,
-            constraints: const BoxConstraints.tightFor(width: 28, height: 28),
-            tooltip: isEn ? 'Unsubscribe' : '取消关注',
-          ),
-        ],
-      ),
-    );
-  }
 
   // 17:45: 关注 Tab 类目行 (同款 紫 4% 底)
-  Widget _FollowingCategoryRow({
-    required String categoryName,
-    required bool isEn,
-    required double scale,
-    required VoidCallback onRemove,
-  }) {
-    final s = scale;
-    return Container(
-      margin: EdgeInsets.only(bottom: 8 * s),
-      padding: EdgeInsets.symmetric(vertical: 12 * s, horizontal: 8 * s),
-      decoration: BoxDecoration(
-        color: AppTheme.primary.withValues(alpha: 0.04),
-        borderRadius: BorderRadius.circular(14),
-        border: Border.all(color: AppTheme.primary.withValues(alpha: 0.12)),
-      ),
-      child: Row(
-        children: [
-          Container(
-            width: 40 * s,
-            height: 40 * s,
-            decoration: BoxDecoration(
-              color: Colors.white,
-              shape: BoxShape.circle,
-              border: Border.all(color: AppTheme.primary.withValues(alpha: 0.4), width: 1.5),
-            ),
-            alignment: Alignment.center,
-            child: Icon(Icons.local_offer, color: AppTheme.primary, size: 18 * s),
-          ),
-          SizedBox(width: 12 * s),
-          Expanded(
-            child: Text(
-              categoryName,
-              style: TextStyle(fontSize: 14 * s, fontWeight: FontWeight.w700),
-              maxLines: 1,
-              overflow: TextOverflow.ellipsis,
-            ),
-          ),
-          IconButton(
-            onPressed: onRemove,
-            icon: Icon(Icons.close, size: 18, color: AppTheme.textLight),
-            padding: EdgeInsets.zero,
-            constraints: const BoxConstraints.tightFor(width: 28, height: 28),
-            tooltip: isEn ? 'Unsubscribe' : '取消关注',
-          ),
-        ],
-      ),
-    );
-  }
 
   Widget _buildFollowingEmpty(BuildContext context, double scale, bool isEn) {
     return Center(
@@ -1029,23 +921,6 @@ class _MySubscriptionsScreenState extends State<MySubscriptionsScreen>
   }
 
   // 6/25 A: 关注 Tab section header (类似 70fa9a7 风格)
-  Widget _buildFollowingSectionHeader(String label, IconData icon, double scale) {
-    return Row(
-      children: [
-        Icon(icon, size: 14 * scale, color: AppTheme.primary),
-        SizedBox(width: 6 * scale),
-        Text(
-          label,
-          style: TextStyle(
-            fontSize: 12 * scale,
-            fontWeight: FontWeight.w700,
-            color: AppTheme.primary,
-            letterSpacing: 0.5,
-          ),
-        ),
-      ],
-    );
-  }
 
   // 6/25 A: ContentSource enum 转中文
   String _sourceNameZh(ContentSource s) {
@@ -1077,7 +952,7 @@ class _MySubscriptionsScreenState extends State<MySubscriptionsScreen>
             Icon(Icons.search_off, size: 48 * scale, color: AppTheme.textLight.withValues(alpha: 0.5)),
             SizedBox(height: 12 * scale),
             Text(
-              isEn ? 'No matches for "${_searchQuery}"' : '没找到包含 "${_searchQuery}" 的收藏',
+              isEn ? 'No matches for "$_searchQuery"' : '没找到包含 "$_searchQuery" 的收藏',
               style: TextStyle(fontSize: 14 * scale, color: AppTheme.textLight),
               textAlign: TextAlign.center,
             ),
@@ -1199,7 +1074,7 @@ class _SubscribedCard extends StatelessWidget {
               ),
               SizedBox(height: 4 * scale),
               Text(
-                item.description ?? '',
+                item.description,
                 maxLines: 2,
                 overflow: TextOverflow.ellipsis,
                 style: TextStyle(fontSize: 12 * scale, color: AppTheme.textLight),
@@ -1365,11 +1240,11 @@ class _QuoteHeroCard extends StatelessWidget {
                         maxLines: 1,
                         overflow: TextOverflow.ellipsis,
                       ),
-                      if (latest.description != null && latest.description!.isNotEmpty)
+                      if (latest.description.isNotEmpty)
                         Padding(
                           padding: EdgeInsets.only(top: 4 * scale),
                           child: Text(
-                            latest.description!,
+                            latest.description,
                             style: TextStyle(
                               color: Colors.white.withValues(alpha: 0.95),
                               fontSize: 13 * scale,
@@ -1515,7 +1390,7 @@ class _QuoteTimelineItem extends StatelessWidget {
                   SizedBox(height: 4 * scale),
                   // quote 描述
                   Text(
-                    item.description ?? '',
+                    item.description,
                     style: TextStyle(fontSize: 12 * scale, color: AppTheme.textLight, fontStyle: FontStyle.italic),
                     maxLines: 2,
                     overflow: TextOverflow.ellipsis,

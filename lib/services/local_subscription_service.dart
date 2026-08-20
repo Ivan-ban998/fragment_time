@@ -176,7 +176,6 @@ class LocalSubscriptionService extends ChangeNotifier {
 
   // 6/9 场景包：用户选 N 条 → “今天包” / “通勤包” 一键调
   static const String _packKey = 'scene_pack_v1';
-  String? _packName;
   List<String> _packIds = [];
 
   Future<void> setPack(String name, List<ContentItem> items) async {
