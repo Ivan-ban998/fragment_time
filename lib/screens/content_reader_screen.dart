@@ -184,8 +184,11 @@ class _ContentReaderScreenState extends State<ContentReaderScreen> {
         '延伸: ${_truncateForLLM(_getExtendedContent(), 800)}\n\n'
         '摘要:';
     try {
+      // 8/28 P43-1 治本 (沿 SOUL #189 智): 120s → 30s timeout (1.5b/7b 已 cache 5-15s 出)
+      //   真凶: 之前 120s 超长, 用户 1.5b 慢响应干等 2 分钟
+      //   修: 30s (沿 P32-3 1桶优化, 7b 5.7s 充裕 + Ollama fallback 15s 已加)
       final result = await LlmService.generateRaw(prompt, isEn: widget.isEn)
-                    .timeout(const Duration(seconds: 120));
+                    .timeout(const Duration(seconds: 30));
       if (!mounted) return;
       setState(() {
         _aiSummary = result.trim();

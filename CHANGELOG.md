@@ -1,5 +1,17 @@
 # Fragment Time Changelog
 
+## 2026-08-28 (P43) — Tests + admin endpoints list + LLM timeout 优化
+
+### P43 (8/28)
+- P43-1: content_reader_screen AI 摘要 timeout 120s → 30s (1.5b/7b 已 cache 5-15s 出)
+  - 沿 SOUL #189 智: 用户不干等 2 分钟
+- P43-2: 加 test/scene_bucket_key_test.dart (4 tests, all passing)
+  - 验证 P42-3 fromBucketKey 反查 + round-trip + 兜底
+- P43-3: 加 test/rss_service_cache_test.dart (2 tests, all passing)
+  - 验证 cacheStats + clearCache 行为
+- P43-4: ft_server.py 加 /admin/admin_endpoints
+  - 列所有 admin endpoints (GET 19 + POST 3 = 22)
+  - 含 last_refresh timestamp
 ## 2026-08-28 (P41-P42) — Caches + LLM truncate + Scene.fromBucketKey
 
 ### P42 (8/28)
