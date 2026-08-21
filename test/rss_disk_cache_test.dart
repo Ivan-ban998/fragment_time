@@ -1,3 +1,4 @@
+// ignore_for_file: avoid_print
 // 8/8 沿 SOUL #189: 单元测试 RSS disk cache 落盘 + 读盘
 // 验证: 模拟 SharedPreferences 写 → 新 RssService 读 (整路径)
 import 'package:flutter_test/flutter_test.dart';
@@ -40,7 +41,7 @@ void main() {
     final prefs = await SharedPreferences.getInstance();
     final keys = prefs.getKeys().where((k) => k.toString().startsWith('rss_cache_'));
     print('mock SharedPreferences rss_cache_* keys: ${keys.length}');
-    expect(keys.length > 0, true, reason: 'fetchTop 成功应该有 rss_cache_* 落盘');
+    expect(keys.isNotEmpty, true, reason: 'fetchTop 成功应该有 rss_cache_* 落盘');
     print('✓ _saveToDisk 写盘 OK');
 
     // 模拟"重启" — 新 RssService instance

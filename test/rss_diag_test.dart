@@ -1,3 +1,4 @@
+// ignore_for_file: avoid_print
 // 8/2 沿用 #103 #125 真改没改对诊断测试
 // 直接跑 fetchFromRss + getRecommendations 看实际返啥
 import 'package:flutter_test/flutter_test.dart';

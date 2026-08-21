@@ -56,3 +56,8 @@ rss_trace_test.dart
 
 # 8/16 加: deprecated/backup 文件不入仓
 *.deprecated
+
+# 8/28 P34: 一次性 migration script + tmp test outputs (P34 cleanup)
+lib/services/_title_fix.py
+test/_tmp/
+test/*.bak*
