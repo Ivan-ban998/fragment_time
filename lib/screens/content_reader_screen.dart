@@ -145,17 +145,26 @@ class _ContentReaderScreenState extends State<ContentReaderScreen> {
     super.dispose();
   }
 
-  // 6/25 C: AI 摘要 (Ollama, 30s 兌底, 失败可重试)
-  // 6/25 注: child HARD RULE 由 LlmService.generateRaw 后续接入 (现为 stub)
-  //   8/28 P31: 跟踪在 ROADMAP.md (5 TODO 列表 #1)
+  // 6/25 C: AI 摘要 (Ollama 30s / MiniMax 15s, 失败重试)
+  // 8/28 P38-4 治本 (沿 ROADMAP #1): 真调 LlmService.generateRaw, 加 child HARD RULE
+  //   真凶: 之前注释说"现为 stub"但实际 generateRaw 已实现
+  //   修: child userType 走简化 prompt (避免 1.5b/7b 输出"5个教育误解"等学生内容)
   Future<void> _generateAiSummary() async {
     if (_aiSummaryLoading) return;
     setState(() {
       _aiSummaryLoading = true;
       _aiSummaryFailed = false;
     });
+    // 8/28 P38-5: child HARD RULE — 不真调 LLM (1.5b 仍输出"5个教育误解"等学生内容)
+    //   直接走 _loadSummaryFromBucket (P32-3 优化) 1 桶, 0.3s 返回
+    //   其他 userType 仍走 LLM 摘要 (4 scenarios 角色匹配)
+    if (_inferType() == UserType.child) {
+      debugPrint('[content_reader] child userType → 跳过 LLM, 走 _loadSummaryFromBucket');
+      await _loadSummaryFromBucket();
+      return;
+    }
     final langHint = widget.isEn ? 'Respond in English.' : '中文回答.';
-    final prompt = '请为以下文章生成 3-5 句中文摘要, 不超过 150 字, 不要重复标题.\n'
+    final prompt = '请为以下文章生成 3-5 句${widget.isEn ? "English" : "中文"}摘要, 不超过 150 字, 不要重复标题.\n'
         '$langHint\n'
         '标题: ${widget.item.title}\n'
         '描述: ${widget.item.description}\n'

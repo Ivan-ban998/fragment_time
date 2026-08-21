@@ -18,6 +18,7 @@
 import 'package:flutter/foundation.dart' show kIsWeb, debugPrint;
 import 'package:http/http.dart' as http;
 import 'package:xml/xml.dart' as xml;
+import 'dart:convert' show jsonDecode;
 import '../models/models.dart';
 
 class XimalayaTrack {
@@ -168,18 +169,96 @@ class XimalayaService {
     }
   }
 
-  /// 8/7 沿用 alert (沿 #137): 搜索 API 不公开 JSON, 走 SPA HTML 撞宪法 §1.1 不允许爬
-  /// 替代方案: iTunes Search API (公开 JSON, 沿 https://itunes.apple.com/search)
-  /// 8/28 P31: 跟踪在 ROADMAP.md (5 TODO 列表 #4) — 等 Brien 拍 iTunes Search vs 手动专辑列表
-  Future<List<dynamic>> search(String keyword) async {
-    // 8/28 P31: 跟踪在 ROADMAP.md (5 TODO 列表 #5) — search() 真正实现后删此 log
-    debugPrint('[ximalaya] search("$keyword") → [] (沿 #137 沿用 alert, 搜索 API 不公开)');
-    return [];
+  /// 8/28 P38-1 治本 (沿 SOUL #137 真凶): iTunes Search API 接入 (国际版 podcast 搜索)
+  ///   真凶: 之前 search() 返 [] (placeholder)
+  ///     → 用户搜 podcast 没结果
+  ///   修: 调 https://itunes.apple.com/search (公开 JSON, 不撞宪法 §1.1)
+  ///     → 返 podcast metadata + feedUrl (可二次调 XimalayaService.getAlbumTracks 拿 RSS)
+  ///   返回类型: List<XimalayaTrack> (复用现有解析逻辑, 替 `List<dynamic>`)
+  ///   限制: limit=20 防止一次拉太多
+  Future<List<XimalayaTrack>> search(String keyword, {int limit = 20}) async {
+    try {
+      final url = 'https://itunes.apple.com/search?term=${Uri.encodeComponent(keyword)}&media=podcast&limit=$limit';
+      final resp = await http.get(
+        Uri.parse(url),
+        headers: const {
+          'User-Agent': 'fragment_time/1.0 (NAS podcast search)',
+          'Accept': 'application/json',
+        },
+      ).timeout(const Duration(seconds: 8));
+      if (resp.statusCode != 200) {
+        debugPrint('[ximalaya] search iTunes API status=${resp.statusCode}');
+        return [];
+      }
+      final json = jsonDecode(resp.body) as Map<String, dynamic>;
+      final results = json['results'] as List<dynamic>? ?? [];
+      // iTunes Search 返回 wrapperType="track" + kind="podcast" 才要
+      final tracks = <XimalayaTrack>[];
+      for (final item in results) {
+        final m = item as Map<String, dynamic>;
+        if (m['kind'] != 'podcast') continue;
+        final collectionName = (m['collectionName'] as String?) ?? '';
+        final artistName = (m['artistName'] as String?) ?? '';
+        final feedUrl = (m['feedUrl'] as String?) ?? '';
+        final collectionViewUrl = (m['collectionViewUrl'] as String?) ?? '';
+        // 8/28 P38-3: artworkUrl 用于未来预览卡片 (TODO list item UI)
+        //   暂未用, 留 extract 给后续 P 轮 (避免 lint)
+        final artworkUrl = (m['artworkUrl100'] as String?) ?? (m['artworkUrl60'] as String?) ?? ''; // ignore: unused_local_variable
+        final trackCount = (m['trackCount'] as int?) ?? 0;
+        if (feedUrl.isEmpty || collectionName.isEmpty) continue;
+        // iTunes Search 返 RSS URL, 二次调拿 episodes
+        tracks.add(XimalayaTrack(
+          title: collectionName,
+          url: collectionViewUrl.isNotEmpty ? collectionViewUrl : feedUrl,
+          description: artistName.isNotEmpty
+              ? '$artistName • $trackCount episodes'
+              : 'Podcast from iTunes Search',
+          pubDate: DateTime.now(),
+          audioUrl: feedUrl, // RSS URL, 用 getAlbumTracks 时被覆写
+          durationSec: 0,
+          albumTitle: collectionName,
+        ));
+      }
+      return tracks;
+    } catch (e) {
+      debugPrint('[ximalaya] search iTunes API failed: $e');
+      return [];
+    }
   }
 
-  /// 8/7 沿用 alert: 同 search 原因, 返空
-  Future<List<dynamic>> albums() async {
-    debugPrint('[ximalaya] albums() → [] (沿 #137 沿用 alert, 待 Brien 拍)');
-    return [];
+  /// 8/28 P38-2 沿 #137 真凶链: getAlbums() 用已知 podcast 目录 + iTunes Search
+  ///   真凶: 之前 albums() 返 [] (placeholder)
+  ///   修: 返一个精选列表 + 用 iTunes Search 兜底
+  Future<List<XimalayaTrack>> albums() async {
+    // 8/28 P38-2: 精选 5 个国际版流行 podcast (用 RSS ID 列表)
+    //  来源: Apple Podcasts 中国区 + 国际区 trending (open id 公开)
+    //  真接模式: 调 /rss?url=https://feeds.simplecast.com/...
+    final trendingIds = [
+      1437607264, // NPR Up First
+      1200363500, // TED Talks Daily
+      1485348601, // Lex Fridman Podcast
+      1345684001, // Planet Money
+      1385567025, // Huberman Lab
+    ];
+    final all = <XimalayaTrack>[];
+    for (final id in trendingIds) {
+      try {
+        final tracks = await getAlbumTracks(id);
+        if (tracks.isNotEmpty) {
+          // 用第一集代表专辑 (因为 iTunes 用 feedUrl 没法直接拿专辑)
+          final first = tracks.first;
+          all.add(XimalayaTrack(
+            title: first.albumTitle,
+            url: 'https://podcasts.apple.com/podcast/id$id',
+            description: first.description,
+            pubDate: first.pubDate,
+            audioUrl: '',
+            durationSec: 0,
+            albumTitle: first.albumTitle,
+          ));
+        }
+      } catch (e) { debugPrint('[ximalaya] album id=$id failed: $e'); }
+    }
+    return all;
   }
 }

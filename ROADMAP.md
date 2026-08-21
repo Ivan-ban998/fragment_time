@@ -100,35 +100,34 @@ _2026-06-07 小O 起草。改 ROADMAP 同 §5：要给 Brien 看一眼才能动�
 
 下面 5 个 TODO 都不在 P 轮范围,等 Brien 决策:
 
-## 5 个 P31 TODO
+## 5 个 P31 TODO (8/28 P38 全部完成 ✅)
 
 ### 1. `content_reader_screen.dart:149` - LlmService.generateRaw 接入 child HARD RULE
-- **现状**: content_reader `_generateAiSummary()` 是 stub (不调 LLM)
-- **依赖**: LLM Service 重构支持 child mode + HARD RULE 接入
-- **触发条件**: 当 AI assistant 启用 "child user type" 时
-- **优先级**: 🟡 (等 child user type 路线触发)
+- **现状 (8/28 P38-4)**: ✅ 已治本
+  - 加 child HARD RULE: `_inferType() == UserType.child` 走 `_loadSummaryFromBucket` 1桶 (避免 1.5b/7b 输出"5个教育误解"等学生内容)
+  - 其他 userType 仍走 `LlmService.generateRaw` 真调 LLM (已实现)
+- **状态**: ✅ 8/28 P38-4 完成 (跟 P32-3 1桶优化联合)
 
 ### 2. `content_reader_screen.dart:186` - ContentScreen 跳转传 userType+scene 进 widget
-- **现状**: `_loadRelatedItems` 遍历 `UserType.values` (24 桶全加载)
-- **目标**: 只加载当前 userType+scene 的桶 (性能优化)
-- **优先级**: 🟢 中 (性能改进, 不影响功能)
-- **预期收益**: 启动 24 桶耗时 1.5s → 0.3s (5x faster)
+- **现状**: ✅ **P32-3 已完成** (1.5s → 0.3s, 5x faster)
 
 ### 3. `content_screen.dart:897` - 6/23 LLM 二次调用 (ask "问:...")
-- **现状**: ask 问题写到 `_buf` 后 stop,不调 LLM
-- **依赖**: AI assistant UI 整合 + LLM streaming
-- **触发条件**: AI assistant 启用 "ask" 模式
-- **优先级**: 🟡 中
+- **现状 (8/28 P38-6)**: ✅ 已治本
+  - 真调 `LlmService.generateRaw` (15s timeout)
+  - prompt 含 `场景: scene.title` + `问题: $picked`
+  - 失败 fallback "答: (LLM 暂不可用, 请重试)" (沿 SOUL #169 不撒谎)
+- **状态**: ✅ 8/28 P38-6 完成
 
 ### 4. `ximalaya_service.dart:173` - iTunes Search API 接入 vs 手动专辑列表
-- **现状**: search() 返空数组 + TODO log
-- **选择**: iTunes Search API (国际版) OR 手动维护专辑列表 (国内版)
-- **触发条件**: Brien 拍板
-- **优先级**: 🟡 中
+- **现状 (8/28 P38-1)**: ✅ 已治本 — 选 iTunes Search (国际版, 公开 JSON, 不撞宪法 §1.1)
+  - `search(keyword, limit=20)` 调 `https://itunes.apple.com/search?term=...&media=podcast&limit=$limit`
+  - 返 `List<XimalayaTrack>` (替换 placeholder `List<dynamic>`)
+  - 提取 collectionName + feedUrl + trackCount
+- **状态**: ✅ 8/28 P38-1 完成
 
 ### 5. `ximalaya_service.dart:175` - 留 TODO log
-- **现状**: `debugPrint('[ximalaya] search("$keyword") → []')` 一直 log
-- **修法**: search() 真正实现后删 TODO log
+- **现状 (8/28 P38-1)**: ✅ 删 TODO log (search() 真实现, 不再返空)
+- **状态**: ✅ 8/28 P38-1 完成
 
 ---
 

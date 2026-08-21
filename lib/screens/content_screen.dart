@@ -32,6 +32,7 @@ import '../services/share_service.dart';
 import '../services/analytics_service.dart';
 import '../services/news_service.dart';
 import '../services/bilibili_service.dart';
+import '../services/llm_service.dart'; // 8/28 P38-6: ask 真调 LLM
 import '../widgets/tinder_recommendation_stack.dart';
 import 'content_reader_screen.dart';
 import '../services/study_group_service.dart';
@@ -892,9 +893,31 @@ class _ContentScreenState extends State<ContentScreen> {
       setState(() {
         _buf = '${_buf.isEmpty ? '' : '$_buf\n\n'}问: $picked\n答: ';
       });
-      // 6/9 ask 用同一个 LLM 流式 endpoint (复用 _startLlm 的 stream 复用)
-      // 6/22 简化: 不真调 LLM, 改写 _buf 后停止 (用户可以手动看 hero 主体)
-      // 8/28 P31: 跟踪在 ROADMAP.md (5 TODO 列表 #3) — ask 问题调 LLM, 等 AI assistant 启用 ask 模式
+      // 8/28 P38-6 治本 (沿 ROADMAP #3): ask 真调 LLM (之前只写到 _buf 不调)
+      //   真凶: 之前 _buf 加"问: ...答: " 后停止, 用户看不到真回答
+      //   修: 调 LlmService.generateRaw 流式填充 _buf
+      //   限制: 跟其他 LLM 调用一样 15s timeout, 失败保留 "答: " 标记
+      try {
+        // 8/28 P38-7: 用 generateRaw (非流式, 简化)
+        //   文章上下文用 widget.userType + scene (避免 _heroTitle 未定义)
+        final prompt = '${isEn ? 'English' : '中文'}回答, 简短 1-2 句.\n'
+            '场景: ${widget.scene.title}\n'
+            '问题: $picked';
+        final result = await LlmService.generateRaw(prompt, isEn: isEn)
+            .timeout(const Duration(seconds: 15));
+        if (mounted) {
+          setState(() {
+            _buf = '${_buf.isEmpty ? '' : '$_buf\n\n'}问: $picked\n答: $result';
+          });
+        }
+      } catch (e) {
+        debugPrint('[content_screen] ask LLM failed: $e');
+        if (mounted) {
+          setState(() {
+            _buf = '${_buf.isEmpty ? '' : '$_buf\n\n'}问: $picked\n答: (LLM 暂不可用, 请重试)';
+          });
+        }
+      }
     }
   }
 
