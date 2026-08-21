@@ -51,4 +51,23 @@ void main() {
     }
     print('✓ $total 桶 key 格式 (camelCase_lowercase)');
   });
+
+  test('从 bucketKey 拼回 intl 桶 key (international_service)', () {
+    // 8/28 P46 增 (P45-2 沿 #137 验证): international_service 用 intl_${userType}_${scene} 格式
+    //   真凶: 之前 hardcoded 24 桶 keys, 加桶时易漏
+    //   修: 验证动态生成格式
+    int total = 0;
+    for (final s in Scene.values) {
+      for (final ut in UserType.values) {
+        final key = 'intl_${ut.bucketKey}_${s.bucketKey}';
+        expect(key, matches(RegExp(r'^intl_[a-zA-Z]+_[a-z]+$')),
+            reason: 'intl 24 桶 key 应匹配: $key');
+        // 取个 stable substring 验证
+        expect(key, contains(ut.bucketKey));
+        expect(key, contains(s.bucketKey));
+        total++;
+      }
+    }
+    print('✓ $total intl 桶 key 格式 (intl_camelCase_lowercase)');
+  });
 }

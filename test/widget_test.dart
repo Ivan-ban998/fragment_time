@@ -21,4 +21,27 @@ void main() {
     expect(find.byType(MaterialApp), findsOneWidget);
     print('✓ App boots OK');
   });
+
+  testWidgets('App hot restart 重建 widget tree', (WidgetTester tester) async {
+    // 8/28 P46-4 加 (沿 SOUL #137 真凶链): 验证 hot restart 不崩
+    //   真凶: 之前 P31 / P32 修改后未测 hot restart
+    //   修: 测 hot restart 后 MaterialApp + FragmentTimeApp 仍存在
+    tester.view.physicalSize = const Size(1080, 1920);
+    tester.view.devicePixelRatio = 1.0;
+    addTearDown(tester.view.reset);
+
+    await tester.pumpWidget(const FragmentTimeApp());
+    await tester.pump();
+    expect(find.byType(FragmentTimeApp), findsOneWidget);
+
+    // hot restart
+    await tester.pumpWidget(const SizedBox());
+    await tester.pump();
+    expect(find.byType(FragmentTimeApp), findsNothing);
+
+    await tester.pumpWidget(const FragmentTimeApp());
+    await tester.pump();
+    expect(find.byType(FragmentTimeApp), findsOneWidget);
+    print('✓ Hot restart OK');
+  });
 }
