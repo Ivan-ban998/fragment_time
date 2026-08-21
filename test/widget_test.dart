@@ -44,4 +44,26 @@ void main() {
     expect(find.byType(FragmentTimeApp), findsOneWidget);
     print('✓ Hot restart OK');
   });
+
+  testWidgets('App 多次 hot restart 稳定', (WidgetTester tester) async {
+    // 8/28 P47-3 加 (沿 SOUL #189 智): 测多次 hot restart
+    //   真凶: 之前只测 1 次, 多次循环可能漏内存泄漏
+    //   修: 3 次 hot restart, 验证仍能 boot
+    tester.view.physicalSize = const Size(1080, 1920);
+    tester.view.devicePixelRatio = 1.0;
+    addTearDown(tester.view.reset);
+
+    for (int i = 0; i < 3; i++) {
+      await tester.pumpWidget(const FragmentTimeApp());
+      await tester.pump();
+      expect(find.byType(FragmentTimeApp), findsOneWidget,
+          reason: 'iteration $i: App should boot');
+
+      await tester.pumpWidget(const SizedBox());
+      await tester.pump();
+      expect(find.byType(FragmentTimeApp), findsNothing,
+          reason: 'iteration $i: App should be cleared');
+    }
+    print('✓ 3 hot restarts OK');
+  });
 }
