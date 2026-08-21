@@ -465,6 +465,47 @@ class LlmService {
       // 8/13: 120s → 15s (沿 SOUL #103 治本, fail fast)
       final response = await request.send().timeout(const Duration(seconds: 15));
       debugPrint('[chatStream] AFTER send status=${response.statusCode} content_length=${response.contentLength}');
+      // 8/28 P35-2: 加 retry 1 次 (transient network failures)
+      //   真凶: 之前 transient error (TLS hiccup / ft_server 线程死)立即 fallback
+      //   修: 等 1s retry 1 次, 如仍失败再 fallback
+      if (response.statusCode == 502 || response.statusCode == 503 || response.statusCode == 504) {
+        debugPrint('[chatStream] transient ${response.statusCode}, retrying in 1s');
+        await Future.delayed(const Duration(seconds: 1));
+        final retryReq = http.Request('POST', Uri.parse(endpoint));
+        retryReq.headers.addAll(headers);
+        if (useRemote) retryReq.headers['Accept'] = 'text/event-stream';
+        retryReq.body = jsonEncode(body);
+        final retryResp = await retryReq.send().timeout(const Duration(seconds: 15));
+        if (retryResp.statusCode == 200) {
+          debugPrint('[chatStream] retry OK, continue stream');
+          // Fall through to stream loop with retryResp
+          await for (final chunk in retryResp.stream.transform(utf8.decoder).transform(const LineSplitter())) {
+            if (chunk.isEmpty) continue;
+            try {
+              if (useRemote) {
+                if (!chunk.startsWith('data:')) continue;
+                final data = chunk.substring(5).trim();
+                if (data == '[DONE]' || data.isEmpty) continue;
+                final json = jsonDecode(data) as Map<String, dynamic>;
+                final choices = json['choices'] as List<dynamic>?;
+                if (choices == null || choices.isEmpty) continue;
+                final delta = choices[0]['delta'] as Map<String, dynamic>?;
+                final content = delta?['content'] as String?;
+                if (content != null && content.isNotEmpty) yield content;
+              } else {
+                // 7/4 加 Ollama format (本地)
+                final json = jsonDecode(chunk) as Map<String, dynamic>;
+                final content = json['response'] as String? ?? json['message']?['content'] as String?;
+                if (content != null && content.isNotEmpty) yield content;
+              }
+            } catch (e) { debugPrint('[llm_] err'); }
+          }
+          return;
+        }
+        debugPrint('[chatStream] retry failed ${retryResp.statusCode}');
+        yield '(LLM unavailable)';
+        return;
+      }
       if (response.statusCode != 200) {
         debugPrint('[chatStream] NON-200 status, yielding LLM unavailable');
         yield '(LLM unavailable)';

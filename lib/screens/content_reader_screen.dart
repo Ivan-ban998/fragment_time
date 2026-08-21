@@ -1390,15 +1390,21 @@ class _ContentReaderScreenState extends State<ContentReaderScreen> {
   }
 
   String _getExtendedContent() {
-    if (isEn) {
-      return 'This is a simulated extended preview of the article content. In a production version, this would fetch the actual article text from the source platform or a cached version.\n\n'
-          'The full article would discuss the topic in depth, providing additional context, examples, and insights that build upon the brief description already shown.\n\n'
-          'Readers typically spend 5-10 minutes on this type of content, making it perfect for 碎片时间 consumption.';
-    } else {
-      return '这里是文章内容的模拟预览。在生产环境中，这里会显示从平台获取的真实文章正文。\n\n'
-          '完整文章会深入讨论话题，提供更多背景、案例和洞察。\n\n'
-          '读者通常在这类内容上花费5-10分钟，非常适合碎片时间阅读。';
+    // 8/28 P35-3 治本 (沿 SOUL #169 不撒谎): 用真 description 代替 mock placeholder
+    //   真凶: 之前 hardcoded "这里是文章内容的模拟预览..." 一直显示给用户
+    //     → 用户以为内容真实, 实际是 mock 文字
+    //   修: 优先用 item.description (来自 RSS), 然后 source 标签, 最后 1 句 fallback
+    final desc = item.description;
+    if (desc.isNotEmpty && !desc.startsWith('点击查看')) {
+      // 真 description: 加 source 提示
+      return isEn
+          ? '$desc\n\n— from ${item.source}'
+          : '$desc\n\n— 来自 ${item.source}';
     }
+    // Fallback: 1 句短 placeholder (明确说 fallback, 不撒谎)
+    return isEn
+        ? '(No extended content available — open in browser for full article.)'
+        : '(暂无延伸内容, 点击原文链接查看全文)';
   }
 
   Widget _buildExternalVideoLink(String url) {
