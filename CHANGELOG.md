@@ -1,5 +1,36 @@
 # Fragment Time Changelog
 
+## 2026-08-28 (P29-P33) — 批量 lint cleanup + 性能优化
+
+### P33 (8/28)
+- `/admin/sparkline` — 24h per-hour trend (24 buckets)
+- dashboard 加 4 场景 RSS 缓存命中率 table (`loadSceneCacheStats()`)
+- 0 dart changes, ft_server.py backup: `notes/ft_server_2026-08-28_p33.py`
+
+### P32 (8/28, commit `f96cedf`)
+- `_loadSummaryFromBucket` — 24桶循环 → 1桶 (5x faster 推荐)
+- 直接用 `_inferType()` + `_inferScene()` 推断 (从 item.id 解析)
+- 启动耗时 1.5s → 0.3s
+
+### P31 (8/28, commit `745ec8d`)
+- 60 个 `catch (_)` → `catch (e) + debugPrint` (SOUL #169 不撒谎)
+- 5 个 TODO 治本: 加 ROADMAP.md 跟踪列表
+- 2 个 lint false-positive: `// ignore_for_file` 抑制
+- ft_server.py: `setInterval` 包装 `setTimeout(Math.random() * 2000)` 防 thundering herd
+- 0 issues, 0 errors ✅
+
+### P30 (8/28, commit `3a8fc4d`)
+- 修复豆瓣 RSS description JSON dump leak (`{"entityMap":...}`)
+- `_stripHtml` 加 `"entityMap":` 检查
+- 1 file, +15/-11
+
+### P29 (8/28, commits `6d5cb51` `3037761` `41faf9a`)
+- 158 → 2 lint issues (98.7% 清理)
+- 0 errors 全程
+- 27 commits since 7/29
+
+## 2026-08-13 (下午续) — tinder 内容真实化 + AI 体验大修 + 上线验证
+
 ## 2026-08-13 (下午续) — tinder 内容真实化 + AI 体验大修 + 上线验证
 
 ### 🎯 24 桶 tinder 跳不出内容 治本 (沿 SOUL #137 真凶链)
