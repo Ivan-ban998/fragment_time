@@ -1146,11 +1146,11 @@ class _AutoQuizWrapperState extends State<_AutoQuizWrapper> {
             title: widget.item.title,
             description: widget.item.description,
           );
-          // ignore: avoid_print
-          print('[AUTOQUIZ] OK ${qs.length} questions in ${DateTime.now().difference(t0).inSeconds}s');
+          // 8/28 P37-8: print() → debugPrint (沿 SOUL #25 #27, release 模式自动剥)
+          debugPrint('[AUTOQUIZ] OK ${qs.length} questions in ${DateTime.now().difference(t0).inSeconds}s');
         } catch (e) {
-          // ignore: avoid_print
-          print('[AUTOQUIZ] FAIL after ${DateTime.now().difference(t0).inSeconds}s: $e');
+          // 8/28 P37-8: print() → debugPrint (沿 SOUL #25 #27, release 模式自动剥)
+          debugPrint('[AUTOQUIZ] FAIL after ${DateTime.now().difference(t0).inSeconds}s: $e');
         }
       });
     }

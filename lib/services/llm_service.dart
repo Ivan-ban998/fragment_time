@@ -456,15 +456,15 @@ class LlmService {
 
     try {
       // 8/8 升一阶 (沿 SOUL #25 #27): print → debugPrint (release 模式自动剥, web stdout 不被截)
-      debugPrint('[chatStream] BEFORE request.send endpoint=$endpoint messages_count=${messages.length}');
+      // 8/28 P37-9: 合并 2 BEFORE logs 到 1 (减少日志噪声)
+      debugPrint('[chatStream] send endpoint=$endpoint body_len=${messages.length * 100}');
       final request = http.Request('POST', Uri.parse(endpoint));
       request.headers.addAll(headers);
       if (useRemote) request.headers['Accept'] = 'text/event-stream'; // 6/29 20:25: 云端 SSE
       request.body = jsonEncode(body);
-      debugPrint('[chatStream] BEFORE send body_len=${request.body.length}');
       // 8/13: 120s → 15s (沿 SOUL #103 治本, fail fast)
       final response = await request.send().timeout(const Duration(seconds: 15));
-      debugPrint('[chatStream] AFTER send status=${response.statusCode} content_length=${response.contentLength}');
+      debugPrint('[chatStream] status=${response.statusCode}');
       // 8/28 P35-2: 加 retry 1 次 (transient network failures)
       //   真凶: 之前 transient error (TLS hiccup / ft_server 线程死)立即 fallback
       //   修: 等 1s retry 1 次, 如仍失败再 fallback
@@ -512,9 +512,8 @@ class LlmService {
         return;
       }
       // 6/29 20:25: 云端走 MiniMax /chat SSE 格式, 本地走 Ollama 格式
-      debugPrint('[chatStream] stream loop START');
+      // 8/28 P37-9: 删 "stream loop START" + "raw line len" (per-line 噪声)
       await for (final chunk in response.stream.transform(utf8.decoder).transform(const LineSplitter())) {
-        debugPrint('[chatStream] raw line len=${chunk.length} preview=${chunk.substring(0, chunk.length.clamp(0, 30))}');
         if (chunk.isEmpty) continue;
         try {
           if (useRemote) {
