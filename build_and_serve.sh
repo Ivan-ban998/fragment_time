@@ -45,7 +45,7 @@ DART_DEFINES="$DART_DEFINES --dart-define=BUILD_VERSION=$BUILD_TS"
 if [ -n "$LLM_API_KEY" ] && [ -n "$LLM_ENDPOINT" ]; then
   DART_DEFINES="$DART_DEFINES --dart-define=LLM_API_KEY=$LLM_API_KEY --dart-define=LLM_ENDPOINT=$LLM_ENDPOINT"
 fi
-"$FLUTTER" build web --release $DART_DEFINES
+"$FLUTTER" build web --release --source-maps --optimization-level=4 $DART_DEFINES
 
 # 2) canvaskit renderer 需要 canvaskit 目录, 不清除
 

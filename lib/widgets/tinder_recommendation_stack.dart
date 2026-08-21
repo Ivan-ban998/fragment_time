@@ -119,7 +119,7 @@ class _TinderRecommendationStackState extends State<TinderRecommendationStack> {
           userType: widget.userType,
           scene: widget.scene,
         );
-      } catch (_) {}
+      } catch (e) { debugPrint('[tinder_recommendation_stack] err'); }
       _seenIds.add(item.id);
     }
     await Future.delayed(const Duration(milliseconds: 250));
@@ -149,7 +149,7 @@ class _TinderRecommendationStackState extends State<TinderRecommendationStack> {
         userType: widget.userType,
         scene: widget.scene,
       );
-    } catch (_) {}
+    } catch (e) { debugPrint('[tinder_recommendation_stack] err'); }
     _seenIds.add(item.id);
     if (!mounted) return;
     setState(() => _topIndex++);
@@ -171,7 +171,7 @@ class _TinderRecommendationStackState extends State<TinderRecommendationStack> {
     if (widget.onTapItem == null) return;
     try {
       await widget.onTapItem!(item);
-    } catch (_) {}
+    } catch (e) { debugPrint('[tinder_recommendation_stack] err'); }
     if (!mounted) return;
     // 详情返回后: 写 view + 推下一张
     _seenIds.add(item.id);
@@ -182,7 +182,7 @@ class _TinderRecommendationStackState extends State<TinderRecommendationStack> {
         userType: widget.userType,
         scene: widget.scene,
       );
-    } catch (_) {}
+    } catch (e) { debugPrint('[tinder_recommendation_stack] err'); }
     if (!mounted) return;
     setState(() => _topIndex++);
     if (_topIndex >= _items.length) {

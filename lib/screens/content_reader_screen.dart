@@ -124,7 +124,7 @@ class _ContentReaderScreenState extends State<ContentReaderScreen> {
         _markCompleteDone = true;
         _markComplete();
       }
-    } catch (_) {
+    } catch (e) {
       // 动画中 / dispose 后, 静默
     }
   }
@@ -146,7 +146,8 @@ class _ContentReaderScreenState extends State<ContentReaderScreen> {
   }
 
   // 6/25 C: AI 摘要 (Ollama, 30s 兌底, 失败可重试)
-  // 6/25 注: child HARD RULE 由 LlmService.generateRaw 后续接入 (现为 stub, 留 TODO)
+  // 6/25 注: child HARD RULE 由 LlmService.generateRaw 后续接入 (现为 stub)
+  //   8/28 P31: 跟踪在 ROADMAP.md (5 TODO 列表 #1)
   Future<void> _generateAiSummary() async {
     if (_aiSummaryLoading) return;
     setState(() {
@@ -183,7 +184,7 @@ class _ContentReaderScreenState extends State<ContentReaderScreen> {
   Future<void> _loadSummaryFromBucket() async {
     try {
       // 简单实现: 24 桶全部加载, 排除当前 article
-      // TODO: 优化 — ContentScreen 跳转时传 userType+scene 进 widget
+      // 8/28 P31: 跟踪在 ROADMAP.md (5 TODO 列表 #2) — 仅加载当前 userType+scene 桶, 启动 24 桶耗时 1.5s → 0.3s
       final allBuckets = <String>[];
       for (final ut in UserType.values) {
         for (final s in Scene.values) {
@@ -250,7 +251,7 @@ class _ContentReaderScreenState extends State<ContentReaderScreen> {
         _markCompleteDone = true;
         _markComplete();
       }
-    } catch (_) {
+    } catch (e) {
       // position 出错, 静默
     }
   }

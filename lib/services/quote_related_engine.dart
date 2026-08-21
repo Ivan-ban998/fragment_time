@@ -3,6 +3,7 @@
 // A 路径: Hero 详情页底部 / B 路径: banner + Hero 问 AI sheet 都用
 
 import '../models/models.dart';
+import 'package:flutter/foundation.dart' show debugPrint;
 import '../models/quote.dart';
 import 'content_aggregator.dart';
 import 'llm_service.dart';
@@ -60,7 +61,7 @@ class QuoteRelatedEngine {
           ));
           seen.add(key);
         }
-      } catch (_) {/* 桶搜失败就跳过 */}
+      } catch (e) { debugPrint('[quote_related_engine] err'); /* 桶搜失败就跳过 */ }
     }
 
     // 阶段 2: LLM 补 1-3 条 (短标题列表, JSON 解析)
@@ -155,7 +156,7 @@ class QuoteRelatedEngine {
         ));
       }
       return results;
-    } catch (_) {
+    } catch (e) {
       return [];
     }
   }

@@ -168,7 +168,7 @@ class _AiAssistantScreenState extends State<AiAssistantScreen> {
         if (!_scrollController.hasClients) return;
         _scrollController.jumpTo(_scrollController.position.maxScrollExtent);
       });
-    } catch (_) {
+    } catch (e) {
       _addWelcome();
     }
   }
@@ -253,7 +253,7 @@ class _AiAssistantScreenState extends State<AiAssistantScreen> {
         };
       }).toList();
       await prefs.setString(_historyKey, jsonEncode(list));
-    } catch (_) {}
+    } catch (e) { debugPrint('[ai_assistant_] err'); }
   }
 
   @override
@@ -343,7 +343,7 @@ class _AiAssistantScreenState extends State<AiAssistantScreen> {
           realItem: ci,
         ));
       }
-    } catch (_) {}
+    } catch (e) { debugPrint('[ai_assistant_] err'); }
     if (!mounted) return;
     _sending = false;
     if (cards.isEmpty) {
@@ -929,7 +929,7 @@ Rules:
               }
             }
           }
-        } catch (_) {}
+        } catch (e) { debugPrint('[ai_assistant_] err'); }
         if (realItem == null) continue; // 6/29 16:35: 过滤掉找不到的 card
         out.add(_ContentCard(
           title: title,
@@ -942,7 +942,7 @@ Rules:
         ));
       }
       return out;
-    } catch (_) {
+    } catch (e) {
       return null;
     }
   }
@@ -971,7 +971,7 @@ Rules:
           realItem: item,
         );
       }).toList();
-    } catch (_) {
+    } catch (e) {
       return [];
     }
   }

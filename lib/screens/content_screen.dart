@@ -374,7 +374,7 @@ class _ContentScreenState extends State<ContentScreen> {
     setState(() => _progress = p);
     try {
       await LocalSubscriptionService.instance.updateProgress(_aiContentItem!, p);
-    } catch (_) {}
+    } catch (e) { debugPrint('[content_] err'); }
   }
 
   /// 6/30 12:23: 看完后主动弹 AI sheet — 拿今日历史 + 推用户点 "答疑解惑"
@@ -421,7 +421,7 @@ class _ContentScreenState extends State<ContentScreen> {
         userType: widget.userType,
         scene: widget.scene,
       );
-    } catch (_) {}
+    } catch (e) { debugPrint('[content_] err'); }
   }
 
   // 7/2 B 站真 BV 预览: 对当前 AI 主体 + 推荐池中所有 video 类并发查真 BV
@@ -443,10 +443,10 @@ class _ContentScreenState extends State<ContentScreen> {
           if (vids.isNotEmpty && mounted) {
             setState(() => _biliCache[c.id] = vids.first);
           }
-        } catch (_) {}
+        } catch (e) { debugPrint('[content_] err'); }
       });
       await Future.wait(futures);
-    } catch (_) {}
+    } catch (e) { debugPrint('[content_] err'); }
   }
 
   // 续读: 拉订阅里 progress 0-100 的
@@ -455,7 +455,7 @@ class _ContentScreenState extends State<ContentScreen> {
       final items = await LocalSubscriptionService.instance.getInProgress(limit: 3);
       if (!mounted) return;
       setState(() => _inProgressItems = items);
-    } catch (_) {}
+    } catch (e) { debugPrint('[content_] err'); }
   }
 
   // 6/25 AppBar title 联动昵称: 加载 handle
@@ -464,7 +464,7 @@ class _ContentScreenState extends State<ContentScreen> {
       final h = await HandleService().get();
       if (!mounted) return;
       setState(() => _handle = h);
-    } catch (_) {}
+    } catch (e) { debugPrint('[content_] err'); }
   }
 
   // 今日完成计数 (从 UserPreference getDailyDone)
@@ -473,7 +473,7 @@ class _ContentScreenState extends State<ContentScreen> {
       final c = await UserPreferenceService.instance.getDailyDone();
       if (!mounted) return;
       setState(() => _todayCompleteCount = c);
-    } catch (_) {}
+    } catch (e) { debugPrint('[content_] err'); }
   }
 
   // TL;DR 精要: 拿上次同 userType+scene 的 preference summary
@@ -488,7 +488,7 @@ class _ContentScreenState extends State<ContentScreen> {
         _tlDrText = cache;
         _showTlDrBanner = true;
       });
-    } catch (_) {}
+    } catch (e) { debugPrint('[content_] err'); }
   }
 
   // 6 张全看完 callback
@@ -894,7 +894,7 @@ class _ContentScreenState extends State<ContentScreen> {
       });
       // 6/9 ask 用同一个 LLM 流式 endpoint (复用 _startLlm 的 stream 复用)
       // 6/22 简化: 不真调 LLM, 改写 _buf 后停止 (用户可以手动看 hero 主体)
-      // TODO: 6/23 接 LLM 二次调用
+      // 8/28 P31: 跟踪在 ROADMAP.md (5 TODO 列表 #3) — ask 问题调 LLM, 等 AI assistant 启用 ask 模式
     }
   }
 
@@ -908,11 +908,11 @@ class _ContentScreenState extends State<ContentScreen> {
         if (mounted) {
           _showFloatingSnack(context, isEn ? 'Saved' : '已收藏');
         }
-      } catch (_) {}
+      } catch (e) { debugPrint('[content_] err'); }
     } else {
       try {
         await LocalSubscriptionService.instance.unsubscribe(item);
-      } catch (_) {}
+      } catch (e) { debugPrint('[content_] err'); }
     }
   }
 
@@ -1308,7 +1308,7 @@ class _ContentScreenState extends State<ContentScreen> {
                     onTap: () async {
                       try {
                         await launchUrl(Uri.parse(extUrl), mode: LaunchMode.externalApplication);
-                      } catch (_) {}
+                      } catch (e) { debugPrint('[content_] err'); }
                     },
                     child: Padding(
                       padding: EdgeInsets.symmetric(horizontal: 10 * _scale, vertical: 6 * _scale),
@@ -1597,7 +1597,7 @@ class _ContentScreenState extends State<ContentScreen> {
           ),
         ),
       );
-    } catch (_) {
+    } catch (e) {
       if (mounted) {
         _showFloatingSnack(context, isEn ? 'Failed to load groups' : '加载小组失败');
       }
@@ -1625,7 +1625,7 @@ class _ContentScreenState extends State<ContentScreen> {
           ],
         ),
       );
-    } catch (_) {
+    } catch (e) {
       if (mounted) {
         _showFloatingSnack(context, isEn ? 'Failed to load recap' : '加载周报失败');
       }
@@ -1770,7 +1770,7 @@ class _ContentScreenState extends State<ContentScreen> {
           userType: widget.userType,
           scene: widget.scene,
         );
-      } catch (_) {}
+      } catch (e) { debugPrint('[content_] err'); }
     }
     if (!mounted) return;
     setState(() => _showCompletionBanner = true);
@@ -1827,13 +1827,13 @@ class _ContentScreenState extends State<ContentScreen> {
     if (_ttsPlaying) {
       try {
         await TtsService.instance.stop();
-      } catch (_) {}
+      } catch (e) { debugPrint('[content_] err'); }
       setState(() => _ttsPlaying = false);
     } else {
       setState(() => _ttsPlaying = true);
       try {
         await TtsService.instance.speak(_buf);
-      } catch (_) {}
+      } catch (e) { debugPrint('[content_] err'); }
       if (mounted) setState(() => _ttsPlaying = false);
     }
   }

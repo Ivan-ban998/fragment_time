@@ -7,7 +7,7 @@ import 'dart:html' as html;
 String currentHostname() {
   try {
     return html.window.location.hostname ?? '192.168.1.2';
-  } catch (_) {
+  } catch (e) {
     return '192.168.1.2';
   }
 }

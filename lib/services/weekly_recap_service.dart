@@ -71,7 +71,7 @@ class WeeklyRecapService {
         } else {
           summary = _fallbackSummary(recent.length, topSource, topType, daysActive.length);
         }
-      } catch (_) {
+      } catch (e) {
         summary = _fallbackSummary(recent.length, topSource, topType, daysActive.length);
       }
     } else {
@@ -148,7 +148,7 @@ class WeeklyRecapService {
       final data = jsonDecode(resp.body) as Map<String, dynamic>;
       final msg = data['message'] as Map<String, dynamic>?;
       return msg?['content'] as String?;
-    } catch (_) {
+    } catch (e) {
       return null;
     }
   }

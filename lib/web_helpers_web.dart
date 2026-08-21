@@ -10,7 +10,7 @@ void webReloadPage() {
     debugPrint('webReloadPage 失败: $e');
     try {
       js.context.callMethod('reload');
-    } catch (_) {}
+    } catch (e) { debugPrint('[web_helpers_web] err'); }
   }
 }
 

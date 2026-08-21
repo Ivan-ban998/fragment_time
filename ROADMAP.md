@@ -93,3 +93,53 @@
 ---
 
 _2026-06-07 小O 起草。改 ROADMAP 同 §5：要给 Brien 看一眼才能动。_
+
+---
+
+# 📋 **P31 5 TODO 跟踪** (8/28)
+
+下面 5 个 TODO 都不在 P 轮范围,等 Brien 决策:
+
+## 5 个 P31 TODO
+
+### 1. `content_reader_screen.dart:149` - LlmService.generateRaw 接入 child HARD RULE
+- **现状**: content_reader `_generateAiSummary()` 是 stub (不调 LLM)
+- **依赖**: LLM Service 重构支持 child mode + HARD RULE 接入
+- **触发条件**: 当 AI assistant 启用 "child user type" 时
+- **优先级**: 🟡 (等 child user type 路线触发)
+
+### 2. `content_reader_screen.dart:186` - ContentScreen 跳转传 userType+scene 进 widget
+- **现状**: `_loadRelatedItems` 遍历 `UserType.values` (24 桶全加载)
+- **目标**: 只加载当前 userType+scene 的桶 (性能优化)
+- **优先级**: 🟢 中 (性能改进, 不影响功能)
+- **预期收益**: 启动 24 桶耗时 1.5s → 0.3s (5x faster)
+
+### 3. `content_screen.dart:897` - 6/23 LLM 二次调用 (ask "问:...")
+- **现状**: ask 问题写到 `_buf` 后 stop,不调 LLM
+- **依赖**: AI assistant UI 整合 + LLM streaming
+- **触发条件**: AI assistant 启用 "ask" 模式
+- **优先级**: 🟡 中
+
+### 4. `ximalaya_service.dart:173` - iTunes Search API 接入 vs 手动专辑列表
+- **现状**: search() 返空数组 + TODO log
+- **选择**: iTunes Search API (国际版) OR 手动维护专辑列表 (国内版)
+- **触发条件**: Brien 拍板
+- **优先级**: 🟡 中
+
+### 5. `ximalaya_service.dart:175` - 留 TODO log
+- **现状**: `debugPrint('[ximalaya] search("$keyword") → []')` 一直 log
+- **修法**: search() 真正实现后删 TODO log
+
+---
+
+**触发机制**: 这些 TODO 等 Brien 拍板 + P 轮 (P32+) 进入。
+
+### 6. **P31-6 跳过**: LLM prompt 缓存
+- _buildSystemPrompt + _buildUserPrompt 各仅 2 处调用
+- 缓存收益 < 复杂度, 跳过
+
+### 7. **P31-7 跳过**: API key 轮换
+- 8/27 Brien 说"先不要管了" (沿用 #188)
+- 旧 key 仍在 f5c0ee3 commit info + GitHub events cache
+- 等 Brien 拍板
+

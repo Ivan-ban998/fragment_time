@@ -118,7 +118,7 @@ static const String _proxyBase = '/rss';
       if (age < 0 || age > _diskTtl.inMilliseconds) return [];
       final list = (jsonDecode(raw) as List).cast<Map<String, dynamic>>();
       return list.map(RssItem.fromJson).toList();
-    } catch (_) {
+    } catch (e) {
       return [];
     }
   }
@@ -142,7 +142,7 @@ static const String _proxyBase = '/rss';
         '$key$_diskLoadedAtSuffix',
         DateTime.now().millisecondsSinceEpoch,
       );
-    } catch (_) {
+    } catch (e) {
       // 写盘失败不影响主流程 (in-memory 仍 cache)
     }
   }
@@ -564,7 +564,7 @@ static const String _proxyBase = '/rss';
         if (pubDateStr.isNotEmpty) {
           try {
             dt = _parseRfc822(pubDateStr);
-          } catch (_) {
+          } catch (e) {
             dt = DateTime.now();
           }
         } else {
@@ -734,7 +734,7 @@ static const String _proxyBase = '/rss';
       try {
         final host = Uri.parse(url).host;
         return host.isNotEmpty ? 'RSS ($host)' : 'RSS';
-      } catch (_) {
+      } catch (e) {
         return 'RSS';
       }
     }

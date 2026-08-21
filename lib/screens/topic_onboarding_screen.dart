@@ -32,7 +32,7 @@ class _TopicOnboardingScreenState extends State<TopicOnboardingScreen> {
     for (final cat in _selected) {
       try {
         await SubscriptionService.instance.subscribeCategory(cat);
-      } catch (_) {}
+      } catch (e) { debugPrint('[topic_onboarding_] err'); }
     }
     widget.onComplete();
   }

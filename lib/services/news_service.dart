@@ -171,7 +171,7 @@ class NewsService {
           }
         }
       }
-    } catch (_) {
+    } catch (e) {
       // RSS 拉失败不影响 stub 返回
     }
     return results;

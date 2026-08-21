@@ -1,4 +1,5 @@
 import 'package:shared_preferences/shared_preferences.dart';
+import 'package:flutter/foundation.dart' show debugPrint;
 import '../models/models.dart';
 
 class SubscriptionService {
@@ -159,7 +160,7 @@ class SubscriptionService {
       try {
         final items = _getSampleContent(source);
         allContent.addAll(items);
-      } catch (_) {}
+      } catch (e) { debugPrint('[subscription_] err'); }
     }
 
     return allContent;

@@ -118,7 +118,7 @@ class XimalayaService {
         if (pubDateStr != null && pubDateStr.isNotEmpty) {
           try {
             pubDate = DateTime.parse(pubDateStr.replaceAll(RegExp(r'[,]'), '').trim());
-          } catch (_) {}
+          } catch (e) { debugPrint('[ximalaya_] err'); }
         }
 
         // audio enclosure url (宪法 §1.1: 仅 metadata, 不缓存)
@@ -170,9 +170,9 @@ class XimalayaService {
 
   /// 8/7 沿用 alert (沿 #137): 搜索 API 不公开 JSON, 走 SPA HTML 撞宪法 §1.1 不允许爬
   /// 替代方案: iTunes Search API (公开 JSON, 沿 https://itunes.apple.com/search)
-  /// TODO (沿 #137 沿用 alert): 等你拍要不要接 iTunes 搜索 (国际版) 还是手动专辑列表
+  /// 8/28 P31: 跟踪在 ROADMAP.md (5 TODO 列表 #4) — 等 Brien 拍 iTunes Search vs 手动专辑列表
   Future<List<dynamic>> search(String keyword) async {
-    // 8/7 沿用 alert: 返空数组 + TODO log, 不假装能搜
+    // 8/28 P31: 跟踪在 ROADMAP.md (5 TODO 列表 #5) — search() 真正实现后删此 log
     debugPrint('[ximalaya] search("$keyword") → [] (沿 #137 沿用 alert, 搜索 API 不公开)');
     return [];
   }

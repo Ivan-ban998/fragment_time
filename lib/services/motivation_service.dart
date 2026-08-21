@@ -1,4 +1,5 @@
 import 'package:shared_preferences/shared_preferences.dart';
+import 'package:flutter/foundation.dart' show debugPrint;
 import '../models/quote.dart';
 
 // 7/15 重构后 Quote struct: 用 fallback 池里 struct 化 Quote。
@@ -196,7 +197,7 @@ class StreakService {
       try {
         final q = Quote.fromJson(_decodeJson(cachedJson));
         if (q.text.isNotEmpty) return q;
-      } catch (_) {/* 下走重新生成 */}
+      } catch (e) { debugPrint('[motivation_] err'); /* 下走重新生成 */ }
     }
 
     // 按时段选作者
@@ -243,7 +244,7 @@ class StreakService {
           createdAt: result.createdAt,
         );
       }
-    } catch (_) {
+    } catch (e) {
       // 7/15: fallback 走 _QuotePool (27 条 pool 按天+小时索引)
       final pool = isEn ? _QuotePool.en : _QuotePool.zh;
       result = pool[(now.day + hour) % pool.length];

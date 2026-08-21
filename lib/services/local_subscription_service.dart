@@ -19,7 +19,7 @@ class LocalSubscriptionService extends ChangeNotifier {
     try {
       final List<dynamic> jsonList = jsonDecode(jsonStr);
       return jsonList.map((json) => _itemFromJson(json)).toList();
-    } catch (_) {
+    } catch (e) {
       return [];
     }
   }

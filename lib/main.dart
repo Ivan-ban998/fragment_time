@@ -1,3 +1,4 @@
+// ignore_for_file: unused_import
 import 'package:flutter/material.dart';
 import 'package:flutter/foundation.dart';
 import 'package:url_launcher/url_launcher.dart';
@@ -733,7 +734,7 @@ class _MainHomeScreenState extends State<MainHomeScreen> {
         isEn: isEn,
         limit: 6,
       );
-    } catch (_) {/* engine 失败就 fallback */}
+    } catch (e) { debugPrint('[main] err'); /* engine 失败就 fallback */ }
 
     // 兜底: history 7 天 抽 6 条
     List<HistoryItem> historyFallback = [];
@@ -752,7 +753,7 @@ class _MainHomeScreenState extends State<MainHomeScreen> {
     List<String>? llmKeywords;
     try {
       llmKeywords = await _getLLMKeywordsForQuote(_dailyQuote!.text);
-    } catch (_) {
+    } catch (e) {
       llmKeywords = null;
     }
 
@@ -786,7 +787,7 @@ class _MainHomeScreenState extends State<MainHomeScreen> {
           .where((s) => s.isNotEmpty && s.length <= 8)
           .take(3)
           .toList();
-    } catch (_) {
+    } catch (e) {
       return null;
     }
   }
@@ -1232,7 +1233,7 @@ class _DailyEncouragementBannerState extends State<_DailyEncouragementBanner> {
         }
       }
       if (mounted) setState(() => _saved = shouldBeSaved);
-    } catch (_) {
+    } catch (e) {
       if (mounted) setState(() => _saved = false);
     }
   }

@@ -60,7 +60,7 @@ class StudyGroupService {
     try {
       final list = jsonDecode(raw) as List;
       return list.map((m) => StudyGroup.fromJson(m as Map<String, dynamic>)).toList();
-    } catch (_) {
+    } catch (e) {
       return seedGroups();
     }
   }

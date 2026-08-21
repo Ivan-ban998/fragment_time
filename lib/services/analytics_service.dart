@@ -51,7 +51,7 @@ class AnalyticsService {
         .map((s) {
           try {
             return jsonDecode(s) as Map<String, dynamic>;
-          } catch (_) {
+          } catch (e) {
             return <String, dynamic>{};
           }
         })

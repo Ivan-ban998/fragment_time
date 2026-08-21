@@ -95,7 +95,7 @@ class _MySubscriptionsScreenState extends State<MySubscriptionsScreen>
         final prefs = await SharedPreferences.getInstance();
         // 鼓励 id 格式: 'encourage_${year}-${month}-${day}' → prefs key 是同样的
         await prefs.remove('encourage_saved_${item.id.replaceFirst('encourage_', '')}');
-      } catch (_) {}
+      } catch (e) { debugPrint('[my_subscriptions_] err'); }
     }
     await _load();
     if (mounted) {

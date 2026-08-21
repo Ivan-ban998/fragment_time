@@ -18,7 +18,7 @@ class HistoryService {
     try {
       final list = jsonDecode(jsonStr) as List;
       return list.map((e) => HistoryItem.fromJson(e as Map<String, dynamic>)).toList();
-    } catch (_) {
+    } catch (e) {
       return [];
     }
   }

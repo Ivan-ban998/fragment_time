@@ -262,7 +262,7 @@ class LlmService {
                     miniMaxYieldedLen = safe.length;
                   }
                 }
-              } catch (_) {}
+              } catch (e) { debugPrint('[llm_] err'); }
             }
           }
         }
@@ -284,7 +284,7 @@ class LlmService {
               yield thinking;
             }
             if (json['done'] == true) return;
-          } catch (_) {}
+          } catch (e) { debugPrint('[llm_] err'); }
         }
       }
     }
@@ -494,7 +494,7 @@ class LlmService {
             final content = msg?['content'] as String?;
             if (content != null && content.isNotEmpty) yield content;
           }
-        } catch (_) {}
+        } catch (e) { debugPrint('[llm_] err'); }
       }
     } catch (e, st) {
       debugPrint('[chatStream] CATCH ERROR: $e');

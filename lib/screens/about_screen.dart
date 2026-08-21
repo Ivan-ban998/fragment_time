@@ -401,7 +401,7 @@ class AboutScreen extends StatelessWidget {
       final ByteData? byteData = await image.toByteData(format: ui.ImageByteFormat.png);
       if (byteData == null) return null;
       return base64Encode(byteData.buffer.asUint8List());
-    } catch (_) {
+    } catch (e) {
       return null;
     }
   }
@@ -446,7 +446,7 @@ class AboutScreen extends StatelessWidget {
         await prefs.setString('feedback_log', jsonEncode(list));
         return true;
       }
-    } catch (_) {
+    } catch (e) {
       // 网络失败, prefs 已保留 synced: false
     }
     return false;

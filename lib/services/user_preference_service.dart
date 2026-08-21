@@ -176,7 +176,7 @@ class UserPreferenceService {
     try {
       final m = jsonDecode(s) as Map<String, dynamic>;
       return m.map((k, v) => MapEntry(k, (v as num).toInt()));
-    } catch (_) {
+    } catch (e) {
       return {};
     }
   }
@@ -187,7 +187,7 @@ class UserPreferenceService {
     try {
       final list = jsonDecode(s) as List<dynamic>;
       return list.map((e) => Map<String, dynamic>.from(e as Map)).toList();
-    } catch (_) {
+    } catch (e) {
       return [];
     }
   }
