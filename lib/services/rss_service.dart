@@ -610,19 +610,23 @@ static const String _proxyBase = '/rss';
           .replaceAll(RegExp(r'\s+'), ' ')
           .trim();
       final unescaped = _decodeHtmlEntities(stripped);
-      // 检测豆瓣内部 JSON dump 模式: "{"blocks":..." 或 "{&#34;blocks&#34;:..."
-      // 8/16 修: 截到 "评论:" 之前 (豆瓣 description 通常 "用户 评论: 书名 评价: 推荐\n\nJSON dump")
-      if (unescaped.contains('"blocks":[') || unescaped.contains('"entityRanges":[')) {
-        // 找到 JSON dump 起始位置 "{"
-        final jsonStart = unescaped.indexOf('{');
-        if (jsonStart > 0) {
-          // 截到 JSON dump 之前, 避免 UI 显示 JSON
-          return unescaped.substring(0, jsonStart).trim();
-        }
-        return unescaped.length > 80 ? '${unescaped.substring(0, 80)}…' : unescaped;
+    // 8/28 P30 治本 (沿 SOUL #169 不撒谎): 任何 "{ ... JSON dump" 都截掉
+    //   真凶: 之前检查 '"blocks":[ / "entityRanges":[' 错过了 "entityMap":{' 这种模式
+    //     → 截图证实 (豆瓣音乐/电影 description 漏出 "entityMap":0,"blocks":[...]
+    //   修法: 检测 "{ " 起始的 JSON dump 模式 (豆瓣内部 draft.js blocks)
+    if (unescaped.contains('"blocks":[') ||
+        unescaped.contains('"entityRanges":[') ||
+        unescaped.contains('"entityMap":')) {
+      // 找到 JSON dump 起始位置 "{"
+      final jsonStart = unescaped.indexOf('{');
+      if (jsonStart > 0) {
+        // 截到 JSON dump 之前, 避免 UI 显示 JSON
+        return unescaped.substring(0, jsonStart).trim();
       }
-      return unescaped.length > 160 ? '${unescaped.substring(0, 160)}…' : unescaped;
+      return unescaped.length > 80 ? '${unescaped.substring(0, 80)}…' : unescaped;
     }
+    return unescaped.length > 160 ? '${unescaped.substring(0, 160)}…' : unescaped;
+  }
 
     /// 8/16 加 (沿 SOUL #169 不撒谎): 解码 HTML entity (避免 UI 显示乱码)
     /// 真凶: 之前 _stripHtml 不解码 entity, 豆瓣 RSS 返 "&#34;blocks&#34;..." UI 显乱码
