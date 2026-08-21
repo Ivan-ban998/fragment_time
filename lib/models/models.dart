@@ -261,6 +261,16 @@ extension SceneBucket on Scene {
       case Scene.workout: return 'workout';
     }
   }
+  // 8/28 P42-3: 加 fromBucketKey 反查 (RSS / analytics 持久化用)
+  static Scene fromBucketKey(String key) {
+    switch (key) {
+      case 'learn': return Scene.learn;
+      case 'listen': return Scene.listen;
+      case 'relax': return Scene.relax;
+      case 'workout': return Scene.workout;
+      default: return Scene.learn; // fallback (沿 #137)
+    }
+  }
 }
 // 6/11 B2：AI 出题
 // 宪法 §3：老人小孩用，AI 帮理解

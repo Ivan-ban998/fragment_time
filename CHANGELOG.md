@@ -1,5 +1,59 @@
 # Fragment Time Changelog
 
+## 2026-08-28 (P41-P42) — Caches + LLM truncate + Scene.fromBucketKey
+
+### P42 (8/28)
+- 加 ApplePodcastsService cache 测试 (test/apple_podcasts_cache_test.dart)
+  - 验证 P41-5 10min cache (topCharts hits/misses)
+- Scene.fromBucketKey() 加 (反查, RSS / analytics 持久化)
+- content_reader_screen _truncateForLLM() helper
+  - 截断 description/extension 800 字符
+  - 防止豆瓣音乐 / NPR 长文 2-5KB 让 LLM prompt 超限
+
+### P41 (8/28, commit `e34201c`)
+- ft_server.py 加 /admin/build_size_history (24h trend)
+  - 当前点真实值 + 24 bucket 估算
+- ApplePodcastsService 10min in-memory cache
+  - topCharts: key=${country}_$limit
+  - search: key=${keyword}_${limit}_$country
+  - hits/misses 计数器
+
+### P40 (8/28, commit `edf3542`)
+- 加 ContentItem toJson/fromJson 单元测试 (3 tests, all passing)
+- ft_server.py /admin/clear_metrics?full=1 加 ximalaya_cache_bust signal
+  - 返 JSON 格式 (从 string concat 改 json.dumps)
+
+### P39 (8/28, commit `2a135e7` + `1d2110a`)
+- ximalaya_service albums() Future.wait 并发 fetch (5 串行 → 5 并发, ~3s)
+- ximalaya_service search() 10min in-memory cache
+  - 加 searchCacheHits/Misses getter
+- ft_server.py /admin/clear_ximalaya_cache (bust signal)
+
+### P38 (8/28, commit `be5e428`)
+- 5 TODO 全部治本 (P31 跟踪列表)
+  - ximalaya iTunes Search API 接入 (治本 #4)
+  - ximalaya search 真调 (治本 #5, 删 TODO log)
+  - content_reader child HARD RULE (治本 #1)
+  - content_screen ask 真调 LLM (治本 #3)
+- 加 test/ximalaya_search_test.dart (2 tests)
+
+### P37 (8/28, commit `9073855`)
+- 加 test/llm_cache_test.dart (2 tests, all passing)
+- main.dart autoquiz print() → debugPrint (沿 SOUL #25 #27)
+- chatStream 日志减少 (12 → 9 logs)
+
+### P36 (8/28, commit `93097bf`)
+- 加 test/llm_smoke_test.dart (chatStream 真 API 验证)
+- build_and_serve.sh drop --source-maps (-3.1MB build)
+
+### P35 (8/28, commit `9d1a93e`) ⭐ 治本 3 真凶
+- P35-1: ft_server thread death 修复 (沿 SOUL #137)
+  - 真凶: P32-6 bucket 4-tuple, _check_llm_rate unpack 2-tuple
+    → ValueError → handler thread 静默死
+  - 修: existing_bucket[0]/[1] + master try-except
+- P35-2: chatStream transient retry (502/503/504 → 1s 后 retry)
+- P35-3: _getExtendedContent() 真数据 (沿 SOUL #169 不撒谎)
+
 ## 2026-08-28 (P29-P33) — 批量 lint cleanup + 性能优化
 
 ### P33 (8/28)

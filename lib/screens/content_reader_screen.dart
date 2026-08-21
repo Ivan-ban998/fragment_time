@@ -114,6 +114,15 @@ class _ContentReaderScreenState extends State<ContentReaderScreen> {
     return '$m:${s.toString().padLeft(2, '0')}';
   }
 
+  // 8/28 P42-5 治本 (沿 SOUL #189 智): 限 description 长度避免 LLM prompt 超限
+  //   真凶: 之前 description 全量送 LLM (豆瓣音乐/NPR 长文可达 2-5KB)
+  //     → token 超限, 1.5b/7b 摘要质量下降
+  //   修: 限 800 字符 (中文约 200 字 token), 保证 prompt < 2000 tokens
+  String _truncateForLLM(String text, int maxChars) {
+    if (text.length <= maxChars) return text;
+    return '${text.substring(0, maxChars)}… (全文 ${text.length} 字)';
+  }
+
   // 6/24 修: 短文章检 (不用 scroll, 文章本身就能全显)
   void _checkShortArticle() {
     if (!mounted || _markCompleteDone) return;
@@ -167,8 +176,12 @@ class _ContentReaderScreenState extends State<ContentReaderScreen> {
     final prompt = '请为以下文章生成 3-5 句${widget.isEn ? "English" : "中文"}摘要, 不超过 150 字, 不要重复标题.\n'
         '$langHint\n'
         '标题: ${widget.item.title}\n'
-        '描述: ${widget.item.description}\n'
-        '延伸: ${_getExtendedContent()}\n\n'
+        // 8/28 P42-5 治本 (沿 SOUL #189 智): 截断 description 防止 LLM prompt 超限
+        //   真凶: 之前 description 全量送 LLM (豆瓣音乐/NPR 长文可达 2-5KB)
+        //     → token 超限, 1.5b/7b 摘要质量下降
+        //   修: 限 800 字符 (中文约 200 字 token), 保证 prompt < 2000 tokens
+        '描述: ${_truncateForLLM(widget.item.description, 800)}\n'
+        '延伸: ${_truncateForLLM(_getExtendedContent(), 800)}\n\n'
         '摘要:';
     try {
       final result = await LlmService.generateRaw(prompt, isEn: widget.isEn)
