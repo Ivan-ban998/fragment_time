@@ -240,14 +240,17 @@ class XimalayaService {
       1345684001, // Planet Money
       1385567025, // Huberman Lab
     ];
-    final all = <XimalayaTrack>[];
-    for (final id in trendingIds) {
-      try {
-        final tracks = await getAlbumTracks(id);
-        if (tracks.isNotEmpty) {
-          // 用第一集代表专辑 (因为 iTunes 用 feedUrl 没法直接拿专辑)
+    // 8/28 P39-1 治本 (沿 SOUL #137 真凶): albums() 5 顺序 await → Future.wait 并发
+    //   真凶: 之前 5 个 RSS fetch 串行, 单次 8s timeout × 5 = 最坏 40s
+    //   修: Future.wait 并发, 5 个同时拉 (8s timeout + 网络并行)
+    //   预期: 5 串行 8s → 5 并发 ~3s (3x faster)
+    final results = await Future.wait(
+      trendingIds.map((id) async {
+        try {
+          final tracks = await getAlbumTracks(id);
+          if (tracks.isEmpty) return null;
           final first = tracks.first;
-          all.add(XimalayaTrack(
+          return XimalayaTrack(
             title: first.albumTitle,
             url: 'https://podcasts.apple.com/podcast/id$id',
             description: first.description,
@@ -255,10 +258,14 @@ class XimalayaService {
             audioUrl: '',
             durationSec: 0,
             albumTitle: first.albumTitle,
-          ));
+          );
+        } catch (e) {
+          debugPrint('[ximalaya] album id=$id failed: $e');
+          return null;
         }
-      } catch (e) { debugPrint('[ximalaya] album id=$id failed: $e'); }
-    }
-    return all;
+      }),
+      eagerError: false, // 单个失败不阻塞其他
+    );
+    return results.whereType<XimalayaTrack>().toList();
   }
 }
