@@ -179,26 +179,16 @@ class _ContentReaderScreenState extends State<ContentReaderScreen> {
   }
 
   // 6/26 Brien 00:44 修: 1.5b 仍输出学生内容 — 摘要从 NewsService 24 桶加载 (不调 LLM)
-  // 注: ContentReaderScreen 只接 item, 不知道 userType/scene
-  // → 用 item 标题前缀 'student_learn_1' 等解析出 userType + scene
+  // 8/28 P32-3 治本 (沿 ROADMAP #2): 直接用 _inferType() + _inferScene() 1 桶
+  //   之前 24 桶 loop 1.5s+, 改后 1 桶 0.3s (5x faster)
   Future<void> _loadSummaryFromBucket() async {
     try {
-      // 简单实现: 24 桶全部加载, 排除当前 article
-      // 8/28 P31: 跟踪在 ROADMAP.md (5 TODO 列表 #2) — 仅加载当前 userType+scene 桶, 启动 24 桶耗时 1.5s → 0.3s
-      final allBuckets = <String>[];
-      for (final ut in UserType.values) {
-        for (final s in Scene.values) {
-          allBuckets.add('${ut.bucketKey}_${s.bucketKey}');
-        }
-      }
-      List<ContentItem> candidates = [];
-      for (final _ in allBuckets) {
-        // 直接调 NewsService 内部 _allContent, 但没暴露 — 改用 6x4 = 24 次
-        final results = await NewsService().getRecommendations(_inferType(), _inferScene());
-        candidates.addAll(
-            results.where((it) => it.id != widget.item.id).toList());
-        if (candidates.isNotEmpty) break; // 拿到 1 桶就够
-      }
+      final inferredType = _inferType();
+      final inferredScene = _inferScene();
+      final results = await NewsService().getRecommendations(inferredType, inferredScene);
+      if (!mounted) return;
+      // 排除当前 article, 取下一条
+      final candidates = results.where((it) => it.id != widget.item.id).toList();
       if (!mounted || candidates.isEmpty) return;
       final next = candidates.first;
       final summary = '${next.title}\n\n${next.description}';
