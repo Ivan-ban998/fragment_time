@@ -250,6 +250,18 @@ extension UserTypeBucket on UserType {
       case UserType.child: return 'child';
     }
   }
+  // 8/28 P44-2 治本 (沿 P42-3 SceneBucket 模式): 反查 (analytics / settings 持久化用)
+  static UserType fromBucketKey(String key) {
+    switch (key) {
+      case 'student': return UserType.student;
+      case 'officeWorker': return UserType.officeWorker;
+      case 'entrepreneur': return UserType.entrepreneur;
+      case 'parent': return UserType.parent;
+      case 'senior': return UserType.senior;
+      case 'child': return UserType.child;
+      default: return UserType.student; // fallback (沿 #137)
+    }
+  }
 }
 
 extension SceneBucket on Scene {
