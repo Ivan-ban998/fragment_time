@@ -56,7 +56,23 @@ class XimalayaTrack {
   }
 }
 
+class _SearchCacheEntry {
+  final List<XimalayaTrack> tracks;
+  final DateTime ts;
+  _SearchCacheEntry(this.tracks, this.ts);
+}
+
 class XimalayaService {
+  // 8/28 P39-9 治本 (沿 SOUL #189 智): iTunes Search 10min cache (减少 API load)
+  //   真凶: 之前每次 search() 都调 iTunes API
+  //     → 用户搜"tech podcast"多次, 重复网络请求
+  //   修: in-memory cache (key=keyword.toLowerCase(), value=tracks+ts)
+  static final Map<String, _SearchCacheEntry> _searchCache = {};
+  static const Duration _searchCacheTtl = Duration(minutes: 10);
+  static int _searchCacheHits = 0;
+  static int _searchCacheMisses = 0;
+  static int get searchCacheHits => _searchCacheHits;
+  static int get searchCacheMisses => _searchCacheMisses;
   // 8/7 加: ft_server.py /rss 同源代理 (沿 #137 #171 模式)
   String _resolveAlbumUrl(int albumId) {
     if (kIsWeb) {
@@ -177,6 +193,14 @@ class XimalayaService {
   ///   返回类型: List<XimalayaTrack> (复用现有解析逻辑, 替 `List<dynamic>`)
   ///   限制: limit=20 防止一次拉太多
   Future<List<XimalayaTrack>> search(String keyword, {int limit = 20}) async {
+    // 8/28 P39-9: 10min in-memory cache (避免重复 API 调用)
+    final cacheKey = '${keyword.toLowerCase()}_$limit';
+    final cached = _searchCache[cacheKey];
+    if (cached != null && DateTime.now().difference(cached.ts) < _searchCacheTtl) {
+      _searchCacheHits++;
+      return cached.tracks;
+    }
+    _searchCacheMisses++;
     try {
       final url = 'https://itunes.apple.com/search?term=${Uri.encodeComponent(keyword)}&media=podcast&limit=$limit';
       final resp = await http.get(
@@ -219,6 +243,8 @@ class XimalayaService {
           albumTitle: collectionName,
         ));
       }
+      // 8/28 P39-9: 存 cache (10min TTL)
+      _searchCache[cacheKey] = _SearchCacheEntry(tracks, DateTime.now());
       return tracks;
     } catch (e) {
       debugPrint('[ximalaya] search iTunes API failed: $e');
