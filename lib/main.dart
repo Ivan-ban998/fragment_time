@@ -887,6 +887,10 @@ class _MainHomeScreenState extends State<MainHomeScreen> {
                 isEn: isEn,
                 userType: _selectedUserType,
                 scene: TimeAwareRecommender.recommendAt(DateTime.now(), currentUserType: _selectedUserType).scene,
+                // 8/28 P56-2: 关注类目 chip 跳主场景 tab (主入口)
+                onSceneJump: () {
+                  if (mounted) setTab(0);
+                },
               ),
               SettingsTab(
                 config: config,

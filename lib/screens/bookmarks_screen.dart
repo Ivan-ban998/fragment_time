@@ -7,6 +7,7 @@ import '../services/bookmark_service.dart';
 import '../models/models.dart';
 import 'content_reader_screen.dart';
 
+/// 8/28 P56-3: BookmarksScreen (独立 screen, 走 AppBar + 嵌 BookmarksListView)
 class BookmarksScreen extends StatefulWidget {
   final bool isEn;
   const BookmarksScreen({super.key, required this.isEn});
@@ -16,6 +17,60 @@ class BookmarksScreen extends StatefulWidget {
 }
 
 class _BookmarksScreenState extends State<BookmarksScreen> {
+  @override
+  Widget build(BuildContext context) {
+    return Scaffold(
+      appBar: AppBar(
+        title: Text(widget.isEn ? 'My Bookmarks' : '我的收藏'),
+        elevation: 1,
+      ),
+      body: BookmarksListView(
+        isEn: widget.isEn,
+        onItemTap: _openEntry,
+      ),
+    );
+  }
+
+  void _openEntry(BookmarkEntry e) {
+    // 8/28 P53-4: 构造 ContentItem (沿 SOUL #169 snapshot 真实数据)
+    final item = ContentItem(
+      id: e.id,
+      title: e.title,
+      description: e.description,
+      duration: '5min',
+      source: e.source,
+      sourceType: ContentSource.rss,
+      contentType: ContentType.article,
+      externalUrl: e.url,
+    );
+    Navigator.of(context).push(MaterialPageRoute(
+      builder: (_) => ContentReaderScreen(
+        item: item,
+        isEn: widget.isEn,
+        userType: UserType.student,
+        scene: Scene.learn,
+      ),
+    ));
+  }
+}
+
+/// 8/28 P56-3: 公共 BookmarksListView widget (让 MySubscriptionsScreen 嵌入 4th tab)
+///   沿 SOUL #188 透明: 独立 widget, 可复用, 行为跟 BookmarksScreen 一致
+class BookmarksListView extends StatefulWidget {
+  final bool isEn;
+  final void Function(BookmarkEntry entry)? onItemTap;
+
+  const BookmarksListView({
+    super.key,
+    required this.isEn,
+    this.onItemTap,
+  });
+
+  @override
+  State<BookmarksListView> createState() => _BookmarksListViewState();
+}
+
+class _BookmarksListViewState extends State<BookmarksListView> {
   List<BookmarkEntry> _entries = [];
   bool _loading = true;
 
@@ -23,7 +78,6 @@ class _BookmarksScreenState extends State<BookmarksScreen> {
   void initState() {
     super.initState();
     _load();
-    // 8/28 P53-4: 加 listener 自动刷新
     BookmarkService.instance.addListener(_load);
   }
 
@@ -57,7 +111,7 @@ class _BookmarksScreenState extends State<BookmarksScreen> {
       );
     }
     if (_entries.isEmpty) {
-      return _EmptyState(isEn: widget.isEn);
+      return _BookmarksEmptyState(isEn: widget.isEn);
     }
     return RefreshIndicator(
       onRefresh: _load,
@@ -68,35 +122,17 @@ class _BookmarksScreenState extends State<BookmarksScreen> {
         itemBuilder: (context, i) => _BookmarkTile(
           entry: _entries[i],
           isEn: widget.isEn,
-          onTap: () => _openEntry(_entries[i]),
+          onTap: () {
+            if (widget.onItemTap != null) {
+              widget.onItemTap!(_entries[i]);
+            }
+          },
           onRemove: () async {
             await BookmarkService.instance.remove(_entries[i].id);
           },
         ),
       ),
     );
-  }
-
-  void _openEntry(BookmarkEntry e) {
-    // 8/28 P53-4: 构造 ContentItem (沿 SOUL #169 snapshot 真实数据)
-    final item = ContentItem(
-      id: e.id,
-      title: e.title,
-      description: e.description,
-      duration: '5min',
-      source: e.source,
-      sourceType: ContentSource.rss,
-      contentType: ContentType.article,
-      externalUrl: e.url,
-    );
-    Navigator.of(context).push(MaterialPageRoute(
-      builder: (_) => ContentReaderScreen(
-        item: item,
-        isEn: widget.isEn,
-        userType: UserType.student,
-        scene: Scene.learn,
-      ),
-    ));
   }
 }
 
@@ -168,9 +204,9 @@ class _BookmarkTile extends StatelessWidget {
   }
 }
 
-class _EmptyState extends StatelessWidget {
+class _BookmarksEmptyState extends StatelessWidget {
   final bool isEn;
-  const _EmptyState({required this.isEn});
+  const _BookmarksEmptyState({required this.isEn});
 
   @override
   Widget build(BuildContext context) {

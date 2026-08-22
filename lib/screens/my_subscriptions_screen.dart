@@ -19,6 +19,8 @@ class MySubscriptionsScreen extends StatefulWidget {
   // 7/15 17:19: 透传给 ContentReaderScreen (含 quote Hero 卡, 关联阅读用)
   final UserType? userType;
   final Scene? scene;
+  // 8/28 P56-2: 跳主场景 tab 回调 (注入 from main.dart)
+  final VoidCallback? onSceneJump;
 
   const MySubscriptionsScreen({
     super.key,
@@ -26,6 +28,7 @@ class MySubscriptionsScreen extends StatefulWidget {
     this.isEn = false,
     this.userType,
     this.scene,
+    this.onSceneJump,
   });
 
   // 6/24 v8: GlobalKey 让详情页订阅后能 reload
@@ -52,7 +55,7 @@ class _MySubscriptionsScreenState extends State<MySubscriptionsScreen>
   @override
   void initState() {
     super.initState();
-    _tabController = TabController(length: 3, vsync: this);
+    _tabController = TabController(length: 4, vsync: this); // 8/28 P56-3: 3 → 4 (加我的收藏)
     // 7/20 18:42 Brien "每个子 Tab 该有专属 hint" → 切 Tab 时 setState 重 build 换 hint
     _tabController.addListener(() {
       if (mounted) setState(() {});
@@ -200,6 +203,7 @@ class _MySubscriptionsScreenState extends State<MySubscriptionsScreen>
           ),
         ],
         // 6/25 A: 顶部 TabBar (内容/名言/关注)
+        // 8/28 P56-3: 加 4th tab "我收藏的" (走 BookmarkService 单文章收藏, 沿 P53-4)
         bottom: TabBar(
           controller: _tabController,
           labelColor: AppTheme.primary,
@@ -211,7 +215,9 @@ class _MySubscriptionsScreenState extends State<MySubscriptionsScreen>
             Tab(icon: Icon(Icons.article_outlined, size: 18 * scale), text: isEn ? 'Articles' : '内容'),
             Tab(icon: Icon(Icons.format_quote, size: 18 * scale), text: isEn ? 'Quotes' : '名言'),
             Tab(icon: Icon(Icons.subscriptions, size: 18 * scale), text: isEn ? 'Following' : '关注'),
+            Tab(icon: Icon(Icons.bookmark, size: 18 * scale), text: isEn ? 'Saved' : '我的收藏'),
           ],
+          // 8/28 P56-3: 5 个 tab 改 4 个 (避免 TabBar overflow)
         ),
       ),
       body: Column(
@@ -229,6 +235,8 @@ class _MySubscriptionsScreenState extends State<MySubscriptionsScreen>
                 _buildSavedTab(scale, isEn, quotesOnly: true),
                 // Tab 3: 关注管理 (跳转)
                 _buildFollowingTab(scale, isEn),
+                // Tab 4: 我的收藏 (P53-4 BookmarksScreen 接入)
+                _buildBookmarksTab(scale, isEn),
               ],
             ),
           ),
@@ -236,6 +244,34 @@ class _MySubscriptionsScreenState extends State<MySubscriptionsScreen>
       ),
     ),
   );
+  }
+
+  // 8/28 P56-3: 我的收藏 Tab (走 BookmarkService, 沿 P53-4)
+  Widget _buildBookmarksTab(double scale, bool isEn) {
+    return BookmarksListView(
+      isEn: isEn,
+      onItemTap: (entry) {
+        // 8/28 P56-3: 点条目跳 ContentReaderScreen
+        final item = ContentItem(
+          id: entry.id,
+          title: entry.title,
+          description: entry.description,
+          duration: '5min',
+          source: entry.source,
+          sourceType: ContentSource.rss,
+          contentType: ContentType.article,
+          externalUrl: entry.url,
+        );
+        Navigator.of(context).push(MaterialPageRoute(
+          builder: (_) => ContentReaderScreen(
+            item: item,
+            isEn: isEn,
+            userType: widget.userType ?? UserType.student,
+            scene: widget.scene ?? Scene.learn,
+          ),
+        ));
+      },
+    );
   }
 
   // 7/20 16:48 Brien 反馈 "收藏内容多了, 让用户搜搜" → 加搜索框
@@ -626,16 +662,26 @@ class _MySubscriptionsScreenState extends State<MySubscriptionsScreen>
                                 categoryName: c,
                                 isEn: isEn,
                                 scale: scale,
+                                // 8/28 P56-2 沿 SOUL #103 治好不抢注意力: 取消 SnackBar placeholder
+                                //   真凶: 之前 "$c 类目详情即将上线" = 假承诺, 没真实内容
+                                //   修: 点 chip 切主场景 tab (主入口), 用户能马上看内容
                                 onTap: () {
-                                  ScaffoldMessenger.of(context).showSnackBar(
-                                    SnackBar(
-                                      content: Text(
-                                        isEn
-                                            ? '"$c" category detail coming soon'
-                                            : '"$c" 类目详情即将上线',
+                                  // 8/28 P56-2: 跳场景 tab (主入口)
+                                  if (widget.onSceneJump != null) {
+                                    widget.onSceneJump!();
+                                  } else {
+                                    // 8/28 P56-2: 兜底 SnackBar (onSceneJump 没注入)
+                                    ScaffoldMessenger.of(context).showSnackBar(
+                                      SnackBar(
+                                        content: Text(
+                                          isEn
+                                              ? 'Showing "$c" content'
+                                              : '显示 "$c" 相关内容',
+                                        ),
+                                        duration: const Duration(seconds: 2),
                                       ),
-                                    ),
-                                  );
+                                    );
+                                  }
                                 },
                               );
                             },
