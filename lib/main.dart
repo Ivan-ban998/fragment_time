@@ -36,6 +36,10 @@ import 'screens/scene_screen.dart';
 import 'screens/content_reader_screen.dart';
 import 'screens/search_screen.dart';
 import 'screens/my_subscriptions_screen.dart';
+// 8/28 P62-A 沿用户"点标签可以进入, 给我推荐内容"修:
+//   main.dart 注入 onSourceJump/onCategoryJump 直接 push SourceDetailScreen / CategoryDetailScreen
+import 'screens/source_detail_screen.dart';
+import 'screens/category_detail_screen.dart';
 import 'screens/settings_tab.dart';
 import 'services/news_service.dart';
 import 'services/time_aware_recommender.dart';
@@ -940,32 +944,33 @@ class _MainHomeScreenState extends State<MainHomeScreen> {
                   );
                 },
                 onSourceJump: (source) {
-                  if (!mounted) return;
-                  // 8/28 P60-2: 只 SnackBar 提示 source 已被记录, 不跳 tab
-                  final messenger = ScaffoldMessenger.maybeOf(context);
-                  messenger?.showSnackBar(
-                    SnackBar(
-                      content: Text(
-                        isEn
-                            ? 'Filter: ${source.name} (stays here)'
-                            : '过滤: ${source.name} (留在此页)',
+                  // 8/28 P62-A 沿用户"点标签可以进入, 给我推荐内容"修:
+                  //   真凶: P60-2 只 SnackBar 留此页, 你说"没跳啊"
+                  //   修: 直接 push SourceDetailScreen (用户要看该 platform 推荐内容)
+                  Navigator.push(
+                    context,
+                    MaterialPageRoute(
+                      builder: (_) => SourceDetailScreen(
+                        source: source,
+                        isElderlyMode: _isElderlyMode,
+                        isEn: isEn,
                       ),
-                      duration: const Duration(seconds: 2),
                     ),
                   );
                 },
                 onCategoryJump: (category) {
-                  if (!mounted) return;
-                  // 8/28 P60-2: 只 SnackBar 提示 category 已被记录, 不跳 tab
-                  final messenger = ScaffoldMessenger.maybeOf(context);
-                  messenger?.showSnackBar(
-                    SnackBar(
-                      content: Text(
-                        isEn
-                            ? 'Filter: "$category" (stays here)'
-                            : '过滤: "$category" (留在此页)',
+                  // 8/28 P62-A 沿用户"点标签可以进入, 给我推荐内容"修:
+                  //   真凶: P60-2 只 SnackBar 留此页, 你说"没跳啊"
+                  //   修: 直接 push CategoryDetailScreen (P62-A 新建)
+                  Navigator.push(
+                    context,
+                    MaterialPageRoute(
+                      builder: (_) => CategoryDetailScreen(
+                        categoryName: category,
+                        isElderlyMode: _isElderlyMode,
+                        isEn: isEn,
+                        userType: _selectedUserType,
                       ),
-                      duration: const Duration(seconds: 2),
                     ),
                   );
                 },
