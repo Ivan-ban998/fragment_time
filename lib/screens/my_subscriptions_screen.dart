@@ -5,6 +5,7 @@ import '../models/models.dart';
 import '../theme/app_theme.dart';
 import '../services/local_subscription_service.dart';
 import '../services/subscription_service.dart';
+import '../services/bookmark_service.dart'; // 8/28 P59-1: 阅读 tab 合并 BookmarkService
 import '../services/pack_io_helpers.dart';
 import '../services/handle_service.dart';
 import '../widgets/skeleton.dart';
@@ -63,7 +64,7 @@ class _MySubscriptionsScreenState extends State<MySubscriptionsScreen>
   @override
   void initState() {
     super.initState();
-    _tabController = TabController(length: 4, vsync: this); // 8/28 P56-3: 3 → 4 (加我的收藏)
+    _tabController = TabController(length: 2, vsync: this); // 8/28 P59-1: 4 → 2 (合并 内容/名言/我的收藏 → 阅读)
     // 7/20 18:42 Brien "每个子 Tab 该有专属 hint" → 切 Tab 时 setState 重 build 换 hint
     _tabController.addListener(() {
       if (mounted) setState(() {});
@@ -211,7 +212,10 @@ class _MySubscriptionsScreenState extends State<MySubscriptionsScreen>
           ),
         ],
         // 6/25 A: 顶部 TabBar (内容/名言/关注)
-        // 8/28 P56-3: 加 4th tab "我收藏的" (走 BookmarkService 单文章收藏, 沿 P53-4)
+        // 8/28 P59-1 沿 SOUL #137 真凶链 + 用户"重复的改成阅读历史"指示:
+        //   真凶: 之前 4 tabs (内容/名言/关注/我的收藏) 真重复 (沿 P57-2 双写, 都看得到同一内容)
+        //   修: 合并 内容/名言/我的收藏 → 1 个 "阅读" tab (走 LocalSubscription + BookmarkService)
+        //     保留 "关注" tab (平台/类目订阅, 跟内容无关)
         bottom: TabBar(
           controller: _tabController,
           labelColor: AppTheme.primary,
@@ -220,31 +224,24 @@ class _MySubscriptionsScreenState extends State<MySubscriptionsScreen>
           indicatorWeight: 3,
           labelStyle: TextStyle(fontSize: 14 * scale, fontWeight: FontWeight.w600),
           tabs: [
-            Tab(icon: Icon(Icons.article_outlined, size: 18 * scale), text: isEn ? 'Articles' : '内容'),
-            Tab(icon: Icon(Icons.format_quote, size: 18 * scale), text: isEn ? 'Quotes' : '名言'),
+            Tab(icon: Icon(Icons.menu_book, size: 18 * scale), text: isEn ? 'Reading' : '阅读'),
             Tab(icon: Icon(Icons.subscriptions, size: 18 * scale), text: isEn ? 'Following' : '关注'),
-            Tab(icon: Icon(Icons.bookmark, size: 18 * scale), text: isEn ? 'Saved' : '我的收藏'),
           ],
-          // 8/28 P56-3: 5 个 tab 改 4 个 (避免 TabBar overflow)
         ),
       ),
       body: Column(
         children: [
-          // 7/20 16:48 Brien 反馈 "收藏内容多了, 让用户搜搜" → 加搜索框 (跨 3 个子 Tab 共享)
+          // 7/20 16:48 Brien 反馈 "收藏内容多了, 让用户搜搜" → 加搜索框 (跨 2 个子 Tab 共享)
           _buildSearchBar(scale, isEn),
           // 7/30: 顶部汇总栏已移到 _buildFollowingTab 内部 pinned SliverPersistentHeader (统一风格)
           Expanded(
             child: TabBarView(
               controller: _tabController,
               children: [
-                // Tab 1: 内容收藏
-                _buildSavedTab(scale, isEn, contentOnly: true),
-                // Tab 2: 名言收藏
-                _buildSavedTab(scale, isEn, quotesOnly: true),
-                // Tab 3: 关注管理 (跳转)
+                // Tab 1: 阅读 (合并 内容/名言/我的收藏, 沿 P59-1)
+                _buildReadingTab(scale, isEn),
+                // Tab 2: 关注 (P56-2 类目 chip 跳主场景已实)
                 _buildFollowingTab(scale, isEn),
-                // Tab 4: 我的收藏 (P53-4 BookmarksScreen 接入)
-                _buildBookmarksTab(scale, isEn),
               ],
             ),
           ),
@@ -254,7 +251,113 @@ class _MySubscriptionsScreenState extends State<MySubscriptionsScreen>
   );
   }
 
-  // 8/28 P56-3: 我的收藏 Tab (走 BookmarkService, 沿 P53-4)
+  // 8/28 P59-1: 阅读 tab (合并 内容/名言/我的收藏)
+  //   沿 SOUL #103 治好不抢注意力: 不细分 (用户都希望"我读过什么")
+  //   数据源: LocalSubscriptionService (手动 + P57-2 自动) + BookmarkService (P57-4 demo)
+  //   注: LocalSubscriptionService 是 ChangeNotifier (有 listener), BookmarkService 是手动 listener
+  //     本期不加混 listener (避免过度耦合), 直接用 FutureBuilder 触发重 build
+  Widget _buildReadingTab(double scale, bool isEn) {
+    return ListenableBuilder(
+      listenable: _subService,
+      builder: (context, _) {
+        return FutureBuilder<List<ContentItem>>(
+          future: _loadReadingItems(),
+          builder: (context, snapshot) {
+            if (!snapshot.hasData) {
+              return ListView.builder(
+                padding: const EdgeInsets.all(16),
+                itemCount: 4,
+                itemBuilder: (_, __) => const Padding(
+                  padding: EdgeInsets.only(bottom: 10),
+                  child: ListItemSkeleton(),
+                ),
+              );
+            }
+            final items = snapshot.data!;
+            final filtered = items.where((it) {
+              // 8/28 P59-1: 按 _searchQuery 搜 title + description + source
+              if (_searchQuery.isEmpty) return true;
+              final q = _searchQuery;
+              return it.title.toLowerCase().contains(q) ||
+                  it.description.toLowerCase().contains(q) ||
+                  it.source.toLowerCase().contains(q);
+            }).toList();
+            if (filtered.isEmpty) {
+              if (_searchQuery.isNotEmpty) {
+                return _buildNoSearchResult(scale, isEn);
+              }
+              return _buildEmptyReading(scale, isEn);
+            }
+            // 8/28 P59-1: 按 lastReadAt 倒序, 最新置顶 (跟 quotesOnly 一致)
+            final sorted = List<ContentItem>.from(filtered)
+              ..sort((a, b) => (b.lastReadAt ?? DateTime.now())
+                  .compareTo(a.lastReadAt ?? DateTime.now()));
+            return _buildContentView(sorted, scale, isEn);
+          },
+        );
+      },
+    );
+  }
+
+  /// 8/28 P59-1: 阅读 tab 数据源 (合并 LocalSubscription ∪ BookmarkService)
+  Future<List<ContentItem>> _loadReadingItems() async {
+    final subItems = await _subService.getSubscribedItems();
+    final bookmarks = await BookmarkService.instance.getAll();
+    // 8/28 P59-1: 合并去重 (按 id), BookmarkService 内容先 (P57-4 demo 在前)
+    final seen = <String>{};
+    final merged = <ContentItem>[];
+    for (final b in bookmarks) {
+      if (seen.add(b.id)) {
+        merged.add(ContentItem(
+          id: b.id,
+          title: b.title,
+          description: b.description,
+          duration: '5min',
+          source: b.source,
+          sourceType: ContentSource.rss,
+          contentType: ContentType.article,
+          externalUrl: b.url,
+        ));
+      }
+    }
+    for (final s in subItems) {
+      if (seen.add(s.id)) {
+        merged.add(s);
+      }
+    }
+    return merged;
+  }
+
+  /// 8/28 P59-1: 阅读 tab 空状态 (比 _buildEmpty 更友好, 提示是合并视图)
+  Widget _buildEmptyReading(double scale, bool isEn) {
+    return Center(
+      child: Padding(
+        padding: const EdgeInsets.all(32),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Icon(Icons.menu_book, size: 80, color: Colors.grey[300]),
+            const SizedBox(height: 16),
+            Text(
+              isEn ? 'No reading yet' : '还没有阅读记录',
+              style: const TextStyle(fontSize: 18, fontWeight: FontWeight.w500, color: Colors.grey),
+            ),
+            const SizedBox(height: 8),
+            Text(
+              isEn
+                  ? 'Read articles or tap the bookmark to save items here.'
+                  : '阅读文章或点收藏按钮, 内容会自动出现在这里。',
+              textAlign: TextAlign.center,
+              style: TextStyle(fontSize: 13, color: Colors.grey[500]),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  // 8/28 P59-1: 删除 P56-3 _buildBookmarksTab (阅读 tab 合并后不需要单独 tab)
+  // ignore: unused_element
   Widget _buildBookmarksTab(double scale, bool isEn) {
     return BookmarksListView(
       isEn: isEn,
@@ -341,9 +444,8 @@ class _MySubscriptionsScreenState extends State<MySubscriptionsScreen>
   // 7/30: 顶部汇总已升级为 _followingHeroCard (紫色 hero), 在 _buildFollowingTab 内 pinned 展示
   // (旧 _buildStickySummary / _buildSummaryBar 轻量浅紫条已删, 统一 hero 风格)
 
-  // 6/25 A: 收藏 Tab (内容 / 名言)
-  // 7/15: quotesOnly 走 _buildQuotesView (顶部大字 quote + time-grouped 列表)
-  // 7/20 16:48: _searchQuery 跨 3 个子 Tab 共享, 内容/名言子 Tab 过滤
+  // 8/28 P59-1: 删除 P59-1 _buildSavedTab (内容/名言已合并到阅读 tab, 旧版保留供 rollback)
+  // ignore: unused_element
   Widget _buildSavedTab(double scale, bool isEn, {bool contentOnly = false, bool quotesOnly = false}) {
     // 6/29 14:59 Brien 反馈: 收藏后 Tab 2 看不到新条目 — _items state 不重 load, 显示旧数据
     // 修: ListenableBuilder 每次 rebuild 都在 FutureBuilder 里重拉 service, 不依赖 _items

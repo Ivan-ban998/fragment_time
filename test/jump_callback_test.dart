@@ -142,8 +142,8 @@ void main() {
     print('✓ fallback onSceneJump OK');
   });
 
-  testWidgets('P58: MySubscriptionsScreen mount 不崩 (含 4 tabs)', (tester) async {
-    // 8/28 P58-4: widget mount 稳定 (沿 P56-3 4th tab + P57 自动)
+  testWidgets('P58: MySubscriptionsScreen mount 不崩 (含 2 tabs)', (tester) async {
+    // 8/28 P59-1: 4 tabs → 2 tabs (合并内容/名言/我的收藏 → 阅读)
     await tester.pumpWidget(MaterialApp(
       home: MySubscriptionsScreen(
         isEn: false,
@@ -153,13 +153,12 @@ void main() {
     ));
     await tester.pumpAndSettle();
 
-    // 8/28 P58-4: 4 tabs 应该都显示 (至少各 1 个)
+    // 8/28 P59-1: 2 tabs 应该都显示 (阅读 + 关注, 沿你截图描述"重复的改成阅读历史")
     expect(find.byType(MySubscriptionsScreen), findsOneWidget);
-    expect(find.text('内容'), findsWidgets);
-    expect(find.text('名言'), findsWidgets);
-    expect(find.text('关注'), findsWidgets);
-    expect(find.text('我的收藏'), findsWidgets,
-        reason: 'P56-3 4th tab 应显示');
-    print('✓ MySubscriptionsScreen 4 tabs mount OK');
+    expect(find.text('阅读'), findsWidgets,
+        reason: 'P59-1 阅读 tab 应显示 (合并 内容/名言/我的收藏)');
+    expect(find.text('关注'), findsWidgets,
+        reason: 'P59-1 关注 tab 应保留 (平台/类目订阅)');
+    print('✓ MySubscriptionsScreen 2 tabs mount OK (P59-1 合并后)');
   });
 }

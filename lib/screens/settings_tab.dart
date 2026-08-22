@@ -1,6 +1,8 @@
 import 'package:flutter/material.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'dart:convert';
+// 8/28 P59-2: 删除 history_screen import (设置里"阅读历史"入口已删, tab 唯一入口)
+// import 'history_screen.dart';
 import '../models/models.dart';
 import '../theme/app_theme.dart';
 import '../services/motivation_service.dart';
@@ -10,7 +12,8 @@ import '../services/theme_preference_service.dart';
 import '../services/weekly_recap_service.dart';
 import '../services/pack_io_helpers.dart';
 import '../services/daily_prefs_service.dart';
-import 'history_screen.dart';
+// 8/28 P59-2: 删除 history_screen import (设置里"阅读历史"入口已删, tab 唯一入口)
+// import 'history_screen.dart';
 import 'analytics_dashboard_screen.dart';
 import 'study_group_screen.dart';
 import 'scene_pack_screen.dart';
@@ -447,25 +450,32 @@ class SettingsTab extends StatelessWidget {
                 onTap: () => AboutScreen.showFeedbackDialog(context, languageCode),
               ),
             ),
+            // 8/28 P59-2 沿 SOUL #137 真凶链 + 用户"重复的改成阅读历史"指示:
+//   真凶: 设置里"阅读历史"独立入口 (HistoryScreen), 但 tab-收藏 已有阅读 tab
+//     → 重复 (用户两个地方都能看阅读记录)
+//   修: 删除设置里的"阅读历史"入口 (tab-收藏 阅读 tab 唯一入口)
+//     保留 HistoryScreen 类代码 (沿 SOUL #6 不删, 避免回归)
             // 7/1: 最近反馈列表 (复用 _OctopusFeedbackList, 让用户看到自己刚发的话)
             _OctopusFeedbackList(scale: scale, isEn: isEn),
-            Card(
-              child: ListTile(
-                leading: Icon(Icons.history, size: 24 * scale, color: AppTheme.primary),
-                title: Text(isEn ? 'Reading History' : '阅读历史', style: TextStyle(fontSize: 16 * scale)),
-                subtitle: Text(
-                  isEn ? 'Articles and videos you opened' : '你读过的内容和看过的视频',
-                  style: TextStyle(fontSize: 13 * scale),
-                ),
-                trailing: Icon(Icons.chevron_right, size: 24 * scale, color: AppTheme.textLight),
-                onTap: () {
-                  Navigator.push(
-                    context,
-                    MaterialPageRoute(builder: (_) => const HistoryScreen()),
-                  );
-                },
-              ),
-            ),
+            // 8/28 P59-2: 设置里的阅读历史入口已删除 (沿真凶链 + 用户指示, 跟 tab 重复)
+            //   旧版代码保留供 rollback:
+            //   Card(
+            //     child: ListTile(
+            //       leading: Icon(Icons.history, size: 24 * scale, color: AppTheme.primary),
+            //       title: Text(isEn ? 'Reading History' : '阅读历史', style: TextStyle(fontSize: 16 * scale)),
+            //       subtitle: Text(
+            //         isEn ? 'Articles and videos you opened' : '你读过的内容和看过的视频',
+            //         style: TextStyle(fontSize: 13 * scale),
+            //       ),
+            //       trailing: Icon(Icons.chevron_right, size: 24 * scale, color: AppTheme.textLight),
+            //       onTap: () {
+            //         Navigator.push(
+            //           context,
+            //           MaterialPageRoute(builder: (_) => const HistoryScreen()),
+            //         );
+            //       },
+            //     ),
+            //   ),
             // 7/14: About FragmentTime 入口 (推到 AboutScreen 实例 + 让 build() 不被 tree-shake)
             Card(
               child: ListTile(
