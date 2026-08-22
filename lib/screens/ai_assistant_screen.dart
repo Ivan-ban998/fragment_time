@@ -13,6 +13,8 @@ import '../services/robot_name_service.dart';
 import '../services/history_service.dart';
 import '../models/models.dart';
 import 'content_reader_screen.dart';
+// 8/28 P64: 有效推荐屏 (沿 SOUL #137 治本用户"还得自己去搜"反馈)
+import 'recommendation_screen.dart';
 import 'package:url_launcher/url_launcher.dart';
 
 /// 6/29 v2: AI 助手聊天 sheet (静态版, 不接 LLM)
@@ -1283,6 +1285,9 @@ Rules:
                       itemBuilder: (ctx, i) => _MessageBubble(
                         message: _messages[i],
                         isElderlyMode: widget.isElderlyMode,
+                        // 8/28 P64: 透传所有 messages + isEn 给"查看更多"按钮用
+                        allMessages: _messages,
+                        isEn: widget.isEn,
                       ),
                     ),
             ),
@@ -1534,8 +1539,17 @@ class _ContentCard {
 class _MessageBubble extends StatelessWidget {
   final _ChatMessage message;
   final bool isElderlyMode;
+  // 8/28 P64: 透传所有 messages (查最后一个 user input 当 keyword)
+  final List<_ChatMessage> allMessages;
+  // 8/28 P64: 透传 isEn (沿 SOUL #169 不撒谎 + 治好不抢注意力)
+  final bool isEn;
 
-  const _MessageBubble({required this.message, required this.isElderlyMode});
+  const _MessageBubble({
+    required this.message,
+    required this.isElderlyMode,
+    required this.allMessages,
+    required this.isEn,
+  });
 
   @override
   Widget build(BuildContext context) {
@@ -1543,6 +1557,10 @@ class _MessageBubble extends StatelessWidget {
     final isUser = message.isUser;
     // 6/29 段 5: 有 cards 走列卡渲染
     if (message.cards != null && message.cards!.isNotEmpty) {
+      // 8/28 P64 沿 SOUL #137 + 用户"还得自己去搜"治本:
+      //   真凶: 之前 card onTap 跳平台搜索页, 用户还得自己搜
+      //   修: 加"查看更多有效推荐"按钮 → RecommendationScreen 显示 App 内拉的真推荐
+      //   按钮带 keyword (从最后一个 user message 提取), source 类型根据 cards[0].type 决定
       return Align(
         alignment: Alignment.centerLeft,
         child: Container(
@@ -1566,6 +1584,53 @@ class _MessageBubble extends StatelessWidget {
                   ),
                 ),
               ...message.cards!.map((c) => _CardTile(card: c, scale: scale)),
+              // 8/28 P64: "查看更多" 按钮 (沿 SOUL #103 治好不抢注意力)
+              Builder(builder: (ctx) {
+                // 提取用户上一个 input 作为 keyword (沿 SOUL #169 不撒谎)
+                String keyword = '';
+                for (final m in allMessages.reversed) {
+                  if (m.isUser && m.text.isNotEmpty) {
+                    keyword = m.text;
+                    break;
+                  }
+                }
+                if (keyword.isEmpty) return const SizedBox.shrink();
+                final cardType = message.cards!.first.type;
+                return Padding(
+                  padding: EdgeInsets.only(top: 6 * scale, left: 4),
+                  child: TextButton.icon(
+                    style: TextButton.styleFrom(
+                      padding: EdgeInsets.symmetric(horizontal: 12 * scale, vertical: 6 * scale),
+                      backgroundColor: AppTheme.primary.withValues(alpha: 0.08),
+                      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
+                    ),
+                    icon: Icon(Icons.playlist_add, size: 16 * scale, color: AppTheme.primary),
+                    label: Text(
+                      isEn ? 'View more recommendations' : '查看更多有效推荐',
+                      style: TextStyle(fontSize: 12 * scale, color: AppTheme.primary),
+                    ),
+                    onPressed: () {
+                      // 8/28 P64: 跳 RecommendationScreen (App 内拉真推荐列表)
+                      // 源根据 contentType 决定: audio → apple_podcasts, 其他 → rss
+                      final recSource = cardType == 'audio'
+                          ? RecommendationSource.applePodcasts
+                          : RecommendationSource.rssTop;
+                      Navigator.push(
+                        ctx,
+                        MaterialPageRoute(
+                          builder: (_) => RecommendationScreen(
+                            title: keyword,
+                            contentType: cardType,
+                            searchKeyword: keyword,
+                            source: recSource,
+                            isEn: isEn,
+                          ),
+                        ),
+                      );
+                    },
+                  ),
+                );
+              }),
             ],
           ),
         ),
@@ -1636,14 +1701,17 @@ class _CardTile extends StatelessWidget {
           ),
         ],
       ),
-      child: Material(
+      // 8/28 P64 沿 SOUL #137 + 用户"还得自己去搜"治本:
+//   真凶: 之前 audio card onTap → launchUrl(externalUrl) 跳平台搜索页
+//     → 用户还得自己搜 (P63 换平台只换了 URL, 没解决问题)
+//   修: 改 audio card onTap → 直接 push RecommendationScreen
+//     显示 App 内拉的真推荐列表 (image + title + author + 真 episode URL)
+child: Material(
         color: Colors.transparent,
         child: InkWell(
           borderRadius: BorderRadius.circular(12),
           onTap: () {
-            // 6/29 段 6: 优先用 NewsService.search 找的真 ContentItem
-            // 6/29 12:30 Brien 反馈: 兑底 mock 给出 AI 编的 URL (蜻蜓 FM 错的 URL), 错位内容
-            // 修: 找不到真内容 → SnackBar 提示, 不跳 reader 避免 AI 编 URL 进去
+            // 8/28 P64: 优先用 NewsService.search 找的真 ContentItem
             if (card.realItem == null) {
               ScaffoldMessenger.of(context).showSnackBar(
                 SnackBar(
@@ -1656,7 +1724,28 @@ class _CardTile extends StatelessWidget {
               return;
             }
             final item = card.realItem!;
-            // 6/29 15:55: audio 三层 fallback — audioUrl 真播 → TTS 读 → externalUrl 跳原文
+            // 8/28 P64: audio 路径改 - 不再 launchUrl(externalUrl), 改用 App 内推荐屏
+            //   沿 SOUL #169 不撒谎: 跳平台搜索页 = 让用户自己搜 = 没解决问题
+            //   修: 跳 RecommendationScreen, 用户看到 App 内拉的真推荐 (image + title + URL)
+            if (card.type == 'audio') {
+              // 8/28 P64: audio card → RecommendationScreen (沿 _MessageBubble 同样的 keyword 提取)
+              String keyword = '';
+              // 从 title 拆第一段 (e.g. "BBC 6 Minute English" → "BBC 6 Minute English")
+              keyword = item.title.isNotEmpty ? item.title : card.title;
+              Navigator.of(context).push(
+                MaterialPageRoute(
+                  builder: (_) => RecommendationScreen(
+                    title: card.title,
+                    contentType: 'audio',
+                    searchKeyword: keyword,
+                    source: RecommendationSource.applePodcasts,
+                    isEn: false, // 沿 SOUL #188: 暂不支持, 默认中文
+                  ),
+                ),
+              );
+              return;
+            }
+            // 6/29 段 6: 保留 audioUrl 优先播 (老路径)
             if (card.type == 'audio' && (card.audioUrl?.isNotEmpty ?? false)) {
               AudioPlayService().play(item);
               ScaffoldMessenger.of(context).showSnackBar(
