@@ -412,35 +412,20 @@ class _AiAssistantScreenState extends State<AiAssistantScreen> {
         });
       }
     });
-    final libTitles = widget.isEn
-        ? const [
-            'BBC 6 Minute English',
-            'New Concept English 5 min',
-            'Today Headlines 5 min',
-            'Harvard Business Review 5 min',
-            'Office Meditation 5 min',
-            'Commute Podcast 5 min',
-            'Business Headlines 5 min',
-            'Bedtime English Stories 5 min',
-            '3-Minute Science 5 min',
-            'School Poems Recitation 5 min',
-            'OKR vs KPI 5 min',
-            'Deep Work 5 min',
-          ]
-        : const [
-            'BBC 6 Minute English',
-            '新概念英语：5 分钟一段',
-            '哈佛商业评论：5 分钟',
-            '得到头条：5 分钟',
-            '樊登读书：5 分钟',
-            '5 分钟办公室冥想',
-            '课间 5 分钟：白噪音 + 闭眼',
-            '通勤路上：白噪音 + 闭眼',
-            '今日科普：3 个奇闻',
-            '睡前英语故事：5 分钟',
-            '一级市场：5 分钟看融资',
-            '商业要闻 5 分钟',
-          ];
+    // 8/28 P50-2 治本 (沿 SOUL #137 真凶): libTitles 硬编码 → NewsService.getRecommendations 真数据
+    //   真凶: 之前 12 个 hardcoded titles, 用户想 "BBC 英语" AI 输出 "BBC 6 Minute English"
+    //     但本地库没这个 title → newsService.search 0 hits → 显示 "库里没有"
+    //   修: 先拉真实 24 桶 titles 进 prompt, LLM 推荐结果 100% 在库里
+    final userType = widget.userType ?? UserType.student;
+    final scene = widget.scene ?? Scene.learn;
+    final libItems = await NewsService().getRecommendations(userType, scene);
+    // 8/28 P50-2 改: dedup + 限 20 条避免 prompt 超长
+    final seen = <String>{};
+    final libTitles = libItems
+        .where((it) => it.title.isNotEmpty && seen.add(it.title))
+        .take(20)
+        .map((it) => '${it.title} (${it.source})')
+        .toList();
     final userTypeTag = widget.isEn
         ? (widget.userType?.name ?? 'student')
         : (widget.userType?.title ?? '学生');
