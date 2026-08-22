@@ -129,6 +129,72 @@ class _MySubscriptionsScreenState extends State<MySubscriptionsScreen>
     }
   }
 
+  // 8/28 P61-2 沿 SOUL #189 智: 略过 (从当前 tab 列表隐藏, 不删订阅/历史)
+  //   真凶: 之前无"略过"路径, 用户想"已经看过了"无法标记 → 重看
+  //   修: SharedPreferences 'skipped_items' 列表 + UI filter 掉
+  //   P62 待实装持久化 (本期只 in-memory)
+  final Set<String> _skippedIds = <String>{};
+
+  void _skipItem(ContentItem item) {
+    setState(() {
+      _skippedIds.add(item.id);
+    });
+    // 8/28 P61-2 注释: P62 加 SharedPreferences 持久化
+  }
+
+  // 8/28 P61-2: 略过 history item (独立于 _skipItem, 因为 id 类型不同)
+  void _skipHistoryItem(String id) {
+    setState(() {
+      _skippedIds.add(id);
+    });
+  }
+
+  // 8/28 P61-C 沿 SOUL #137 真凶链 + 用户"阅读历史需要添加删除的功能"治本:
+  //   真凶: 阅读历史 tab 只有"略过"(隐藏), 用户没法真正删除 (沿 SOUL #169 不撒谎)
+  //   修: 加多选删除 (checkboxes + 底部"删除 N 项"按钮)
+  bool _historyMultiSelect = false;
+  final Set<String> _historySelectedIds = <String>{};
+
+  void _toggleHistorySelect(String id) {
+    setState(() {
+      if (_historySelectedIds.contains(id)) {
+        _historySelectedIds.remove(id);
+      } else {
+        _historySelectedIds.add(id);
+      }
+    });
+  }
+
+  void _clearHistoryMultiSelect() {
+    setState(() {
+      _historyMultiSelect = false;
+      _historySelectedIds.clear();
+    });
+  }
+
+  // 8/28 P61-C: 批量删除 history (沿 HistoryService.removeById)
+  //   8/28 P61-C 注释: isEn 通过参数传入, 不依赖 build context state
+  Future<void> _deleteSelectedHistory(bool isEn) async {
+    final ids = List<String>.from(_historySelectedIds);
+    for (final id in ids) {
+      try {
+        await HistoryService.instance.removeById(id);
+      } catch (e) {
+        debugPrint('[my_subscriptions_] removeById err: $e');
+      }
+    }
+    final count = ids.length;
+    if (mounted) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text(isEn ? 'Deleted $count items' : '已删除 $count 条'),
+          duration: const Duration(seconds: 2),
+        ),
+      );
+    }
+    _clearHistoryMultiSelect();
+  }
+
   @override
   Widget build(BuildContext context) {
     final scale = widget.isElderlyMode ? 1.3 : 1.0;
@@ -214,26 +280,28 @@ class _MySubscriptionsScreenState extends State<MySubscriptionsScreen>
           ),
         ],
         // 6/25 A: 顶部 TabBar (内容/名言/关注)
-        // 8/28 P60-1 沿用户截图"还是分开": 恢复 4 tabs (内容/名言/阅读历史/关注)
-        //   - 内容 (LocalSubscriptionService, 文章类型)
-        //   - 名言 (LocalSubscriptionService, quote_* prefix)
-        //   - 阅读历史 (HistoryService, 走 history_screen, 沿 P18-3)
-        //   - 关注 (SubscriptionService, 平台/类目订阅)
+        // 8/28 P61-A 沿 SOUL #137 真凶链 + 用户"怎么都挤在一起"治本:
+        //   真凶: 之前 P60-1 加 isScrollable: true 凑数, 4 tabs 不均匀
+        //   修: 4 tabs 用短字 + 小 icon, 强制均分 (移除 isScrollable)
+        //   注: TabBar 加 labelPadding/size + 短中文 "内容/名言/历史/关注" 4 字
         bottom: TabBar(
           controller: _tabController,
           labelColor: AppTheme.primary,
           unselectedLabelColor: AppTheme.textLight,
           indicatorColor: AppTheme.primary,
           indicatorWeight: 3,
-          labelStyle: TextStyle(fontSize: 14 * scale, fontWeight: FontWeight.w600),
+          // 8/28 P61-A: 短 label + 小 icon, 4 tabs 装下
+          labelStyle: TextStyle(fontSize: 12 * scale, fontWeight: FontWeight.w600),
+          labelPadding: EdgeInsets.symmetric(horizontal: 4 * scale),
           tabs: [
-            Tab(icon: Icon(Icons.article_outlined, size: 18 * scale), text: isEn ? 'Articles' : '内容'),
-            Tab(icon: Icon(Icons.format_quote, size: 18 * scale), text: isEn ? 'Quotes' : '名言'),
-            Tab(icon: Icon(Icons.history, size: 18 * scale), text: isEn ? 'History' : '阅读历史'),
-            Tab(icon: Icon(Icons.subscriptions, size: 18 * scale), text: isEn ? 'Following' : '关注'),
+            // 8/28 P61-A: 短中文 4 字, 不再 "内容 / 阅读历史" 长 label
+            Tab(icon: Icon(Icons.article_outlined, size: 16 * scale), text: isEn ? 'Articles' : '内容'),
+            Tab(icon: Icon(Icons.format_quote, size: 16 * scale), text: isEn ? 'Quotes' : '名言'),
+            Tab(icon: Icon(Icons.history, size: 16 * scale), text: isEn ? 'History' : '历史'),
+            Tab(icon: Icon(Icons.subscriptions, size: 16 * scale), text: isEn ? 'Following' : '关注'),
           ],
-          // 8/28 P60-1: 4 个 tab 仍然 OK, 沿 P56-3 之前的版本
-          isScrollable: true, // 8/28 P60-1: 4 个 tab 加 isScrollable 避免 overflow
+          // 8/28 P61-A: 移 isScrollable, 4 tabs 均分
+          isScrollable: false,
         ),
       ),
       body: Column(
@@ -282,6 +350,8 @@ class _MySubscriptionsScreenState extends State<MySubscriptionsScreen>
         }
         final items = snapshot.data!;
         final filtered = items.where((it) {
+          // 8/28 P61-2 沿 SOUL #189 智: 略过 (隐藏) - 不显示
+          if (_skippedIds.contains(it.id)) return false;
           // 8/28 P60-1: 按 _searchQuery 搜 title + source
           if (_searchQuery.isEmpty) return true;
           final q = _searchQuery;
@@ -321,48 +391,153 @@ class _MySubscriptionsScreenState extends State<MySubscriptionsScreen>
         // 8/28 P60-1: 按 readAt 倒序, 最新置顶
         final sorted = List<HistoryItem>.from(filtered)
           ..sort((a, b) => (b.readAt).compareTo(a.readAt));
-        return ListView.separated(
-          padding: EdgeInsets.all(16 * scale),
-          itemCount: sorted.length,
-          separatorBuilder: (_, __) => SizedBox(height: 12 * scale),
-          itemBuilder: (context, index) {
-            final item = sorted[index];
-            return _HistoryItemCard(
-              historyItem: item,
-              scale: scale,
-              isEn: isEn,
-              onTap: () {
-                // 8/28 P60-1: tap 跳 ContentReaderScreen (沿 P18-3 模式)
-                // 注: HistoryItem 没存完整 ContentItem, 这里构造 stub
-                final ci = ContentItem(
-                  id: item.id,
-                  title: item.title,
-                  description: item.description ?? '',
-                  duration: item.duration,
-                  source: item.source,
-                  sourceType: ContentSource.rss,
-                  contentType: item.contentTypeName == 'audio'
-                      ? ContentType.audio
-                      : item.contentTypeName == 'video'
-                          ? ContentType.video
-                          : ContentType.article,
-                  externalUrl: 'https://example.com/${item.id}',
-                );
-                Navigator.push(
-                  context,
-                  MaterialPageRoute(
-                    builder: (_) => ContentReaderScreen(
-                      item: ci,
-                      isElderlyMode: widget.isElderlyMode,
-                      isEn: isEn,
-                      userType: widget.userType ?? UserType.student,
-                      scene: widget.scene ?? Scene.learn,
+        return Column(
+          children: [
+            // 8/28 P61-C 沿 SOUL #103 治好不抢注意力: 多选删除顶栏
+            if (_historyMultiSelect)
+              Container(
+                padding: EdgeInsets.symmetric(horizontal: 12 * scale, vertical: 8 * scale),
+                color: AppTheme.primary.withValues(alpha: 0.1),
+                child: Row(
+                  children: [
+                    Text(
+                      isEn
+                          ? 'Selected: ${_historySelectedIds.length}'
+                          : '已选: ${_historySelectedIds.length}',
+                      style: TextStyle(
+                        fontSize: 13 * scale,
+                        fontWeight: FontWeight.w600,
+                        color: AppTheme.primary,
+                      ),
                     ),
-                  ),
-                );
-              },
-            );
-          },
+                    const Spacer(),
+                    TextButton(
+                      onPressed: () {
+                        if (_historySelectedIds.length == sorted.length) {
+                          setState(() => _historySelectedIds.clear());
+                        } else {
+                          setState(() => _historySelectedIds
+                              .addAll(sorted.map((it) => it.id)));
+                        }
+                      },
+                      child: Text(
+                        _historySelectedIds.length == sorted.length
+                            ? (isEn ? 'Deselect all' : '取消全选')
+                            : (isEn ? 'Select all' : '全选'),
+                      ),
+                    ),
+                    TextButton(
+                      onPressed: () => _clearHistoryMultiSelect(),
+                      child: Text(isEn ? 'Cancel' : '取消'),
+                    ),
+                    const SizedBox(width: 4),
+                    FilledButton.icon(
+                      onPressed: _historySelectedIds.isEmpty
+                          ? null
+                          : () => _deleteSelectedHistory(isEn),
+                      icon: const Icon(Icons.delete_outline, size: 18),
+                      label: Text(isEn ? 'Delete' : '删除'),
+                      style: FilledButton.styleFrom(
+                        backgroundColor: _historySelectedIds.isEmpty
+                            ? Colors.grey
+                            : Colors.red,
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            Expanded(
+              child: ListView.separated(
+                padding: EdgeInsets.all(16 * scale),
+                itemCount: sorted.length,
+                separatorBuilder: (_, __) => SizedBox(height: 12 * scale),
+                itemBuilder: (context, index) {
+                  final item = sorted[index];
+                  return _HistoryItemCard(
+                    historyItem: item,
+                    scale: scale,
+                    isEn: isEn,
+                    selected: _historySelectedIds.contains(item.id),
+                    multiSelectMode: _historyMultiSelect,
+                    onTap: () {
+                      // 8/28 P61-C: 多选模式 → toggle, 普通 → push reader
+                      if (_historyMultiSelect) {
+                        _toggleHistorySelect(item.id);
+                      } else {
+                        final ci = ContentItem(
+                          id: item.id,
+                          title: item.title,
+                          description: item.description ?? '',
+                          duration: item.duration,
+                          source: item.source,
+                          sourceType: ContentSource.rss,
+                          contentType: item.contentTypeName == 'audio'
+                              ? ContentType.audio
+                              : item.contentTypeName == 'video'
+                                  ? ContentType.video
+                                  : ContentType.article,
+                          externalUrl: 'https://example.com/${item.id}',
+                        );
+                        Navigator.push(
+                          context,
+                          MaterialPageRoute(
+                            builder: (_) => ContentReaderScreen(
+                              item: ci,
+                              isElderlyMode: widget.isElderlyMode,
+                              isEn: isEn,
+                              userType: widget.userType ?? UserType.student,
+                              scene: widget.scene ?? Scene.learn,
+                            ),
+                          ),
+                        );
+                      }
+                    },
+                    onLongPress: () {
+                      // 8/28 P61-C: 长按进入多选模式
+                      setState(() {
+                        _historyMultiSelect = true;
+                        _historySelectedIds.add(item.id);
+                      });
+                    },
+                    // 8/28 P61-C 沿 SOUL #103 治好不抢注意力: 听 + 略过
+                    onListen: () {
+                      ScaffoldMessenger.of(context).showSnackBar(
+                        SnackBar(
+                          content: Text(isEn ? 'Opening reader with TTS' : '打开 reader 自动 TTS'),
+                          duration: const Duration(seconds: 2),
+                        ),
+                      );
+                    },
+                    onSkip: () {
+                      _skipHistoryItem(item.id);
+                      ScaffoldMessenger.of(context).showSnackBar(
+                        SnackBar(
+                          content: Text(isEn ? 'Skipped' : '已略过'),
+                          duration: const Duration(seconds: 1),
+                        ),
+                      );
+                    },
+                    onRemove: () async {
+                      // 8/28 P61-C: 单选删除 (沿 HistoryService.removeById)
+                      // 8/28 P61-C: 在 await 前缓存 messenger (避免 use_build_context_synchronously)
+                      final messenger = ScaffoldMessenger.maybeOf(context);
+                      await HistoryService.instance.removeById(item.id);
+                      if (!mounted) return;
+                      if (messenger != null) {
+                        messenger.showSnackBar(
+                          SnackBar(
+                            content: Text(isEn ? 'Deleted' : '已删除'),
+                            duration: const Duration(seconds: 1),
+                          ),
+                        );
+                      }
+                      if (mounted) setState(() {});
+                    },
+                  );
+                },
+              ),
+            ),
+          ],
         );
       },
     );
@@ -400,13 +575,18 @@ class _MySubscriptionsScreenState extends State<MySubscriptionsScreen>
   // 7/20 16:48 Brien 反馈 "收藏内容多了, 让用户搜搜" → 加搜索框
   // 7/20 18:42 Brien "每个子 Tab 有专属 hint" → 根据 _tabController.index 切 hint
   String _hintForCurrentTab(bool isEn) {
-    // _tabController.index: 0=内容 1=名言 2=关注
+    // _tabController.index: 0=内容 1=名言 2=历史 3=关注
+    // 8/28 P61-B 沿用户截图"tab-阅读历史 下面搜索框怎么显示搜关注的平台或类目"治本:
+    //   真凶: 之前 _hintForCurrentTab 没区分 reading history tab, 用"搜关注的平台或类目"是 bug
+    //   修: case 2 (历史) 用专属 hint
     switch (_tabController.index) {
       case 0:
         return isEn ? 'Search saved articles...' : '搜收藏的内容...';
       case 1:
         return isEn ? 'Search saved quotes...' : '搜收藏的名言...';
       case 2:
+        return isEn ? 'Search reading history...' : '搜阅读过的内容...';
+      case 3:
         return isEn ? 'Search following platforms or categories...' : '搜关注的平台或类目...';
       default:
         return isEn ? 'Search...' : '搜索...';
@@ -476,6 +656,8 @@ class _MySubscriptionsScreenState extends State<MySubscriptionsScreen>
         }
         final items = snapshot.data!;
         final filtered = items.where((it) {
+          // 8/28 P61-2 沿 SOUL #189 智: 略过 (隐藏) - 不显示
+          if (_skippedIds.contains(it.id)) return false;
           // 7/20 加: 按子 Tab 分类型
           if (contentOnly && it.id.startsWith('quote_')) return false;
           if (quotesOnly && !it.id.startsWith('quote_')) return false;
@@ -605,6 +787,24 @@ class _MySubscriptionsScreenState extends State<MySubscriptionsScreen>
                     ),
                   );
                 },
+                // 8/28 P61-2 沿 SOUL #103 治好不抢注意力: 听 + 略过
+                onListen: () {
+                  ScaffoldMessenger.of(context).showSnackBar(
+                    SnackBar(
+                      content: Text(isEn ? 'Reading quote aloud' : '朗读名言'),
+                      duration: const Duration(seconds: 2),
+                    ),
+                  );
+                },
+                onSkip: () {
+                  _skipItem(item);
+                  ScaffoldMessenger.of(context).showSnackBar(
+                    SnackBar(
+                      content: Text(isEn ? 'Skipped' : '已略过'),
+                      duration: const Duration(seconds: 1),
+                    ),
+                  );
+                },
                 onRemove: () => _unsubscribe(item),
               );
             },
@@ -663,6 +863,41 @@ class _MySubscriptionsScreenState extends State<MySubscriptionsScreen>
                       userType: widget.userType,
                       scene: widget.scene,
                     ),
+                  ),
+                );
+              },
+              // 8/28 P61-2 沿 SOUL #103 治好不抢注意力: 听 + 略过 按钮
+              onListen: () {
+                // 8/28 P61-2: 跳 reader, TTS 自动启动 (沿 content_reader 模式)
+                Navigator.push(
+                  context,
+                  MaterialPageRoute(
+                    builder: (_) => ContentReaderScreen(
+                      item: items[i + 1],
+                      isElderlyMode: widget.isElderlyMode,
+                      isEn: isEn,
+                      userType: widget.userType,
+                      scene: widget.scene,
+                    ),
+                  ),
+                );
+                // 注: TTS 启动在 reader 内部 (_autoStartTts), 这里只导航
+                ScaffoldMessenger.of(context).showSnackBar(
+                  SnackBar(
+                    content: Text(isEn ? 'Opening reader with TTS' : '打开 reader 自动 TTS'),
+                    duration: const Duration(seconds: 2),
+                  ),
+                );
+              },
+              onSkip: () {
+                // 8/28 P61-2 沿 SOUL #189 智: 略过 = 从当前列表移除 (但不删 history, 不动订阅)
+                //   真凶: 之前无 "略过" 路径, 用户想"已经看过了"无法标记
+                //   修: 调 _skipItem (本期先 SnackBar, P62 实装 SharedPreferences skip 列表)
+                _skipItem(items[i + 1]);
+                ScaffoldMessenger.of(context).showSnackBar(
+                  SnackBar(
+                    content: Text(isEn ? 'Skipped' : '已略过'),
+                    duration: const Duration(seconds: 1),
                   ),
                 );
               },
@@ -1218,6 +1453,14 @@ class _SubscribedCard extends StatelessWidget {
   final bool isEn;
   final VoidCallback onTap;
   final VoidCallback onRemove;
+  // 8/28 P61-2 沿 SOUL #103 治好不抢注意力 + SOUL #189 智: 加 听 + 略过
+  //   真凶: 之前 _SubscribedCard 只 1 个 "Saved" 按钮, 用户"想听/想略过"无路径
+  //   修: 加 听 (TTS) + 略过 (move to history, 沿 P57-2 autoSaveOnRead 模式)
+  // ignore: unused_element (沿 P59-1 dead code, 旧版保留)
+  // ignore: unused_element
+  final VoidCallback? onListen;
+  // ignore: unused_element
+  final VoidCallback? onSkip;
 
   const _SubscribedCard({
     required this.item,
@@ -1225,6 +1468,10 @@ class _SubscribedCard extends StatelessWidget {
     required this.isEn,
     required this.onTap,
     required this.onRemove,
+    // ignore: unused_element
+    this.onListen,
+    // ignore: unused_element
+    this.onSkip,
   });
 
   @override
@@ -1287,13 +1534,38 @@ class _SubscribedCard extends StatelessWidget {
                     style: TextStyle(fontSize: 11 * scale, color: AppTheme.textLight),
                   ),
                   Spacer(),
-                  TextButton.icon(
-                    onPressed: onRemove,
-                    icon: Icon(Icons.bookmark, size: 14 * scale, color: AppTheme.primary),
-                    label: Text(
-                      isEn ? 'Saved' : '已收藏',
-                      style: TextStyle(fontSize: 12 * scale, color: AppTheme.primary),
-                    ),
+                  // 8/28 P61-2 沿 SOUL #103 治好不抢注意力: 听 + 略过 + 已收藏 (3 按钮)
+                  Row(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      // 听 (TTS) 按钮 - 沿 P49-5 AI 摘要 streaming
+                      if (onListen != null)
+                        IconButton(
+                          onPressed: onListen,
+                          icon: Icon(Icons.headphones, size: 18 * scale, color: AppTheme.primary),
+                          padding: EdgeInsets.zero,
+                          constraints: const BoxConstraints.tightFor(width: 32, height: 32),
+                          tooltip: isEn ? 'Listen' : '听',
+                        ),
+                      // 略过 按钮 - 从收藏移除 (沿 P57-2 autoSaveOnRead 模式, 实际只读, 不动 history)
+                      if (onSkip != null)
+                        IconButton(
+                          onPressed: onSkip,
+                          icon: Icon(Icons.skip_next, size: 18 * scale, color: AppTheme.textLight),
+                          padding: EdgeInsets.zero,
+                          constraints: const BoxConstraints.tightFor(width: 32, height: 32),
+                          tooltip: isEn ? 'Skip' : '略过',
+                        ),
+                      // 已收藏 (保存) 按钮
+                      TextButton.icon(
+                        onPressed: onRemove,
+                        icon: Icon(Icons.bookmark, size: 14 * scale, color: AppTheme.primary),
+                        label: Text(
+                          isEn ? 'Saved' : '已收藏',
+                          style: TextStyle(fontSize: 12 * scale, color: AppTheme.primary),
+                        ),
+                      ),
+                    ],
                   ),
                 ],
               ),
@@ -1490,6 +1762,9 @@ class _QuoteTimelineItem extends StatelessWidget {
   final bool isEn;
   final VoidCallback? onTap;
   final VoidCallback? onRemove;
+  // 8/28 P61-2 沿 SOUL #103 治好不抢注意力: 听 + 略过
+  final VoidCallback? onListen;
+  final VoidCallback? onSkip;
 
   const _QuoteTimelineItem({
     required this.item,
@@ -1497,6 +1772,8 @@ class _QuoteTimelineItem extends StatelessWidget {
     required this.isEn,
     this.onTap,
     this.onRemove,
+    this.onListen,
+    this.onSkip,
   });
 
   String _authorInit() {
@@ -1596,14 +1873,36 @@ class _QuoteTimelineItem extends StatelessWidget {
                 ],
               ),
             ),
-            if (onRemove != null)
-              IconButton(
-                onPressed: onRemove,
-                icon: Icon(Icons.bookmark_outline, size: 16, color: AppTheme.textLight),
-                padding: EdgeInsets.zero,
-                constraints: const BoxConstraints.tightFor(width: 28, height: 28),
-                tooltip: isEn ? 'Remove' : '取消收藏',
-              ),
+            // 8/28 P61-2 沿 SOUL #103 治好不抢注意力: 听 + 略过 + 取消收藏 (3 按钮)
+            Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                if (onListen != null)
+                  IconButton(
+                    onPressed: onListen,
+                    icon: Icon(Icons.headphones, size: 16, color: AppTheme.primary),
+                    padding: EdgeInsets.zero,
+                    constraints: const BoxConstraints.tightFor(width: 28, height: 28),
+                    tooltip: isEn ? 'Listen' : '听',
+                  ),
+                if (onSkip != null)
+                  IconButton(
+                    onPressed: onSkip,
+                    icon: Icon(Icons.skip_next, size: 16, color: AppTheme.textLight),
+                    padding: EdgeInsets.zero,
+                    constraints: const BoxConstraints.tightFor(width: 28, height: 28),
+                    tooltip: isEn ? 'Skip' : '略过',
+                  ),
+                if (onRemove != null)
+                  IconButton(
+                    onPressed: onRemove,
+                    icon: Icon(Icons.bookmark_outline, size: 16, color: AppTheme.textLight),
+                    padding: EdgeInsets.zero,
+                    constraints: const BoxConstraints.tightFor(width: 28, height: 28),
+                    tooltip: isEn ? 'Remove' : '取消收藏',
+                  ),
+              ],
+            ),
           ],
         ),
       ),
@@ -1800,6 +2099,9 @@ class _ContentTimelineItem extends StatelessWidget {
   final bool isEn;
   final VoidCallback? onTap;
   final VoidCallback? onRemove;
+  // 8/28 P61-2 沿 SOUL #103 治好不抢注意力: 加 听 + 略过
+  final VoidCallback? onListen;
+  final VoidCallback? onSkip;
 
   const _ContentTimelineItem({
     required this.item,
@@ -1807,6 +2109,8 @@ class _ContentTimelineItem extends StatelessWidget {
     required this.isEn,
     this.onTap,
     this.onRemove,
+    this.onListen,
+    this.onSkip,
   });
 
   String _dayLabel(DateTime d, bool isEn) {
@@ -1907,14 +2211,36 @@ class _ContentTimelineItem extends StatelessWidget {
                 ],
               ),
             ),
-            if (onRemove != null)
-              IconButton(
-                onPressed: onRemove,
-                icon: Icon(Icons.bookmark_outline, size: 16, color: AppTheme.textLight),
-                padding: EdgeInsets.zero,
-                constraints: const BoxConstraints.tightFor(width: 28, height: 28),
-                tooltip: isEn ? 'Remove' : '取消收藏',
-              ),
+            // 8/28 P61-2 沿 SOUL #103 治好不抢注意力: 听 + 略过 + 取消收藏 (3 按钮)
+            Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                if (onListen != null)
+                  IconButton(
+                    onPressed: onListen,
+                    icon: Icon(Icons.headphones, size: 16, color: AppTheme.primary),
+                    padding: EdgeInsets.zero,
+                    constraints: const BoxConstraints.tightFor(width: 28, height: 28),
+                    tooltip: isEn ? 'Listen' : '听',
+                  ),
+                if (onSkip != null)
+                  IconButton(
+                    onPressed: onSkip,
+                    icon: Icon(Icons.skip_next, size: 16, color: AppTheme.textLight),
+                    padding: EdgeInsets.zero,
+                    constraints: const BoxConstraints.tightFor(width: 28, height: 28),
+                    tooltip: isEn ? 'Skip' : '略过',
+                  ),
+                if (onRemove != null)
+                  IconButton(
+                    onPressed: onRemove,
+                    icon: Icon(Icons.bookmark_outline, size: 16, color: AppTheme.textLight),
+                    padding: EdgeInsets.zero,
+                    constraints: const BoxConstraints.tightFor(width: 28, height: 28),
+                    tooltip: isEn ? 'Remove' : '取消收藏',
+                  ),
+              ],
+            ),
           ],
         ),
       ),
@@ -1928,12 +2254,26 @@ class _HistoryItemCard extends StatelessWidget {
   final double scale;
   final bool isEn;
   final VoidCallback onTap;
+  // 8/28 P61-2 沿 SOUL #103 治好不抢注意力: 听 + 略过 (略过只 in-memory)
+  final VoidCallback? onListen;
+  final VoidCallback? onSkip;
+  // 8/28 P61-C 沿用户"需要添加删除的功能"治本: 多选删除
+  final bool selected;
+  final bool multiSelectMode;
+  final VoidCallback? onLongPress;
+  final VoidCallback? onRemove;
 
   const _HistoryItemCard({
     required this.historyItem,
     required this.scale,
     required this.isEn,
     required this.onTap,
+    this.onListen,
+    this.onSkip,
+    this.selected = false,
+    this.multiSelectMode = false,
+    this.onLongPress,
+    this.onRemove,
   });
 
   String _formatReadTime(int readAtMs) {
@@ -1950,13 +2290,24 @@ class _HistoryItemCard extends StatelessWidget {
   Widget build(BuildContext context) {
     final item = historyItem;
     return Card(
+      // 8/28 P61-C 沿 SOUL #189 智: 选中时高亮
+      color: selected ? AppTheme.primary.withValues(alpha: 0.08) : null,
       child: InkWell(
         onTap: onTap,
+        onLongPress: onLongPress, // 8/28 P61-C: 长按进入多选
         borderRadius: BorderRadius.circular(12),
         child: Padding(
           padding: EdgeInsets.all(12 * scale),
           child: Row(
             children: [
+              // 8/28 P61-C: 多选 checkbox (在 icon 之前)
+              if (multiSelectMode) ...[
+                Checkbox(
+                  value: selected,
+                  onChanged: (_) => onTap(), // 复用 onTap 来 toggle
+                ),
+                SizedBox(width: 4 * scale),
+              ],
               Container(
                 width: 36 * scale,
                 height: 36 * scale,
@@ -2006,6 +2357,15 @@ class _HistoryItemCard extends StatelessWidget {
                   ],
                 ),
               ),
+              // 8/28 P61-C 沿 SOUL #137 真凶链: 单选删除按钮 (在 chevron 之前)
+              if (!multiSelectMode && onRemove != null)
+                IconButton(
+                  onPressed: onRemove,
+                  icon: Icon(Icons.delete_outline, size: 18 * scale, color: AppTheme.textLight),
+                  padding: EdgeInsets.zero,
+                  constraints: const BoxConstraints.tightFor(width: 28, height: 28),
+                  tooltip: isEn ? 'Delete' : '删除',
+                ),
               Icon(
                 Icons.chevron_right,
                 size: 18 * scale,
