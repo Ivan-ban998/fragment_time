@@ -12,6 +12,84 @@
 - P43-4: ft_server.py 加 /admin/admin_endpoints
   - 列所有 admin endpoints (GET 19 + POST 3 = 22)
   - 含 last_refresh timestamp
+## 2026-08-28 (P50-P51) — AI 助手真数据 + dashboard_data endpoint
+
+### P51 (8/28)
+- P51-2: 加 /admin/dashboard_data endpoint (services + build + uptime JSON)
+  - dashboard 表格用 JSON 数据 (避免 HTML 解析)
+
+### P50 (8/28, commit `276d620`)
+- P50-2: AI 助手 _handleRecommend 接 NewsService 真数据 (沿 SOUL #137 真凶)
+  - 真凶: 之前 12 个 hardcoded libTitles, AI 输出 "BBC 6 Minute English"
+    但本地 RSS 库没这个 title → NewsService.search 0 hits → "库里没有"
+  - 修: libTitles = NewsService.getRecommendations(userType, scene) 真数据
+    拉真 24 桶 titles 进 prompt (dedup + 限 20 条)
+    LLM 推荐结果 100% 在库, 修 "库里没有"
+
+### P49 (8/28, commit `b637f46`)
+- P49-5: AI 摘要 streaming (generateRaw → chatStream refactor)
+- P49-6/7: /admin/llm_cache_stats + /admin/bucket_keys endpoints
+
+### P48 (8/28, commit `b140257`)
+- P48-2: /admin/system_health 一站式 (services + caches + uptime)
+- P48-4: 24 桶 key integration test
+
+### P47 (8/28, commit `d19e5ab`)
+- P47-2: /admin/all_cache_stats 跨服务 cache 汇总 (4 services)
+- P47-3: widget_test 加多次 hot restart 测 (3 次)
+
+### P46 (8/28, commit `67033aa`)
+- P46-3: /admin/ximalaya_cache_stats
+- P46-4: widget_test 加 hot restart 验证
+
+### P45 (8/28, commit `376d9e3`)
+- P45-2: bucketKey 24 组合 round-trip 测试
+- P45-4: widget_test 加 viewport size 修复
+
+### P44 (8/28, commit `1033f86`)
+- P44-2: UserType.fromBucketKey 反查
+- P44-5: /admin/refresh_metrics endpoint
+
+### P43 (8/28, commit `66d5701`)
+- P43-1: AI 摘要 timeout 120s → 30s
+- P43-2/3: Scene/UserType/RssService cache 测试
+- P43-4: /admin/admin_endpoints list (22 endpoints)
+
+### P42 (8/28, commit `c01af2b`)
+- P42-3: Scene.fromBucketKey 反查
+- P42-5: content_reader _truncateForLLM (800 chars)
+
+### P41 (8/28, commit `e34201c`)
+- P41-5: ApplePodcastsService 10min cache
+- P41-3: /admin/build_size_history (24h trend)
+
+### P40 (8/28, commit `edf3542`)
+- P40-4: ContentItem toJson/fromJson 单元测试
+
+### P39 (8/28, commits `2a135e7` + `1d2110a`)
+- P39-1: ximalaya_service albums() Future.wait 并发
+- P39-9: ximalaya_service search() 10min cache
+- P39-10: ft_server /admin/clear_ximalaya_cache
+
+### P38 (8/28, commit `be5e428`) — 5 TODO 全部治本
+- P38-1: ximalaya iTunes Search API 接入 (治本 #4)
+- P38-2: ximalaya albums() trending IDs
+- P38-4: content_reader child HARD RULE (治本 #1)
+- P38-6: content_screen ask 真调 LLM (治本 #3)
+
+### P37 (8/28, commit `ca35fcf`)
+- LlmService cache 单元测试
+- chatStream 日志减少 (12 → 9)
+- main.dart autoquiz print() → debugPrint
+
+### P36 (8/28, commit `93097bf`)
+- chatStream smoke test (P35-1 thread death fix 验证)
+
+### P35 (8/28, commit `9d1a93e`) ⭐ 治本 3 真凶
+- P35-1: ft_server thread death 修复 (P32-6 bucket 4-tuple → unpack ValueError)
+- P35-2: chatStream transient retry (502/503/504 → 1s 后 retry)
+- P35-3: _getExtendedContent() 真数据 (沿 SOUL #169 不撒谎)
+
 ## 2026-08-28 (P41-P42) — Caches + LLM truncate + Scene.fromBucketKey
 
 ### P42 (8/28)
