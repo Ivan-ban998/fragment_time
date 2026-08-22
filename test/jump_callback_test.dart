@@ -156,14 +156,14 @@ void main() {
     // 8/28 P60-1: 4 tabs 应该都显示
     expect(find.byType(MySubscriptionsScreen), findsOneWidget);
     expect(find.text('内容'), findsWidgets,
-        reason: 'P60-1 内容 tab 应显示');
+        reason: 'P61-A 内容 tab 应显示');
     expect(find.text('名言'), findsWidgets,
-        reason: 'P60-1 名言 tab 应显示');
-    expect(find.text('阅读历史'), findsWidgets,
-        reason: 'P60-1 阅读历史 tab 应显示 (走 HistoryService)');
+        reason: 'P61-A 名言 tab 应显示');
+    expect(find.text('历史'), findsWidgets,
+        reason: 'P61-A 历史 tab 应显示 (短 label, 沿 P61-A 4 tabs 均分)');
     expect(find.text('关注'), findsWidgets,
-        reason: 'P60-1 关注 tab 应保留');
-    print('✓ MySubscriptionsScreen 4 tabs mount OK (P60-1 内容/名言/阅读历史/关注)');
+        reason: 'P61-A 关注 tab 应保留');
+    print('✓ MySubscriptionsScreen 4 tabs mount OK (P61-A 内容/名言/历史/关注)');
   });
 }
 // 8/28 P60-2: 加 widget test - 验证 source/category chip 不再调用 setTab(0) (修"任何 chip 都跳首页"真凶)

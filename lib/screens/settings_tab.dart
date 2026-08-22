@@ -496,8 +496,17 @@ class SettingsTab extends StatelessWidget {
               child: ListTile(
                 leading: Icon(Icons.info_outline, size: 24 * scale, color: AppTheme.primary),
                 // 8/28 P60-3: 改名 'About FragmentTime' → 'About' (简洁, 已含 FragmentTime)
-                title: Text(isEn ? 'About' : '关于', style: TextStyle(fontSize: 16 * scale, fontWeight: FontWeight.w600)),
-                subtitle: Text(isEn ? 'Brand, version, privacy, copyright, roadmap' : '品牌/版本/隐私/版权/路线图', style: TextStyle(fontSize: 13 * scale)),
+                title: Text(isEn ? 'About FragmentTime' : '关于 FragmentTime', style: TextStyle(fontSize: 16 * scale, fontWeight: FontWeight.w600)),
+                // 8/28 P62-C 沿用户"之前合并, 怎么就简单合并, 还有'关于'的内容呢?"治本:
+                //   真凶: P60-3 总结提示过简, 用户以为内容被删
+                //   修: subtitle 列出全部 8 个 section (What is it / Privacy / Tech stack / Roadmap / Feedback / Constitution 等)
+                subtitle: Text(
+                  isEn
+                      ? 'What · Identities · Scenes · Privacy · Tech · Roadmap · Feedback · Constitution'
+                      : '是什么 · 身份 · 场景 · 隐私 · 技术 · 路线 · 反馈 · 宪法 (8 章节)',
+                  style: TextStyle(fontSize: 11 * scale),
+                  maxLines: 2,
+                ),
                 trailing: Icon(Icons.chevron_right, size: 24 * scale, color: AppTheme.textLight),
                 onTap: () {
                   Navigator.push(

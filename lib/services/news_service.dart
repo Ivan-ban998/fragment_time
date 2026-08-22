@@ -243,6 +243,23 @@ class NewsService {
     return results;
   }
 
+  // 8/28 P62-A 沿 SOUL #137 真凶链 + 用户"点标签可以进入, 给我推荐内容"治本:
+  //   修: 按 category 过滤 (沿 _allContent 的 key 格式 "userType_scene")
+  //     注意: 24 桶 key 是 userType_scene 格式, 不直接按 category
+  //     这里按 item.title + description 包含 category name 来匹配 (粗略但足够 demo)
+  Future<List<ContentItem>> fetchAllByCategory(String category) async {
+    final results = <ContentItem>[];
+    for (final list in _allContent.values) {
+      for (final item in list) {
+        // 8/28 P62-A: 类目名出现在 title 或 description 中就匹配
+        if (item.title.contains(category) || item.description.contains(category)) {
+          results.add(item);
+        }
+      }
+    }
+    return results;
+  }
+
   // 6 角色 × 4 场景 = 24 种推荐，每个 key 至少 4-6 条
   // 6/7 §10 验：24/24 keys 都非空
   static final Map<String, List<ContentItem>> _allContent = {
@@ -259,7 +276,10 @@ class NewsService {
       ContentItem(id: 'student_listen_1', title: '今日科普：3 个奇闻', description: '5 分钟听完', source: '喜马拉雅', sourceType: ContentSource.ximalaya, contentType: ContentType.audio, duration: '5min', externalUrl: 'https://www.ximalaya.com/search/%E4%BB%8A%E6%97%A5%E7%A7%91%E6%99%AE%EF%BC%9A3%20%E4%B8%AA%E5%A5%87%E9%97%BB', priceType: ContentPriceType.free),
       ContentItem(id: 'student_listen_2', title: '睡前英语故事：5 分钟', description: 'English bedtime story', source: '喜马拉雅', sourceType: ContentSource.ximalaya, contentType: ContentType.audio, duration: '5min', externalUrl: 'https://www.ximalaya.com/search/%E7%9D%A1%E5%89%8D%E8%8B%B1%E8%AF%AD%E6%95%85%E4%BA%8B%EF%BC%9A5%20%E5%88%86%E9%92%9F', priceType: ContentPriceType.free),
       ContentItem(id: 'student_listen_3', title: '中学必背古诗：5 首', description: '早晚磨耳朵', source: '喜马拉雅', sourceType: ContentSource.ximalaya, contentType: ContentType.audio, duration: '5min', externalUrl: 'https://www.ximalaya.com/search/%E4%B8%AD%E5%AD%A6%E5%BF%85%E8%83%8C%E5%8F%A4%E8%AF%97%EF%BC%9A5%20%E9%A6%96', priceType: ContentPriceType.free),
-      ContentItem(id: 'student_listen_4', title: 'BBC 6 Minute English', description: '提升听力', source: '喜马拉雅', sourceType: ContentSource.ximalaya, contentType: ContentType.audio, duration: '6min', externalUrl: 'https://www.ximalaya.com/search/BBC%206%20Minute%20Eng', priceType: ContentPriceType.free),
+      // 8/28 P62-F 沿用户"BBC 链接 404"治本:
+      //   真凶: 之前 ximalaya 搜索 BBC 6 Minute English 没资源 (国内访问限制)
+      //   修: 改 Apple Podcasts 链接 (沿 P41-3 ApplePodcastsService 集成)
+      ContentItem(id: 'student_listen_4', title: 'BBC 6 Minute English', description: '提升听力', source: 'Apple Podcasts', sourceType: ContentSource.applePodcasts, contentType: ContentType.audio, duration: '6min', externalUrl: 'https://podcasts.apple.com/search?term=BBC%206%20Minute%20English', priceType: ContentPriceType.free),
       ContentItem(id: 'student_listen_5', title: '初中物理：声学入门', description: '5 分钟听懂', source: '喜马拉雅', sourceType: ContentSource.ximalaya, contentType: ContentType.audio, duration: '5min', externalUrl: 'https://www.ximalaya.com/search/%E5%88%9D%E4%B8%AD%E7%89%A9%E7%90%86%EF%BC%9A%E5%A3%B0%E5%AD%A6%E5%85%A5%E9%97%A8', priceType: ContentPriceType.free),
       ContentItem(id: 'student_listen_6', title: '新概念英语：5 分钟一段', description: '经典教材', source: '喜马拉雅', sourceType: ContentSource.ximalaya, contentType: ContentType.audio, duration: '5min', externalUrl: 'https://www.ximalaya.com/search/%E6%96%B0%E6%A6%82%E5%BF%B5%E8%8B%B1%E8%AF%AD%EF%BC%9A5%20%E5%88%86%E9%92%9F%E4%B8%80%E6%AE%B5', priceType: ContentPriceType.free),
     ],

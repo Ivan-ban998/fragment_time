@@ -870,9 +870,38 @@ Rules:
         _sending = false; // 6/29 17:05: LLM 完, 释放防双击
         final raw = _messages[aiIdx].text.trim();
         if (raw.isEmpty) {
+          // 8/28 P62-E 沿用户"AI 助手预置问题跳无回复"治本:
+          //   真凶: 之前 LLM 返空 → 显示"(无回复)" → 用户卡住
+          //   修: 沿 SOUL #189 智 + P52-1 fuzzy search, fallback 用用户上一条输入搜新闻库
+          //   找得到 → 显示卡片, 找不到 → 显示"试试这些" + 几个相关热门
+          final userQuery = _messages.lastWhere(
+            (m) => m.isUser,
+            orElse: () => _ChatMessage(text: '', isUser: true),
+          ).text;
+          if (userQuery.isNotEmpty) {
+            final fallbackCards = await _searchFallbackCards(userQuery);
+            if (!mounted) return;
+            if (fallbackCards.isNotEmpty) {
+              setState(() {
+                _messages[aiIdx] = _ChatMessage(
+                  text: widget.isEn
+                      ? 'LLM was unavailable, but here are some related items:'
+                      : 'LLM 暂不可用, 但我找到这些相关的内容:',
+                  isUser: false,
+                  cards: fallbackCards,
+                );
+              });
+              _scheduleSave();
+              return;
+            }
+          }
+          // 兜底: 显示提示 + 几个热门提示
+          if (!mounted) return;
           setState(() {
             _messages[aiIdx] = _ChatMessage(
-              text: widget.isEn ? '(no response)' : '（无回复）',
+              text: widget.isEn
+                  ? '(LLM unavailable. Try a preset chip on top, or ask: "BBC", "冥想", "5 分钟英语".)'
+                  : '（LLM 暂不可用。试试上面的预置问题, 或问 "BBC" / "冥想" / "5 分钟英语"。）',
               isUser: false,
             );
           });
@@ -1012,6 +1041,46 @@ Rules:
         );
       }).toList();
     } catch (e) {
+      return [];
+    }
+  }
+
+  // 8/28 P62-E: LLM 返空时用用户输入 fuzzy search 找 fallback cards
+  //   沿 SOUL #189 智 + P52-1 fuzzy search 模式
+  Future<List<_ContentCard>> _searchFallbackCards(String userQuery) async {
+    try {
+      final newsService = NewsService();
+      // 沿 P52-1: title 拆词, 任一 keyword 命中 → 加 cards
+      final keywords = _splitTitleKeywords(userQuery);
+      // 8/28 P62-E 注释: 先试整 query, 再 fuzzy 拆词
+      List<ContentItem> hits = await newsService.search(userQuery);
+      if (hits.isEmpty) {
+        for (final k in keywords) {
+          if (k.length < 2) continue;
+          final h = await newsService.search(k);
+          if (h.isNotEmpty) {
+            hits = h;
+            break;
+          }
+        }
+      }
+      if (hits.isEmpty) return [];
+      return hits.take(3).map((item) {
+        return _ContentCard(
+          title: item.title,
+          type: item.contentType == ContentType.audio ? 'audio'
+              : item.contentType == ContentType.video ? 'video'
+              : item.contentType == ContentType.short ? 'short'
+              : 'article',
+          source: item.source,
+          duration: item.duration,
+          url: item.externalUrl ?? '',
+          audioUrl: item.audioUrl,
+          realItem: item,
+        );
+      }).toList();
+    } catch (e) {
+      debugPrint('[ai_assistant_] _searchFallbackCards err: $e');
       return [];
     }
   }

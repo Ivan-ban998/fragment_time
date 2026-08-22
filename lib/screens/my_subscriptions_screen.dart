@@ -14,6 +14,8 @@ import '../widgets/skeleton.dart';
 import 'content_reader_screen.dart';
 import 'subscription_screen.dart';
 import 'source_detail_screen.dart';
+// 8/28 P62-A: 类目详情屏 (沿 SourceDetailScreen 模式, 关注 tab 类目 chip 跳转用)
+import 'category_detail_screen.dart';
 import 'bookmarks_screen.dart'; // 8/28 P54-3: 跳 BookmarksScreen
 
 class MySubscriptionsScreen extends StatefulWidget {
@@ -30,6 +32,10 @@ class MySubscriptionsScreen extends StatefulWidget {
   //   真凶: 之前只 onSceneJump (不过滤), 跳过去是默认推荐, 看不到该类目内容
   //   修: 类目 chip 跳主场景 + 过滤该 category
   final void Function(String category)? onCategoryJump;
+  // 8/28 P62-B: "管理" 按钮默认跳管理页 (沿用户新反馈)
+  //   真凶: P58-2 改 onManage 调 onSceneJump, 用户点"管理"被跳到首页
+  //   修: 独立 onManage 回调 (默认 push SubscriptionScreen)
+  final VoidCallback? onManage;
 
   const MySubscriptionsScreen({
     super.key,
@@ -40,6 +46,7 @@ class MySubscriptionsScreen extends StatefulWidget {
     this.onSceneJump,
     this.onSourceJump,
     this.onCategoryJump,
+    this.onManage,
   });
 
   // 6/24 v8: GlobalKey 让详情页订阅后能 reload
@@ -944,13 +951,16 @@ class _MySubscriptionsScreenState extends State<MySubscriptionsScreen>
               categoryCount: categories.length,
               scale: scale,
               isEn: isEn,
-              // 8/28 P58-2 沿 SOUL #137 真凶链: 管理按钮跳主场景 (沿你截图描述)
-              //   真凶: 之前点 heroCard → push SubscriptionScreen (新页面, 用户被困)
-              //   修: 跳主场景 tab (主入口, 用户可继续浏览)
+              // 8/28 P62-B 沿用户新反馈"点击管理, 跳回首页提示"治本:
+              //   真凶: P58-2 让 onManage 调 onSceneJump → main.dart 注入 setTab(0)
+              //     → 用户点"管理"期望跳管理页, 实际跳首页
+              //   修: onManage 直接 push SubscriptionScreen (默认), 让 main.dart 仍可 override
+              // 8/28 P62-B 注释: 沿用户截图"管理跳回首页提示"应该改为跳管理页
               onManage: () {
-                if (widget.onSceneJump != null) {
-                  widget.onSceneJump!();
+                if (widget.onManage != null) {
+                  widget.onManage!();
                 } else {
+                  // 8/28 P62-B: 默认 push 管理页 (沿用户"管理"指示)
                   Navigator.push(
                     context,
                     MaterialPageRoute(builder: (_) => const SubscriptionScreen()),
@@ -993,15 +1003,16 @@ class _MySubscriptionsScreenState extends State<MySubscriptionsScreen>
                                 //   真凶: 之前点关注平台 chip → push SourceDetailScreen 新页面
                                 //     → 用户留在关注 tab, 看不到主页推荐
                                 //   修: 跳主场景 tab + 传 source (主页过滤)
+                                // 8/28 P62-A 沿用户新反馈"点标签可以进入, 给我推荐内容"修:
+                                //   真凶: P60-2 只 SnackBar 留此页, 但用户要 push 详情页看推荐
+                                //   修: 默认 push SourceDetailScreen (widget.userType 沿 userType)
+                                //     main.dart 仍可注入 onSourceJump override (向后兼容)
                                 onTap: () {
-                                  // 8/28 P58-1: 跳主场景 + 过滤此 platform
                                   if (widget.onSourceJump != null) {
-                                    widget.onSourceJump!(s);
-                                  } else {
-                                    // 兜底: 跳主场景 (不过滤)
-                                    if (widget.onSceneJump != null) {
-                                      widget.onSceneJump!();
+                                      widget.onSourceJump!(s);
                                     } else {
+                                      // 8/28 P62-A: 默认 push 详情页 (沿用户"给我推荐内容"指示)
+                                      // 注: SourceDetailScreen 不支持 userType 参数, 走默认
                                       Navigator.push(
                                         context,
                                         MaterialPageRoute(
@@ -1013,7 +1024,6 @@ class _MySubscriptionsScreenState extends State<MySubscriptionsScreen>
                                         ),
                                       );
                                     }
-                                  }
                                 },
                               );
                             },
@@ -1045,21 +1055,24 @@ class _MySubscriptionsScreenState extends State<MySubscriptionsScreen>
                                 // 8/28 P58-2 沿 SOUL #137 真凶链: 跳主场景 + 类目过滤
                                 //   真凶: 之前只 onSceneJump (不过滤), 跳过去是默认推荐
                                 //   修: 类目 chip 跳主场景 + 过滤该 category
+                                // 8/28 P62-A 沿用户新反馈"点标签可以进入, 给我推荐内容"修:
+                                //   真凶: P60-2 只 SnackBar 留此页, 但用户要 push 详情页看推荐
+                                //   修: 默认 push CategoryDetailScreen (P62-A 新建, 沿 SourceDetailScreen 模式)
+                                //     main.dart 仍可注入 onCategoryJump override (向后兼容)
                                 onTap: () {
                                   if (widget.onCategoryJump != null) {
                                     widget.onCategoryJump!(c);
-                                  } else if (widget.onSceneJump != null) {
-                                    widget.onSceneJump!();
                                   } else {
-                                    // 兜底 SnackBar (没注入回调)
-                                    ScaffoldMessenger.of(context).showSnackBar(
-                                      SnackBar(
-                                        content: Text(
-                                          isEn
-                                              ? 'Showing "$c" content'
-                                              : '显示 "$c" 相关内容',
+                                    // 8/28 P62-A: 默认 push CategoryDetailScreen (沿用户"给我推荐内容"指示)
+                                    Navigator.push(
+                                      context,
+                                      MaterialPageRoute(
+                                        builder: (_) => CategoryDetailScreen(
+                                          categoryName: c,
+                                          isElderlyMode: widget.isElderlyMode,
+                                          isEn: widget.isEn,
+                                          userType: widget.userType,
                                         ),
-                                        duration: const Duration(seconds: 2),
                                       ),
                                     );
                                   }

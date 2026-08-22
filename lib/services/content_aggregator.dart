@@ -77,4 +77,16 @@ class ContentAggregator {
       return [];
     }
   }
+
+  // 8/28 P62-A 沿 SOUL #137 真凶链 + 用户"点标签可以进入, 给我推荐内容"治本:
+  //   真凶: 之前关注 tab 类目 chip 点 SnackBar 留此页, 用户看不到该类目内容
+  //   修: 加 fetchByCategory (沿 fetchBySource 模式) → CategoryDetailScreen 显示该类目所有文章
+  Future<List<ContentItem>> fetchByCategory(String category) async {
+    try {
+      return await news.fetchAllByCategory(category);
+    } catch (e) {
+      debugPrint('[aggregator] fetchByCategory error: $e');
+      return [];
+    }
+  }
 }
