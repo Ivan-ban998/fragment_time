@@ -405,6 +405,21 @@ class SubscriptionService {
             priceType: ContentPriceType.free,
           ),
         ];
+
+      // 8/28 P63-A 沿 SOUL #169 不撒谎: 加 netease 来源 (原 ximalaya.com/search 坏链治本)
+      case ContentSource.netease:
+        return [
+          ContentItem(
+            id: 'sub_netease_1',
+            title: '网易云音乐热歌榜',
+            description: '今日热门歌曲推荐',
+            duration: '5min',
+            source: '网易云',
+            sourceType: ContentSource.netease,
+            contentType: ContentType.audio,
+            priceType: ContentPriceType.free,
+          ),
+        ];
     }
   }
 }
