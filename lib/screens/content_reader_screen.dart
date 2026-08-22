@@ -8,6 +8,7 @@ import '../theme/app_theme.dart';
 import '../theme/glass_decoration.dart';
 import '../services/tts_service.dart';
 import '../services/local_subscription_service.dart';
+import '../services/bookmark_service.dart'; // 8/28 P54-2: 双写 BookmarksScreen + LocalSubscription
 import '../services/history_service.dart';
 import '../widgets/iframe_video_view.dart';
 import '../widgets/quiz_panel.dart';
@@ -331,8 +332,17 @@ class _ContentReaderScreenState extends State<ContentReaderScreen> {
   }
 
   Future<void> _toggleSubscribe() async {
+    // 8/28 P54-2 沿 SOUL #137 真凶链: 同时调 LocalSubscriptionService + BookmarkService
+    //   真凶: 之前只 LocalSubscriptionService, BookmarksScreen 显示空
+    //   修: 双写 (主服务负责订阅/进度, BookmarkService 负责"我收藏的"列表)
     if (_isSubscribed) {
       await _subService.unsubscribe(item);
+      // 8/28 P54-2: 同步删 BookmarkService 收藏
+      try {
+        await BookmarkService.instance.remove(item.id);
+      } catch (e) {
+        debugPrint('[content_reader] bookmark remove err: $e');
+      }
       if (mounted) {
         setState(() => _isSubscribed = false);
         _showFloatingSnack(
@@ -342,6 +352,12 @@ class _ContentReaderScreenState extends State<ContentReaderScreen> {
       }
     } else {
       await _subService.subscribe(item);
+      // 8/28 P54-2: 同步加 BookmarkService 收藏
+      try {
+        await BookmarkService.instance.add(item);
+      } catch (e) {
+        debugPrint('[content_reader] bookmark add err: $e');
+      }
       if (mounted) {
         setState(() => _isSubscribed = true);
         _showFloatingSnack(

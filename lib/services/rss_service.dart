@@ -118,6 +118,20 @@ static const String _proxyBase = '/rss';
   // NPR 细分 (国际版英语源, 不同 scene 偏好)
   static const String _nprBooksFeed = 'https://feeds.npr.org/1032/rss.xml';
   static const String _nprArtsFeed = 'https://feeds.npr.org/1008/rss.xml';
+  // 8/28 P54-4 沿 SOUL #188 透明: 加 4 个 RSS 源 (科技深度 + 时政 + 生活)
+  //   真凶: 之前 RSS 源覆盖不均, 用户抱怨"科技类不够深, 时政看不到"
+  //   修: 加 Hacker News (科技深度) + BBC News (时政) + Lifehacker (生活技巧) + Ars Technica (科技长文)
+  /// 8/28 P54-4: Hacker News Frontpage (30 items, 科技深度)
+  static const String _hnFeed = 'https://hnrss.org/frontpage';
+  /// 8/28 P54-4: BBC News (50 items, 时政新闻, 沿 SOUL #15 公开 RSS)
+  static const String _bbcNewsFeed = 'https://feeds.bbci.co.uk/news/rss.xml';
+  /// 8/28 P54-4: Lifehacker (100 items, 生活技巧 - productivity + tech)
+  static const String _lifehackerFeed = 'https://lifehacker.com/rss';
+  /// 8/28 P54-4: Ars Technica (50 items, 科技长文) - 已加 _arsFeed
+  // _arsFeed = 'https://feeds.arstechnica.com/arstechnica/index' 已在上面
+
+  // 8/28 P54-4: 4 类目 new content sources 提示 (dashboard 展示)
+  static const List<String> newSourcesAdded = [_hnFeed, _bbcNewsFeed, _lifehackerFeed];
   static const String _nprLifeFeed = 'https://feeds.npr.org/1039/rss.xml';
   static const String _nprHealthFeed = 'https://feeds.npr.org/1128/rss.xml';
   static const String _nprEducationFeed = 'https://feeds.npr.org/1013/rss.xml';
@@ -295,13 +309,14 @@ static const String _proxyBase = '/rss';
     } else {
       // 8/13 升一阶: 国际版 4 场景偏不同 NPR 源
       // 8/14 三次治本: HN Best 慢 → TechCrunch 替代
+      // 8/28 P54-4 加 Hacker News + BBC News + Lifehacker (科技深度 + 时政 + 生活技巧)
       switch (scene) {
         case Scene.learn:
-          return [_nprBooksFeed, _nprFeed, _vergeFeed, _techCrunchFeed];
+          return [_nprBooksFeed, _nprFeed, _vergeFeed, _techCrunchFeed, _hnFeed, _bbcNewsFeed];
         case Scene.listen:
-          return [_nprMusicFeed, _nprArtsFeed, _nprFeed];
+          return [_nprMusicFeed, _nprArtsFeed, _nprFeed, _lifehackerFeed];
         case Scene.relax:
-          return [_nprLifeFeed, _nprHealthFeed, _nprFeed];
+          return [_nprLifeFeed, _nprHealthFeed, _nprFeed, _lifehackerFeed];
         case Scene.workout:
           return [_nprEducationFeed, _nprPlanetMoneyFeed, _nprFeed];
         default:

@@ -11,6 +11,7 @@ import '../widgets/skeleton.dart';
 import 'content_reader_screen.dart';
 import 'subscription_screen.dart';
 import 'source_detail_screen.dart';
+import 'bookmarks_screen.dart'; // 8/28 P54-3: 跳 BookmarksScreen
 
 class MySubscriptionsScreen extends StatefulWidget {
   final bool isElderlyMode;
@@ -131,6 +132,22 @@ class _MySubscriptionsScreenState extends State<MySubscriptionsScreen>
           style: TextStyle(fontSize: 18 * scale),
         ),
         actions: [
+          // 8/28 P54-3 沿 SOUL #188 透明: 加 "我的收藏" 按钮 (跳 BookmarksScreen)
+          //   真凶: 之前 MySubscriptionsScreen 是"主收藏屏", 但用户分不清
+          //     "我订阅的平台/类目" vs "我收藏的具体文章"
+          //   修: 加 ⭐ 按钮 → BookmarksScreen (单文章收藏, 沿 P53-4)
+          IconButton(
+            icon: const Icon(Icons.star_outline),
+            tooltip: isEn ? 'My Bookmarks' : '我收藏的',
+            onPressed: () {
+              Navigator.push(
+                context,
+                MaterialPageRoute(
+                  builder: (_) => BookmarksScreen(isEn: isEn),
+                ),
+              );
+            },
+          ),
           // 6/25 Brien 反馈: 刷新按钮常驻 (之前 _items.isNotEmpty 才显示, 偶发有数量但内容没来时刷不了)
           IconButton(
             icon: const Icon(Icons.refresh),
