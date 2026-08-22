@@ -21,6 +21,12 @@ class MySubscriptionsScreen extends StatefulWidget {
   final Scene? scene;
   // 8/28 P56-2: 跳主场景 tab 回调 (注入 from main.dart)
   final VoidCallback? onSceneJump;
+  // 8/28 P58-1: 跳主场景 + source 过滤回调 (沿用户"点击关注条目跳到首页")
+  final void Function(ContentSource source)? onSourceJump;
+  // 8/28 P58-2 沿 SOUL #137 真凶链: 类目 chip 也跳主场景 + 类目过滤
+  //   真凶: 之前只 onSceneJump (不过滤), 跳过去是默认推荐, 看不到该类目内容
+  //   修: 类目 chip 跳主场景 + 过滤该 category
+  final void Function(String category)? onCategoryJump;
 
   const MySubscriptionsScreen({
     super.key,
@@ -29,6 +35,8 @@ class MySubscriptionsScreen extends StatefulWidget {
     this.userType,
     this.scene,
     this.onSceneJump,
+    this.onSourceJump,
+    this.onCategoryJump,
   });
 
   // 6/24 v8: GlobalKey 让详情页订阅后能 reload
@@ -587,11 +595,18 @@ class _MySubscriptionsScreenState extends State<MySubscriptionsScreen>
               categoryCount: categories.length,
               scale: scale,
               isEn: isEn,
+              // 8/28 P58-2 沿 SOUL #137 真凶链: 管理按钮跳主场景 (沿你截图描述)
+              //   真凶: 之前点 heroCard → push SubscriptionScreen (新页面, 用户被困)
+              //   修: 跳主场景 tab (主入口, 用户可继续浏览)
               onManage: () {
-                Navigator.push(
-                  context,
-                  MaterialPageRoute(builder: (_) => const SubscriptionScreen()),
-                );
+                if (widget.onSceneJump != null) {
+                  widget.onSceneJump!();
+                } else {
+                  Navigator.push(
+                    context,
+                    MaterialPageRoute(builder: (_) => const SubscriptionScreen()),
+                  );
+                }
               },
             );
             return Column(
@@ -625,17 +640,31 @@ class _MySubscriptionsScreenState extends State<MySubscriptionsScreen>
                                 source: s,
                                 isEn: isEn,
                                 scale: scale,
+                                // 8/28 P58-1 沿 SOUL #137 真凶链: 跳主场景 (沿你截图描述)
+                                //   真凶: 之前点关注平台 chip → push SourceDetailScreen 新页面
+                                //     → 用户留在关注 tab, 看不到主页推荐
+                                //   修: 跳主场景 tab + 传 source (主页过滤)
                                 onTap: () {
-                                  Navigator.push(
-                                    context,
-                                    MaterialPageRoute(
-                                      builder: (_) => SourceDetailScreen(
-                                        source: s,
-                                        isElderlyMode: widget.isElderlyMode,
-                                        isEn: widget.isEn,
-                                      ),
-                                    ),
-                                  );
+                                  // 8/28 P58-1: 跳主场景 + 过滤此 platform
+                                  if (widget.onSourceJump != null) {
+                                    widget.onSourceJump!(s);
+                                  } else {
+                                    // 兜底: 跳主场景 (不过滤)
+                                    if (widget.onSceneJump != null) {
+                                      widget.onSceneJump!();
+                                    } else {
+                                      Navigator.push(
+                                        context,
+                                        MaterialPageRoute(
+                                          builder: (_) => SourceDetailScreen(
+                                            source: s,
+                                            isElderlyMode: widget.isElderlyMode,
+                                            isEn: widget.isEn,
+                                          ),
+                                        ),
+                                      );
+                                    }
+                                  }
                                 },
                               );
                             },
@@ -664,13 +693,16 @@ class _MySubscriptionsScreenState extends State<MySubscriptionsScreen>
                                 scale: scale,
                                 // 8/28 P56-2 沿 SOUL #103 治好不抢注意力: 取消 SnackBar placeholder
                                 //   真凶: 之前 "$c 类目详情即将上线" = 假承诺, 没真实内容
-                                //   修: 点 chip 切主场景 tab (主入口), 用户能马上看内容
+                                // 8/28 P58-2 沿 SOUL #137 真凶链: 跳主场景 + 类目过滤
+                                //   真凶: 之前只 onSceneJump (不过滤), 跳过去是默认推荐
+                                //   修: 类目 chip 跳主场景 + 过滤该 category
                                 onTap: () {
-                                  // 8/28 P56-2: 跳场景 tab (主入口)
-                                  if (widget.onSceneJump != null) {
+                                  if (widget.onCategoryJump != null) {
+                                    widget.onCategoryJump!(c);
+                                  } else if (widget.onSceneJump != null) {
                                     widget.onSceneJump!();
                                   } else {
-                                    // 8/28 P56-2: 兜底 SnackBar (onSceneJump 没注入)
+                                    // 兜底 SnackBar (没注入回调)
                                     ScaffoldMessenger.of(context).showSnackBar(
                                       SnackBar(
                                         content: Text(

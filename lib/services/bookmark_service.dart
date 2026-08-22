@@ -63,6 +63,59 @@ class BookmarkService {
   BookmarkService._();
 
   static const String _key = 'bookmarked_items';
+  // 8/28 P57-4 沿 SOUL #137 真凶链: 默认做 (沿用户指示)
+  //   真凶: 之前首次启动 0 收藏, 用户看到"空" tab → 觉得 app 没价值
+  //   修: 首次启动预填 3 条示范收藏 (让用户立即知道收藏怎么用)
+  //     - 不放真实文章 (沿 SOUL #169 不撒谎)
+  //     - 用 '_demo_' 前缀, 用户清空后不再恢复
+  static const List<Map<String, String>> demoBookmarks = [
+    {
+      'id': '_demo_bookmark_1',
+      'title': '如何高效阅读一本书',
+      'source': '精选',
+      'url': '',
+      'description': '示例收藏, 在文章详情点 ❌ 删除即可',
+    },
+    {
+      'id': '_demo_bookmark_2',
+      'title': 'AI 时代我们需要什么样的学习',
+      'source': '精选',
+      'url': '',
+      'description': '示例收藏, 读完文章自动收藏类似内容',
+    },
+    {
+      'id': '_demo_bookmark_3',
+      'title': '5 分钟学会番茄工作法',
+      'source': '精选',
+      'url': '',
+      'description': '示例收藏, 这是默认入口',
+    },
+  ];
+
+  /// 8/28 P57-4: 首次启动 (没有任何收藏) 时, 加 3 条示范
+  Future<bool> addDemoBookmarksIfFirst() async {
+    final existing = await getAll();
+    if (existing.isNotEmpty) return false;
+    for (final demo in demoBookmarks) {
+      await _saveDemoBookmark(demo);
+    }
+    debugPrint('[BookmarkService] P57-4 addDemoBookmarksIfFirst: 加 3 条示范');
+    return true;
+  }
+
+  Future<void> _saveDemoBookmark(Map<String, String> demo) async {
+    final entry = BookmarkEntry(
+      id: demo['id']!,
+      title: demo['title']!,
+      source: demo['source']!,
+      url: demo['url']!,
+      description: demo['description']!,
+      addedAt: DateTime.now(),
+    );
+    final entries = await getAll();
+    entries.add(entry);
+    await _save(entries);
+  }
 
   // 8/28 P53-2: 内存 cache (避免每次 SharedPreferences read)
   List<BookmarkEntry>? _cache;

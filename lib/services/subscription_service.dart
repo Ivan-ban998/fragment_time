@@ -118,6 +118,43 @@ class SubscriptionService {
     await _saveCategories(current);
   }
 
+  // 8/28 P57-3 沿 SOUL #137 真凶链: autoFollowOnView (默认做)
+  //   真凶: 用户选 userType 后, 订阅的是默认 8 个类目, 但没按 userType 兴趣加额外类目
+  //     → "学生" 看不到 "编程开发" 推荐, 因为没订阅
+  //   修: 选 userType 时, 自动订阅 userType 推荐类目
+  // 6 个 userType 的推荐类目 (沿 SOUL #188 透明, 公开常量)
+  static const Map<String, List<String>> recommendedCategoriesByUserType = {
+    'student': ['编程开发', '英语学习', '科技资讯'],
+    'officeWorker': ['职场技能', '理财知识', '心理成长'],
+    'entrepreneur': ['科技资讯', '职场技能', '编程开发'],
+    'parent': ['亲子教育', '健康养生', '心理成长'],
+    'senior': ['健康养生', '历史故事', '音乐有声'],
+    'child': ['冥想放松', '历史故事', '音乐有声'],
+  };
+
+  /// 8/28 P57-3: 选 userType 时自动订阅推荐类目
+  ///   已订阅的跳过 (避免重复), 未订阅的自动加
+  Future<int> autoFollowOnView(UserType userType) async {
+    final key = userType.name;
+    final recommended = recommendedCategoriesByUserType[key] ?? [];
+    if (recommended.isEmpty) return 0;
+    final current = await getSubscribedCategories();
+    debugPrint('[P57-3 DEBUG] recommended=$recommended current=$current');
+    int count = 0;
+    for (final cat in recommended) {
+      if (!current.contains(cat)) {
+        current.add(cat);
+        count++;
+      }
+    }
+    debugPrint('[P57-3 DEBUG] after_loop current=$current count=$count');
+    if (count > 0) {
+      await _saveCategories(current);
+      debugPrint('[SubscriptionService] P57-3 auto-follow: $userType 加 $count 类目');
+    }
+    return count;
+  }
+
   Future<void> _saveSources(Set<ContentSource> sources) async {
     final prefs = await SharedPreferences.getInstance();
     await prefs.setStringList(

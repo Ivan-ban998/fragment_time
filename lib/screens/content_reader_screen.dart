@@ -283,7 +283,20 @@ class _ContentReaderScreenState extends State<ContentReaderScreen> {
   Timer? _markCompleteTimer;
   Future<void> _markComplete() async {
     try {
+      // 8/28 P57-2 沿 SOUL #137 真凶链: 默认做 (你不用点收藏按钮, 读完自动存)
+      //   真凶: 之前用户读完 → updateProgress(100), 但不写 BookmarkService
+      //     → 用户退出去, 收藏 tab 看不到 (沿 P56-3)
+      //   修: 读完 100% 自动 BookmarkService.add (除非已收藏)
       await LocalSubscriptionService.instance.updateProgress(widget.item, 100);
+      // 8/28 P57-2: 默认收藏 (沿用户 "默认做" 指示)
+      try {
+        if (!await BookmarkService.instance.isBookmarked(widget.item.id)) {
+          await BookmarkService.instance.add(widget.item);
+          debugPrint('[content_reader] P57-2 auto-saved: ${widget.item.id}');
+        }
+      } catch (e) {
+        debugPrint('[content_reader] P57-2 auto-save err: $e');
+      }
       if (!mounted) return;
       setState(() => _showAchievementBanner = true);
       // 6/25 v17: 不 3s 淺出, 常驻底部, 用户手动 X 关

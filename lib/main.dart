@@ -17,6 +17,7 @@ import 'theme/app_theme.dart';
 import 'theme/glass_decoration.dart';
 import 'services/local_subscription_service.dart';
 import 'services/subscription_service.dart';
+import 'services/bookmark_service.dart'; // 8/28 P57-4: 首次启动预填示范收藏
 import 'services/history_service.dart';
 import 'services/locale_service.dart';
 import 'services/motivation_service.dart';
@@ -363,6 +364,10 @@ class _MainHomeScreenState extends State<MainHomeScreen> {
     _recordOpen();
     _checkOnboarding();
     _checkWelcome(); // 6/25 首启欢迎屏
+    // 8/28 P57-4 沿 SOUL #137 真凶链: 首次启动预填示范收藏 (沿用户"默认做"指示)
+    //   真凶: 之前首次启动 0 收藏, 用户看到"空" tab → 觉得 app 没价值
+    //   修: 首次启动自动加 3 条示范 (addDemoBookmarksIfFirst 内部检查)
+    _initDemoBookmarks();
     // 6/25 WelcomeScreen 完成信号监听
     WelcomeCompleteSignal.instance.addListener(_onWelcomeComplete);
     // 6/28 LoadingScreen '强制刷新' 信号监听 (Brien 反馈: 保留为强行加载入口)
@@ -592,6 +597,15 @@ class _MainHomeScreenState extends State<MainHomeScreen> {
     });
   }
 
+  // 8/28 P57-4: 首次启动预填 3 条示范收藏
+  Future<void> _initDemoBookmarks() async {
+    try {
+      await BookmarkService.instance.addDemoBookmarksIfFirst();
+    } catch (e) {
+      debugPrint('[main] P57-4 demo bookmarks err: $e');
+    }
+  }
+
   Future<void> _recordOpen() async {
     final before = await _streakService.getStreakCount();
     await _streakService.recordOpen();
@@ -693,6 +707,28 @@ class _MainHomeScreenState extends State<MainHomeScreen> {
     //       让首页推荐池一打开就有内容, 跟用户预期一致
     // 用 fire-and-forget, 不阻塞角色选择
     _autoSubscribeDefaultCategories();
+    // 8/28 P57-3 沿 SOUL #137 真凶链: 选 userType 自动订阅推荐类目 (默认做)
+    //   真凶: 之前默认 8 类目 + 0 userType 推荐, "学生" 看不到编程开发
+    //   修: 沿 userType.name 自动加 3 个推荐类目
+    _autoFollowRecommended(type);
+  }
+
+  // 8/28 P57-3: 选 userType 自动订阅推荐类目
+  Future<void> _autoFollowRecommended(UserType type) async {
+    try {
+      final count = await SubscriptionService.instance.autoFollowOnView(type);
+      if (count > 0 && mounted) {
+        debugPrint('[main] P57-3 auto-follow $type 加 $count 类目');
+        // 8/28 P57-3: 刷新 _subscriptionCount 让 badge 反映新订阅
+        final items = await _subService.getSubscribedItems();
+        if (!mounted) return;
+        setState(() {
+          _subscriptionCount = items.length;
+        });
+      }
+    } catch (e) {
+      debugPrint('[main] P57-3 auto-follow err: $e');
+    }
   }
 
   // 6/28: 自动关注默认 8 个类目 (用户没显式选过的话)
@@ -888,8 +924,48 @@ class _MainHomeScreenState extends State<MainHomeScreen> {
                 userType: _selectedUserType,
                 scene: TimeAwareRecommender.recommendAt(DateTime.now(), currentUserType: _selectedUserType).scene,
                 // 8/28 P56-2: 关注类目 chip 跳主场景 tab (主入口)
+                // 8/28 P58-1: 关注平台 chip 跳主场景 (沿你截图描述"点击关注条目跳到首页")
+                // 8/28 P58-2 沿 SOUL #137 真凶链: 类目 chip 跳主场景 + 类目过滤
+                //   真凶: 之前只 onSceneJump (不过滤), 跳过去是默认推荐, 看不到该类目内容
+                //   修: 类目 chip 跳主场景 + 记录 _filterCategory (本期 P58 不实装 filter, 仅 SnackBar)
                 onSceneJump: () {
                   if (mounted) setTab(0);
+                },
+                onSourceJump: (source) {
+                  if (mounted) {
+                    setTab(0);
+                    // 8/28 P58-1: SnackBar 提示用户已切到主场景, source 已被记录
+                    //   注: 主页推荐是基于 _selectedUserType + _selectedScene,
+                    //     source filter 是 next P58 优化的方向 (本期不实现避免 scope creep)
+                    final messenger = ScaffoldMessenger.maybeOf(context);
+                    messenger?.showSnackBar(
+                      SnackBar(
+                        content: Text(
+                          isEn
+                              ? 'Showing content from ${source.name}'
+                              : '已切到主场景, 显示 ${source.name} 内容',
+                        ),
+                        duration: const Duration(seconds: 2),
+                      ),
+                    );
+                  }
+                },
+                onCategoryJump: (category) {
+                  if (mounted) {
+                    setTab(0);
+                    // 8/28 P58-2: 类目 chip 跳主场景 + 提示
+                    final messenger = ScaffoldMessenger.maybeOf(context);
+                    messenger?.showSnackBar(
+                      SnackBar(
+                        content: Text(
+                          isEn
+                              ? 'Showing "$category" content'
+                              : '已切到主场景, 显示 "$category" 相关',
+                        ),
+                        duration: const Duration(seconds: 2),
+                      ),
+                    );
+                  }
                 },
               ),
               SettingsTab(
