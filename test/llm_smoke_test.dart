@@ -40,4 +40,28 @@ void main() {
           reason: 'Call $i 不应 fallback');
     }
   }, timeout: const Timeout(Duration(seconds: 60)));
+
+  // 8/28 P49-5 沿 SOUL #137 真凶链: AI 摘要 streaming test
+  //   真凶: 之前 _generateAiSummary 用 generateRaw 阻塞 5-15s
+  //   修: 改 chatStream 流式, 用户立刻看到第 1 token
+  test('AI 摘要 streaming (generateRaw → chatStream refactor)', () async {
+    final messages = [
+      {'role': 'user', 'content': 'say hi in 3 words'},
+    ];
+    final chunks = <String>[];
+    final sw = Stopwatch()..start();
+    await for (final chunk in LlmService.chatStream(messages: messages)) {
+      chunks.add(chunk);
+      // 验证第一 chunk 应在 10s 内到 (流式响应)
+      if (chunks.length == 1) {
+        sw.stop();
+        print('First chunk 在 ${sw.elapsedMilliseconds}ms 到');
+        expect(sw.elapsedMilliseconds < 10000, true,
+            reason: '首 chunk 应 < 10s (流式 vs 阻塞)');
+      }
+    }
+    expect(chunks.isNotEmpty, true,
+        reason: 'streaming 应有至少 1 chunk');
+    print('总 chunks: ${chunks.length}, content: "${chunks.join()}"');
+  }, timeout: const Timeout(Duration(seconds: 30)));
 }

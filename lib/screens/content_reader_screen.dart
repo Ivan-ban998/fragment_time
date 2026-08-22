@@ -187,11 +187,19 @@ class _ContentReaderScreenState extends State<ContentReaderScreen> {
       // 8/28 P43-1 治本 (沿 SOUL #189 智): 120s → 30s timeout (1.5b/7b 已 cache 5-15s 出)
       //   真凶: 之前 120s 超长, 用户 1.5b 慢响应干等 2 分钟
       //   修: 30s (沿 P32-3 1桶优化, 7b 5.7s 充裕 + Ollama fallback 15s 已加)
-      final result = await LlmService.generateRaw(prompt, isEn: widget.isEn)
-                    .timeout(const Duration(seconds: 30));
+      //   8/28 P49-5: 改用 chatStream (streaming) 让用户看到渐进
+      //   真凶: 之前 generateRaw 阻塞 5-15s, 用户看到 "AI 摘要加载中" 卡顿
+      //   修: chatStream 流式输出, 用户立刻看到第 1 token
+      final buf = StringBuffer();
+      await for (final chunk in LlmService.chatStream(messages: [
+        {'role': 'user', 'content': prompt},
+      ]).timeout(const Duration(seconds: 30))) {
+        if (!mounted) return;
+        buf.write(chunk);
+      }
       if (!mounted) return;
       setState(() {
-        _aiSummary = result.trim();
+        _aiSummary = buf.toString().trim();
         _aiSummaryLoading = false;
       });
     } catch (e) {
