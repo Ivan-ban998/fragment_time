@@ -61,7 +61,9 @@ enum ContentSource {
   news36kr('36氪', Icons.business_center, true),
   zhihu('知乎', Icons.forum, false),
   bilibili('B站', Icons.play_circle_filled, true),
-  applePodcasts('Apple Podcasts', Icons.podcasts, false),
+    // 8/28 P63-A 沿 SOUL #169 不撒谎: 加 netease 来源 (原 ximalaya.com/search 404 治本)
+    netease('网易云', Icons.music_note, true),
+    applePodcasts('Apple Podcasts', Icons.podcasts, false),
   spotify('Spotify', Icons.music_note, false),
   youtube('YouTube', Icons.play_circle_outline, false),
   rss('RSS订阅', Icons.rss_feed, true);
