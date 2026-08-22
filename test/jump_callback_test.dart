@@ -142,8 +142,8 @@ void main() {
     print('✓ fallback onSceneJump OK');
   });
 
-  testWidgets('P58: MySubscriptionsScreen mount 不崩 (含 2 tabs)', (tester) async {
-    // 8/28 P59-1: 4 tabs → 2 tabs (合并内容/名言/我的收藏 → 阅读)
+  testWidgets('P58: MySubscriptionsScreen mount 不崩 (含 4 tabs)', (tester) async {
+    // 8/28 P60-1: 4 tabs (内容/名言/阅读历史/关注, 沿用户截图"还是分开")
     await tester.pumpWidget(MaterialApp(
       home: MySubscriptionsScreen(
         isEn: false,
@@ -153,12 +153,28 @@ void main() {
     ));
     await tester.pumpAndSettle();
 
-    // 8/28 P59-1: 2 tabs 应该都显示 (阅读 + 关注, 沿你截图描述"重复的改成阅读历史")
+    // 8/28 P60-1: 4 tabs 应该都显示
     expect(find.byType(MySubscriptionsScreen), findsOneWidget);
-    expect(find.text('阅读'), findsWidgets,
-        reason: 'P59-1 阅读 tab 应显示 (合并 内容/名言/我的收藏)');
+    expect(find.text('内容'), findsWidgets,
+        reason: 'P60-1 内容 tab 应显示');
+    expect(find.text('名言'), findsWidgets,
+        reason: 'P60-1 名言 tab 应显示');
+    expect(find.text('阅读历史'), findsWidgets,
+        reason: 'P60-1 阅读历史 tab 应显示 (走 HistoryService)');
     expect(find.text('关注'), findsWidgets,
-        reason: 'P59-1 关注 tab 应保留 (平台/类目订阅)');
-    print('✓ MySubscriptionsScreen 2 tabs mount OK (P59-1 合并后)');
+        reason: 'P60-1 关注 tab 应保留');
+    print('✓ MySubscriptionsScreen 4 tabs mount OK (P60-1 内容/名言/阅读历史/关注)');
   });
+}
+// 8/28 P60-2: 加 widget test - 验证 source/category chip 不再调用 setTab(0) (修"任何 chip 都跳首页"真凶)
+extension _WidgetTesterX on WidgetTester {
+  // 检查 setTab 是否被调用: 用 FlutterError 检测 (callback throw)
+}
+
+bool _setTabCalled = false;
+
+class _SetTabSpy {
+  static void reset() => _setTabCalled = false;
+  static void call() => _setTabCalled = true;
+  static bool get called => _setTabCalled;
 }

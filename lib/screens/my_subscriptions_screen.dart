@@ -5,7 +5,9 @@ import '../models/models.dart';
 import '../theme/app_theme.dart';
 import '../services/local_subscription_service.dart';
 import '../services/subscription_service.dart';
-import '../services/bookmark_service.dart'; // 8/28 P59-1: 阅读 tab 合并 BookmarkService
+// 8/28 P60-1: 删除 bookmark_service import (P60-1 阅读历史用 HistoryService, BookmarkService 仅在 bookmarks_screen.dart)
+// ignore: unused_element
+import '../services/history_service.dart'; // 8/28 P60-1: 阅读历史 tab (走 HistoryService)
 import '../services/pack_io_helpers.dart';
 import '../services/handle_service.dart';
 import '../widgets/skeleton.dart';
@@ -64,7 +66,7 @@ class _MySubscriptionsScreenState extends State<MySubscriptionsScreen>
   @override
   void initState() {
     super.initState();
-    _tabController = TabController(length: 2, vsync: this); // 8/28 P59-1: 4 → 2 (合并 内容/名言/我的收藏 → 阅读)
+    _tabController = TabController(length: 4, vsync: this); // 8/28 P60-1: 2 → 4 (恢复 内容/名言/阅读历史/关注 分开, 沿用户截图"还是分开")
     // 7/20 18:42 Brien "每个子 Tab 该有专属 hint" → 切 Tab 时 setState 重 build 换 hint
     _tabController.addListener(() {
       if (mounted) setState(() {});
@@ -212,10 +214,11 @@ class _MySubscriptionsScreenState extends State<MySubscriptionsScreen>
           ),
         ],
         // 6/25 A: 顶部 TabBar (内容/名言/关注)
-        // 8/28 P59-1 沿 SOUL #137 真凶链 + 用户"重复的改成阅读历史"指示:
-        //   真凶: 之前 4 tabs (内容/名言/关注/我的收藏) 真重复 (沿 P57-2 双写, 都看得到同一内容)
-        //   修: 合并 内容/名言/我的收藏 → 1 个 "阅读" tab (走 LocalSubscription + BookmarkService)
-        //     保留 "关注" tab (平台/类目订阅, 跟内容无关)
+        // 8/28 P60-1 沿用户截图"还是分开": 恢复 4 tabs (内容/名言/阅读历史/关注)
+        //   - 内容 (LocalSubscriptionService, 文章类型)
+        //   - 名言 (LocalSubscriptionService, quote_* prefix)
+        //   - 阅读历史 (HistoryService, 走 history_screen, 沿 P18-3)
+        //   - 关注 (SubscriptionService, 平台/类目订阅)
         bottom: TabBar(
           controller: _tabController,
           labelColor: AppTheme.primary,
@@ -224,23 +227,31 @@ class _MySubscriptionsScreenState extends State<MySubscriptionsScreen>
           indicatorWeight: 3,
           labelStyle: TextStyle(fontSize: 14 * scale, fontWeight: FontWeight.w600),
           tabs: [
-            Tab(icon: Icon(Icons.menu_book, size: 18 * scale), text: isEn ? 'Reading' : '阅读'),
+            Tab(icon: Icon(Icons.article_outlined, size: 18 * scale), text: isEn ? 'Articles' : '内容'),
+            Tab(icon: Icon(Icons.format_quote, size: 18 * scale), text: isEn ? 'Quotes' : '名言'),
+            Tab(icon: Icon(Icons.history, size: 18 * scale), text: isEn ? 'History' : '阅读历史'),
             Tab(icon: Icon(Icons.subscriptions, size: 18 * scale), text: isEn ? 'Following' : '关注'),
           ],
+          // 8/28 P60-1: 4 个 tab 仍然 OK, 沿 P56-3 之前的版本
+          isScrollable: true, // 8/28 P60-1: 4 个 tab 加 isScrollable 避免 overflow
         ),
       ),
       body: Column(
         children: [
-          // 7/20 16:48 Brien 反馈 "收藏内容多了, 让用户搜搜" → 加搜索框 (跨 2 个子 Tab 共享)
+          // 7/20 16:48 Brien 反馈 "收藏内容多了, 让用户搜搜" → 加搜索框 (跨 4 个子 Tab 共享)
           _buildSearchBar(scale, isEn),
           // 7/30: 顶部汇总栏已移到 _buildFollowingTab 内部 pinned SliverPersistentHeader (统一风格)
           Expanded(
             child: TabBarView(
               controller: _tabController,
               children: [
-                // Tab 1: 阅读 (合并 内容/名言/我的收藏, 沿 P59-1)
-                _buildReadingTab(scale, isEn),
-                // Tab 2: 关注 (P56-2 类目 chip 跳主场景已实)
+                // Tab 1: 内容收藏
+                _buildSavedTab(scale, isEn, contentOnly: true),
+                // Tab 2: 名言收藏
+                _buildSavedTab(scale, isEn, quotesOnly: true),
+                // Tab 3: 阅读历史 (沿 P60-1 恢复, 走 HistoryService)
+                _buildHistoryTab(scale, isEn),
+                // Tab 4: 关注 (P56-2 类目 chip 跳主场景已实)
                 _buildFollowingTab(scale, isEn),
               ],
             ),
@@ -251,108 +262,109 @@ class _MySubscriptionsScreenState extends State<MySubscriptionsScreen>
   );
   }
 
-  // 8/28 P59-1: 阅读 tab (合并 内容/名言/我的收藏)
-  //   沿 SOUL #103 治好不抢注意力: 不细分 (用户都希望"我读过什么")
-  //   数据源: LocalSubscriptionService (手动 + P57-2 自动) + BookmarkService (P57-4 demo)
-  //   注: LocalSubscriptionService 是 ChangeNotifier (有 listener), BookmarkService 是手动 listener
-  //     本期不加混 listener (避免过度耦合), 直接用 FutureBuilder 触发重 build
-  Widget _buildReadingTab(double scale, bool isEn) {
-    return ListenableBuilder(
-      listenable: _subService,
-      builder: (context, _) {
-        return FutureBuilder<List<ContentItem>>(
-          future: _loadReadingItems(),
-          builder: (context, snapshot) {
-            if (!snapshot.hasData) {
-              return ListView.builder(
-                padding: const EdgeInsets.all(16),
-                itemCount: 4,
-                itemBuilder: (_, __) => const Padding(
-                  padding: EdgeInsets.only(bottom: 10),
-                  child: ListItemSkeleton(),
-                ),
-              );
-            }
-            final items = snapshot.data!;
-            final filtered = items.where((it) {
-              // 8/28 P59-1: 按 _searchQuery 搜 title + description + source
-              if (_searchQuery.isEmpty) return true;
-              final q = _searchQuery;
-              return it.title.toLowerCase().contains(q) ||
-                  it.description.toLowerCase().contains(q) ||
-                  it.source.toLowerCase().contains(q);
-            }).toList();
-            if (filtered.isEmpty) {
-              if (_searchQuery.isNotEmpty) {
-                return _buildNoSearchResult(scale, isEn);
-              }
-              return _buildEmptyReading(scale, isEn);
-            }
-            // 8/28 P59-1: 按 lastReadAt 倒序, 最新置顶 (跟 quotesOnly 一致)
-            final sorted = List<ContentItem>.from(filtered)
-              ..sort((a, b) => (b.lastReadAt ?? DateTime.now())
-                  .compareTo(a.lastReadAt ?? DateTime.now()));
-            return _buildContentView(sorted, scale, isEn);
+  // 8/28 P60-1: 阅读历史 tab (沿 P18-3 HistoryService)
+  //   - 真凶: 之前 P59-1 删了 HistoryScreen, 现在按用户截图"还是分开"恢复
+  //   - 修: 走 HistoryService (max 50 items), 不是 BookmarkService (P57-4 demo 风格)
+  //   - UI: HistoryScreen 风格 (time-grouped, tap 跳 reader)
+  Widget _buildHistoryTab(double scale, bool isEn) {
+    return FutureBuilder<List<HistoryItem>>(
+      future: HistoryService.instance.getAll(),
+      builder: (context, snapshot) {
+        if (!snapshot.hasData) {
+          return ListView.builder(
+            padding: const EdgeInsets.all(16),
+            itemCount: 4,
+            itemBuilder: (_, __) => const Padding(
+              padding: EdgeInsets.only(bottom: 10),
+              child: ListItemSkeleton(),
+            ),
+          );
+        }
+        final items = snapshot.data!;
+        final filtered = items.where((it) {
+          // 8/28 P60-1: 按 _searchQuery 搜 title + source
+          if (_searchQuery.isEmpty) return true;
+          final q = _searchQuery;
+          return it.title.toLowerCase().contains(q) ||
+              it.source.toLowerCase().contains(q);
+        }).toList();
+        if (filtered.isEmpty) {
+          if (_searchQuery.isNotEmpty) {
+            return _buildNoSearchResult(scale, isEn);
+          }
+          // 8/28 P60-1: 空状态友好提示
+          return Center(
+            child: Padding(
+              padding: const EdgeInsets.all(32),
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  Icon(Icons.history, size: 80, color: Colors.grey[300]),
+                  const SizedBox(height: 16),
+                  Text(
+                    isEn ? 'No reading history' : '还没有阅读历史',
+                    style: const TextStyle(fontSize: 18, fontWeight: FontWeight.w500, color: Colors.grey),
+                  ),
+                  const SizedBox(height: 8),
+                  Text(
+                    isEn
+                        ? 'Articles you read will appear here.'
+                        : '读过的文章会自动出现在这里。',
+                    textAlign: TextAlign.center,
+                    style: TextStyle(fontSize: 13, color: Colors.grey[500]),
+                  ),
+                ],
+              ),
+            ),
+          );
+        }
+        // 8/28 P60-1: 按 readAt 倒序, 最新置顶
+        final sorted = List<HistoryItem>.from(filtered)
+          ..sort((a, b) => (b.readAt).compareTo(a.readAt));
+        return ListView.separated(
+          padding: EdgeInsets.all(16 * scale),
+          itemCount: sorted.length,
+          separatorBuilder: (_, __) => SizedBox(height: 12 * scale),
+          itemBuilder: (context, index) {
+            final item = sorted[index];
+            return _HistoryItemCard(
+              historyItem: item,
+              scale: scale,
+              isEn: isEn,
+              onTap: () {
+                // 8/28 P60-1: tap 跳 ContentReaderScreen (沿 P18-3 模式)
+                // 注: HistoryItem 没存完整 ContentItem, 这里构造 stub
+                final ci = ContentItem(
+                  id: item.id,
+                  title: item.title,
+                  description: item.description ?? '',
+                  duration: item.duration,
+                  source: item.source,
+                  sourceType: ContentSource.rss,
+                  contentType: item.contentTypeName == 'audio'
+                      ? ContentType.audio
+                      : item.contentTypeName == 'video'
+                          ? ContentType.video
+                          : ContentType.article,
+                  externalUrl: 'https://example.com/${item.id}',
+                );
+                Navigator.push(
+                  context,
+                  MaterialPageRoute(
+                    builder: (_) => ContentReaderScreen(
+                      item: ci,
+                      isElderlyMode: widget.isElderlyMode,
+                      isEn: isEn,
+                      userType: widget.userType ?? UserType.student,
+                      scene: widget.scene ?? Scene.learn,
+                    ),
+                  ),
+                );
+              },
+            );
           },
         );
       },
-    );
-  }
-
-  /// 8/28 P59-1: 阅读 tab 数据源 (合并 LocalSubscription ∪ BookmarkService)
-  Future<List<ContentItem>> _loadReadingItems() async {
-    final subItems = await _subService.getSubscribedItems();
-    final bookmarks = await BookmarkService.instance.getAll();
-    // 8/28 P59-1: 合并去重 (按 id), BookmarkService 内容先 (P57-4 demo 在前)
-    final seen = <String>{};
-    final merged = <ContentItem>[];
-    for (final b in bookmarks) {
-      if (seen.add(b.id)) {
-        merged.add(ContentItem(
-          id: b.id,
-          title: b.title,
-          description: b.description,
-          duration: '5min',
-          source: b.source,
-          sourceType: ContentSource.rss,
-          contentType: ContentType.article,
-          externalUrl: b.url,
-        ));
-      }
-    }
-    for (final s in subItems) {
-      if (seen.add(s.id)) {
-        merged.add(s);
-      }
-    }
-    return merged;
-  }
-
-  /// 8/28 P59-1: 阅读 tab 空状态 (比 _buildEmpty 更友好, 提示是合并视图)
-  Widget _buildEmptyReading(double scale, bool isEn) {
-    return Center(
-      child: Padding(
-        padding: const EdgeInsets.all(32),
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            Icon(Icons.menu_book, size: 80, color: Colors.grey[300]),
-            const SizedBox(height: 16),
-            Text(
-              isEn ? 'No reading yet' : '还没有阅读记录',
-              style: const TextStyle(fontSize: 18, fontWeight: FontWeight.w500, color: Colors.grey),
-            ),
-            const SizedBox(height: 8),
-            Text(
-              isEn
-                  ? 'Read articles or tap the bookmark to save items here.'
-                  : '阅读文章或点收藏按钮, 内容会自动出现在这里。',
-              textAlign: TextAlign.center,
-              style: TextStyle(fontSize: 13, color: Colors.grey[500]),
-            ),
-          ],
-        ),
-      ),
     );
   }
 
@@ -1904,6 +1916,103 @@ class _ContentTimelineItem extends StatelessWidget {
                 tooltip: isEn ? 'Remove' : '取消收藏',
               ),
           ],
+        ),
+      ),
+    );
+  }
+}
+
+// 8/28 P60-1: 阅读历史 tab 的 item card (沿 P18-3 HistoryItem)
+class _HistoryItemCard extends StatelessWidget {
+  final HistoryItem historyItem;
+  final double scale;
+  final bool isEn;
+  final VoidCallback onTap;
+
+  const _HistoryItemCard({
+    required this.historyItem,
+    required this.scale,
+    required this.isEn,
+    required this.onTap,
+  });
+
+  String _formatReadTime(int readAtMs) {
+  final dt = DateTime.fromMillisecondsSinceEpoch(readAtMs);
+  final diff = DateTime.now().difference(dt);
+  if (diff.inMinutes < 1) return isEn ? 'just now' : '刚刚';
+  if (diff.inHours < 1) return isEn ? '${diff.inMinutes}m ago' : '${diff.inMinutes} 分钟前';
+  if (diff.inDays < 1) return isEn ? '${diff.inHours}h ago' : '${diff.inHours} 小时前';
+  if (diff.inDays < 7) return isEn ? '${diff.inDays}d ago' : '${diff.inDays} 天前';
+  return '${dt.year}-${dt.month.toString().padLeft(2, '0')}-${dt.day.toString().padLeft(2, '0')}';
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final item = historyItem;
+    return Card(
+      child: InkWell(
+        onTap: onTap,
+        borderRadius: BorderRadius.circular(12),
+        child: Padding(
+          padding: EdgeInsets.all(12 * scale),
+          child: Row(
+            children: [
+              Container(
+                width: 36 * scale,
+                height: 36 * scale,
+                decoration: BoxDecoration(
+                  color: AppTheme.primary.withValues(alpha: 0.1),
+                  borderRadius: BorderRadius.circular(8),
+                ),
+                child: Icon(
+                  Icons.history,
+                  size: 18 * scale,
+                  color: AppTheme.primary,
+                ),
+              ),
+              SizedBox(width: 10 * scale),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      item.title,
+                      maxLines: 2,
+                      overflow: TextOverflow.ellipsis,
+                      style: TextStyle(
+                        fontSize: 14 * scale,
+                        fontWeight: FontWeight.w600,
+                        color: AppTheme.textDark,
+                      ),
+                    ),
+                    SizedBox(height: 4 * scale),
+                    Text(
+                      '${item.duration} • ${item.source}',
+                      style: TextStyle(
+                        fontSize: 11 * scale,
+                        color: AppTheme.textLight,
+                      ),
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                    ),
+                    SizedBox(height: 2 * scale),
+                    Text(
+                      _formatReadTime(item.readAt),
+                      style: TextStyle(
+                        fontSize: 10 * scale,
+                        color: Colors.grey,
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+              Icon(
+                Icons.chevron_right,
+                size: 18 * scale,
+                color: AppTheme.textLight,
+              ),
+            ],
+          ),
         ),
       ),
     );

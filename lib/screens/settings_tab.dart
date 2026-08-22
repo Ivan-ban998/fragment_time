@@ -21,6 +21,8 @@ import 'about_screen.dart';
 
 class SettingsTab extends StatelessWidget {
   // 6/10 加: build 版本号常量（dart-define 注入）
+  // 8/28 P60-3: 旧版"关于"折叠已删, _kBuildVersion 保留 (供 rollback + 旧版菜单可见)
+// ignore: unused_field
   static const String _kBuildVersion = String.fromEnvironment('BUILD_VERSION', defaultValue: 'dev');
 
   final AppConfig config;
@@ -120,6 +122,8 @@ class SettingsTab extends StatelessWidget {
   }
 
   // 6/12 加: 隐私政策弹窗
+  // 8/28 P60-3: 旧版"关于"折叠已删, _showPrivacyPolicy 保留 (供 rollback + 旧版菜单可见)
+// ignore: unused_element
   Future<void> _showPrivacyPolicy(BuildContext context, bool isEn) async {
     final scale = isElderlyMode ? 1.3 : 1.0;
     final lines = isEn
@@ -476,12 +480,24 @@ class SettingsTab extends StatelessWidget {
             //       },
             //     ),
             //   ),
-            // 7/14: About FragmentTime 入口 (推到 AboutScreen 实例 + 让 build() 不被 tree-shake)
+// 8/28 P60-3 沿用户新反馈"关于和关于fragment_time 可以合并"修:
+//   真凶: 设置 tab 有 2 个"关于" Card 真重复:
+//     - "About FragmentTime" (line 481) → AboutScreen (含完整品牌 + 隐私 + 版权 + 路线图)
+//     - "关于" 折叠 (line 586) → _showPrivacyPolicy (弹窗, 显示简短隐私 + 版权)
+//   修: 合并 1 个 "About" Card, AboutScreen 已含完整内容
+//     (沿 SOUL #103 治好不抢注意力, 跟 tab-收藏 4 tabs 同样思路: 不重复)
+//   旧版"关于" 折叠代码保留供参考 (沿 SOUL #6 能跑起来 > 等完美答案):
+//     ExpansionTile(
+//       leading: Icon(Icons.info_outline, size: 24 * scale, color: AppTheme.textLight),
+//       title: Text(isEn ? 'About' : '关于', ...),
+//       children: [ListTile(...privacy), ListTile(...copyright)],
+//     )
             Card(
               child: ListTile(
                 leading: Icon(Icons.info_outline, size: 24 * scale, color: AppTheme.primary),
-                title: Text(isEn ? 'About FragmentTime' : '关于 FragmentTime', style: TextStyle(fontSize: 16 * scale, fontWeight: FontWeight.w600)),
-                subtitle: Text(isEn ? 'Brand, version, project constitution' : '品牌/版本/项目宪法', style: TextStyle(fontSize: 13 * scale)),
+                // 8/28 P60-3: 改名 'About FragmentTime' → 'About' (简洁, 已含 FragmentTime)
+                title: Text(isEn ? 'About' : '关于', style: TextStyle(fontSize: 16 * scale, fontWeight: FontWeight.w600)),
+                subtitle: Text(isEn ? 'Brand, version, privacy, copyright, roadmap' : '品牌/版本/隐私/版权/路线图', style: TextStyle(fontSize: 13 * scale)),
                 trailing: Icon(Icons.chevron_right, size: 24 * scale, color: AppTheme.textLight),
                 onTap: () {
                   Navigator.push(
@@ -579,38 +595,25 @@ class SettingsTab extends StatelessWidget {
               onTap: () => _showWeeklyRecap(context, isEn),
               child: _WeeklyRecapCard(isEn: isEn, scale: scale),
             ),
+            // 8/28 P60-3 沿用户新反馈"关于和关于fragment_time 可以合并"修:
+            //   旧版"关于"折叠已删除 (沿 SOUL #103 治好不抢注意力)
+            //   隐私 + 版权都在 AboutScreen 里 (沿 P18-3)
+            //   旧版代码保留供参考:
+            //     Card(
+            //       child: Theme(
+            //         data: Theme.of(context).copyWith(dividerColor: Colors.transparent),
+            //         child: ExpansionTile(
+            //           leading: Icon(Icons.info_outline, size: 24 * scale, color: AppTheme.textLight),
+            //           title: Text(isEn ? 'About' : '关于', style: TextStyle(fontSize: 16 * scale, fontWeight: FontWeight.w600)),
+            //           subtitle: Text('${config.appName} · ${SettingsTab._kBuildVersion}', ...),
+            //           children: [
+            //             ListTile(...privacy),
+            //             ListTile(...copyright),
+            //           ],
+            //         ),
+            //       ),
+            //     ),
             SizedBox(height: 16 * scale),
-            // 6/12 改: 关于 折叠
-            Card(
-              child: Theme(
-                data: Theme.of(context).copyWith(dividerColor: Colors.transparent),
-                child: ExpansionTile(
-                  leading: Icon(Icons.info_outline, size: 24 * scale, color: AppTheme.textLight),
-                  title: Text(isEn ? 'About' : '关于', style: TextStyle(fontSize: 16 * scale, fontWeight: FontWeight.w600)),
-                  subtitle: Text(
-                    '${config.appName} · ${SettingsTab._kBuildVersion}',
-                    style: TextStyle(fontSize: 12 * scale),
-                  ),
-                  initiallyExpanded: false,
-                  childrenPadding: EdgeInsets.zero,
-                  children: [
-                    ListTile(
-                      leading: Icon(Icons.security, size: 22 * scale),
-                      title: Text(isEn ? 'Privacy Policy' : '隐私政策', style: TextStyle(fontSize: 15 * scale)),
-                      subtitle: Text(isEn ? 'No data collected' : '不收集任何数据', style: TextStyle(fontSize: 12 * scale)),
-                      trailing: Icon(Icons.chevron_right, size: 20 * scale),
-                      onTap: () => _showPrivacyPolicy(context, isEn),
-                    ),
-                    Divider(height: 1, indent: 56),
-                    ListTile(
-                      leading: Icon(Icons.copyright, size: 22 * scale),
-                      title: Text(isEn ? 'Copyright' : '版权声明', style: TextStyle(fontSize: 15 * scale)),
-                      subtitle: Text(config.copyrightFooter, style: TextStyle(fontSize: 11 * scale)),
-                    ),
-                  ],
-                ),
-              ),
-            ),
           ]),
             ),
           ),

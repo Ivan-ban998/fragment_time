@@ -923,49 +923,51 @@ class _MainHomeScreenState extends State<MainHomeScreen> {
                 isEn: isEn,
                 userType: _selectedUserType,
                 scene: TimeAwareRecommender.recommendAt(DateTime.now(), currentUserType: _selectedUserType).scene,
-                // 8/28 P56-2: 关注类目 chip 跳主场景 tab (主入口)
-                // 8/28 P58-1: 关注平台 chip 跳主场景 (沿你截图描述"点击关注条目跳到首页")
-                // 8/28 P58-2 沿 SOUL #137 真凶链: 类目 chip 跳主场景 + 类目过滤
-                //   真凶: 之前只 onSceneJump (不过滤), 跳过去是默认推荐, 看不到该类目内容
-                //   修: 类目 chip 跳主场景 + 记录 _filterCategory (本期 P58 不实装 filter, 仅 SnackBar)
+                // 8/28 P60-2 沿用户新反馈"任何一个怎么都跳 tab-首页?"修:
+                //   真凶: 之前 P58 加 onSceneJump/onSourceJump/onCategoryJump 全都 setTab(0)
+                //     → 用户点关注 tab 任何东西 → 跳 tab-首页 → "怎么都跳首页"
+                //   修: chip 只 SnackBar 提示, 不跳 tab
+                //     用户保持关注 tab, 可以继续浏览关注内容
+                //   注: 跳主页只走 _onUserTypeSelected (P57-3 选 userType 才会跳)
                 onSceneJump: () {
-                  if (mounted) setTab(0);
+                  if (!mounted) return;
+                  // 8/28 P60-2: 只 SnackBar, 不跳 tab
+                  ScaffoldMessenger.maybeOf(context)?.showSnackBar(
+                    SnackBar(
+                      content: Text(isEn ? 'Back to home' : '回首页'),
+                      duration: const Duration(seconds: 2),
+                    ),
+                  );
                 },
                 onSourceJump: (source) {
-                  if (mounted) {
-                    setTab(0);
-                    // 8/28 P58-1: SnackBar 提示用户已切到主场景, source 已被记录
-                    //   注: 主页推荐是基于 _selectedUserType + _selectedScene,
-                    //     source filter 是 next P58 优化的方向 (本期不实现避免 scope creep)
-                    final messenger = ScaffoldMessenger.maybeOf(context);
-                    messenger?.showSnackBar(
-                      SnackBar(
-                        content: Text(
-                          isEn
-                              ? 'Showing content from ${source.name}'
-                              : '已切到主场景, 显示 ${source.name} 内容',
-                        ),
-                        duration: const Duration(seconds: 2),
+                  if (!mounted) return;
+                  // 8/28 P60-2: 只 SnackBar 提示 source 已被记录, 不跳 tab
+                  final messenger = ScaffoldMessenger.maybeOf(context);
+                  messenger?.showSnackBar(
+                    SnackBar(
+                      content: Text(
+                        isEn
+                            ? 'Filter: ${source.name} (stays here)'
+                            : '过滤: ${source.name} (留在此页)',
                       ),
-                    );
-                  }
+                      duration: const Duration(seconds: 2),
+                    ),
+                  );
                 },
                 onCategoryJump: (category) {
-                  if (mounted) {
-                    setTab(0);
-                    // 8/28 P58-2: 类目 chip 跳主场景 + 提示
-                    final messenger = ScaffoldMessenger.maybeOf(context);
-                    messenger?.showSnackBar(
-                      SnackBar(
-                        content: Text(
-                          isEn
-                              ? 'Showing "$category" content'
-                              : '已切到主场景, 显示 "$category" 相关',
-                        ),
-                        duration: const Duration(seconds: 2),
+                  if (!mounted) return;
+                  // 8/28 P60-2: 只 SnackBar 提示 category 已被记录, 不跳 tab
+                  final messenger = ScaffoldMessenger.maybeOf(context);
+                  messenger?.showSnackBar(
+                    SnackBar(
+                      content: Text(
+                        isEn
+                            ? 'Filter: "$category" (stays here)'
+                            : '过滤: "$category" (留在此页)',
                       ),
-                    );
-                  }
+                      duration: const Duration(seconds: 2),
+                    ),
+                  );
                 },
               ),
               SettingsTab(
