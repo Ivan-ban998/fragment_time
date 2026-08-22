@@ -30,7 +30,35 @@ class RssItem {
     required this.sourceName,
   });
 
-  /// 8/8 加 (沿 SOUL #189): disk cache 序列化
+  /// 8/28 P53-3 沿 SOUL #189 智: 优质度评分 (0-100)
+  ///   真凶: 之前用户收藏条目后, 看推荐时无质量区分
+  ///     → "库里" 全是 RSS 源, 不知道哪个新 + 哪个受欢迎
+  ///   修: 综合 3 维度
+  ///     - 新鲜度 (40%): pubDate 距今小时数 (1h=100, 168h=0)
+  ///     - 源热度 (30%): 5 大平台默认高分 (sspai/36kr/知乎/B站/喜马拉雅)
+  ///     - 标题长度 (30%): 8-25 字最易读 (避免过短/过长)
+  int get qualityScore {
+    // 1. 新鲜度 (40%)
+    final ageHours = DateTime.now().difference(pubDate).inHours.clamp(0, 168);
+    final freshness = (40 * (1 - ageHours / 168)).round();
+    // 2. 源热度 (30%) — 5 大主流源
+    //   沿 SOUL #189 智: 不区分空格 + 特殊字符 (36氪 = 36 氪)
+    final hotSources = ['sspai', '36kr', '36氪', '知乎', 'B站', 'bilibili', '喜马拉雅', 'ximalaya', 'NPR', 'solidot'];
+    final sourceNorm = sourceName.replaceAll(' ', '').toLowerCase();
+    final popularity = hotSources.any((s) => sourceNorm.contains(s.toLowerCase())) ? 30 : 15;
+    // 3. 标题长度 (30%) — 8-25 字最佳
+    final titleLen = title.length;
+    final titleScore = titleLen < 8 ? (titleLen * 30 ~/ 8)
+        : titleLen <= 25 ? 30
+        : titleLen <= 40 ? (30 - (titleLen - 25) * 2).clamp(0, 30)
+        : 0;
+    return freshness + popularity + titleScore;
+  }
+
+  /// 8/28 P53-3: 是否为 "优质最新" (score >= 60 + 1 week fresh)
+  bool get isQualityFresh => qualityScore >= 60 && DateTime.now().difference(pubDate).inDays <= 7;
+
+  /// 8/28 P53-3: 序列化
   Map<String, dynamic> toJson() => {
         't': title,
         'u': url,
