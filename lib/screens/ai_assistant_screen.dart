@@ -7,7 +7,6 @@ import '../theme/glass_decoration.dart';
 import '../theme/app_theme.dart';
 import '../services/llm_service.dart';
 import '../services/news_service.dart';
-import '../services/rss_service.dart';
 import '../services/audio_play_service.dart';
 import '../services/tts_service.dart';
 import '../services/robot_name_service.dart';
@@ -325,29 +324,80 @@ class _AiAssistantScreenState extends State<AiAssistantScreen> {
     //     不含这些词 → search 全 0 hits → 用户看到 "库里没有 BBC 英语 的匹配"
     //   修: chip 走 RSS 真数据 — 按 prompt.type + userType 映射 scene → 显示 top 3
     //     audio → listen scene, video → workout scene, card/article → learn scene
-    final scene = _sceneForType(prompt.type);
+    // 8/28 P52-1 治本: 进一步按 prompt.realTitle keyword 搜真数据
+    //   真凶: 之前 _sceneForType('audio') 永远返 Scene.listen, 所有 audio chip
+    //     (白噪音/新闻/冥想/商业) 走同一个 scene → 显示同一批 RSS, 用户体感"都一样"
+    //   修: chip label 拆词调 NewsService.search (fuzzy), 命中才渲染 card
+    //     audio chip: 先用 _splitTitleKeywords 拆 prompt.label/realTitle → 搜 RSS
+    //     0 hits → fallback 旧 _sceneForType 路径 (按 scene 显示 top 3)
     final cards = <_ContentCard>[];
+    final newsService = NewsService();
     try {
-      // 8/18 加: chip 跳对应 scene RSS (真数据, 不 search)
-      final rssService = RssService(isInternational: false);
-      final rssItems = await rssService.fetchTop(limit: 3, scene: scene);
-      for (final rssItem in rssItems) {
-        final ci = rssService.toContentItem(rssItem);
-        cards.add(_ContentCard(
-          title: ci.title,
-          type: prompt.type,
-          source: ci.source,
-          duration: ci.duration,
-          url: ci.externalUrl ?? '',
-          audioUrl: ci.audioUrl,
-          realItem: ci,
-        ));
+      // 8/28 P52-1: 优先按 chip label 拆词 + 搜真数据 (沿 #137 治本)
+      //   label 短 (白噪音/今日新闻), 拆词 "白噪音" → 搜 "白噪音"
+      //   label 短关键词命中率高, 避免 0 hits
+      final kwCandidates = <String>[];
+      // 1. label 拆词 (e.g. "白噪音" → ["白噪音"])
+      kwCandidates.addAll(_splitTitleKeywords(prompt.label));
+      // 2. realTitle 拆词 (e.g. "课间 5 分钟：白噪音 + 闭眼" → ["课间", "5", "分钟", "白噪音", "闭眼"])
+      kwCandidates.addAll(_splitTitleKeywords(prompt.realTitle));
+      // 3. emoji + label (沿 P40-2 模式) - 跳过 (emoji 不参与搜索)
+      // dedup
+      final seen = <String>{};
+      final uniqueKw = kwCandidates.where((k) => k.length >= 2 && seen.add(k)).take(5).toList();
+      debugPrint('[ai_assistant chip ${prompt.label}] kw candidates: $uniqueKw');
+      // 依次搜, 命中即停
+      for (final k in uniqueKw) {
+        try {
+          final hits = await newsService.search(k);
+          if (hits.isNotEmpty) {
+            // 8/28 P52-1: 按 prompt.type 优先类型匹配
+            ContentItem? best;
+            for (final it in hits) {
+              if (_matchType(it.contentType, prompt.type)) {
+                best = it;
+                break;
+              }
+            }
+            best ??= hits.first;
+            cards.add(_ContentCard(
+              title: best.title,
+              type: prompt.type,
+              source: best.source,
+              duration: best.duration,
+              url: best.externalUrl ?? '',
+              audioUrl: best.audioUrl,
+              realItem: best,
+            ));
+            break; // 1 keyword hit 就够
+          }
+        } catch (e) { debugPrint('[ai_assistant_] search err: $e'); }
       }
     } catch (e) { debugPrint('[ai_assistant_] err'); }
+    // 8/28 P52-1: 0 hits → 兜底 scene-based 推荐 (旧路径, 沿用 NewsService.getRecommendations)
+    if (cards.isEmpty) {
+      final scene = _sceneForType(prompt.type);
+      final userType = widget.userType ?? UserType.student;
+      try {
+        final items = await newsService.getRecommendations(userType, scene);
+        for (final it in items.take(3)) {
+          cards.add(_ContentCard(
+            title: it.title,
+            type: prompt.type,
+            source: it.source,
+            duration: it.duration,
+            url: it.externalUrl ?? '',
+            audioUrl: it.audioUrl,
+            realItem: it,
+          ));
+        }
+      } catch (e) { debugPrint('[ai_assistant_] err'); }
+    }
     if (!mounted) return;
     _sending = false;
     if (cards.isEmpty) {
       // 8/18 fallback: scene RSS 也没数据时, 显示 stub fallback card (避免 "库里没有")
+      final scene = _sceneForType(prompt.type);
       setState(() {
         _messages.add(_ChatMessage(
           text: widget.isEn
@@ -359,11 +409,16 @@ class _AiAssistantScreenState extends State<AiAssistantScreen> {
       _scheduleSave();
       return;
     }
+    // 8/28 P52-1: 改 prompt.label 标题显示 (让用户知道"点 BBC 真的拿 BBC 相关")
+    final queryKw = _splitTitleKeywords(prompt.label).firstWhere(
+      (k) => k.length >= 2,
+      orElse: () => prompt.realTitle,
+    );
     setState(() {
       _messages.add(_ChatMessage(
         text: widget.isEn
-            ? 'Top ${cards.length} in ${scene.name}:'
-            : '${scene.name} 场景 top ${cards.length}:',
+            ? 'Top ${cards.length} for "$queryKw":'
+            : '"$queryKw" 相关 top ${cards.length}:',
         isUser: false,
         cards: cards,
       ));
